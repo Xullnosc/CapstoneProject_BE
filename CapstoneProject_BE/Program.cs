@@ -1,5 +1,5 @@
 
-using capstone_be.Models;
+using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 

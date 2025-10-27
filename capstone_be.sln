@@ -5,11 +5,11 @@ VisualStudioVersion = 17.11.35222.181
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "capstone_be", "CapstoneProject_BE\capstone_be.csproj", "{5DF21576-B41A-49E0-9AF7-0FB90C2A8D2D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BusinessObjects", "..\CapstoneProject_Server\BusinessObjects\BusinessObjects.csproj", "{D4D60532-3045-49F4-A969-CCCFC14DAA8C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BusinessObjects", "..\CAPSTONE_PROJECT_BE\BusinessObjects\BusinessObjects.csproj", "{D4D60532-3045-49F4-A969-CCCFC14DAA8C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Repositories", "..\CapstoneProject_Server\Repositories\Repositories.csproj", "{F79F78B2-2421-461C-903E-555D490B0634}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Repositories", "..\CAPSTONE_PROJECT_BE\Repositories\Repositories.csproj", "{F79F78B2-2421-461C-903E-555D490B0634}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Services", "..\CapstoneProject_Server\Services\Services.csproj", "{6757EC97-0840-46A0-94E3-84EB474C9EE5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Services", "..\CAPSTONE_PROJECT_BE\Services\Services.csproj", "{6757EC97-0840-46A0-94E3-84EB474C9EE5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -17,5 +17,8 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.6" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
   </ItemGroup>
-
+	<ItemGroup>
+		<ProjectReference Include="..\BusinessObjects\BusinessObjects.csproj" />
+	</ItemGroup>
+	
 </Project>

@@ -11,8 +11,5 @@
     <Folder Include="Implement\" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\DataAccessLayer\DataAccessLayer.csproj" />
-  </ItemGroup>
 
 </Project>
