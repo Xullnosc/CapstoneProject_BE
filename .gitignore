@@ -1,0 +1,86 @@
+# ==============================
+# Build Folders
+# ==============================
+**/bin/
+**/obj/
+**/out/
+
+# ==============================
+# Visual Studio / IDE files
+# ==============================
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.pidb
+*.booproj
+*.svclog
+*.pdb
+*.cache
+*.ide
+*.sln.cache
+*.ncb
+*.opensdf
+*.sdf
+*.dbmdl
+*.opendb
+
+# ==============================
+# Rider / JetBrains IDE
+# ==============================
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# ==============================
+# VS Code
+# ==============================
+.vscode/
+
+# ==============================
+# NuGet Packages
+# ==============================
+**/packages/
+*.nupkg
+# NuGet auto-generated files
+**/project.lock.json
+**/project.fragment.lock.json
+
+# ==============================
+# Logs and Temporary files
+# ==============================
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.resharper
+
+# ==============================
+# Local DB / User secrets
+# ==============================
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/secrets.json
+*.mdf
+*.ldf
+*.sqlite
+*.db
+
+# ==============================
+# Publish / Deployment
+# ==============================
+*.publishsettings
+*.azurePubxml
+*.scmignore
+*.deploy.cmd
+*.deploy-readme.txt
+
+# ==============================
+# Others
+# ==============================
+**/TestResults/
+*.vsix
+.vsconfig
