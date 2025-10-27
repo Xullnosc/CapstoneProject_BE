@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using capstone_be.Models;
+using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
 namespace capstone_be.Controllers
 {
