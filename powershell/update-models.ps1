@@ -1,9 +1,38 @@
 # to update models by deleting them first and then rebuild the models folder from scratch
 # run in the project folder directory
-. (Join-Path $PSScriptRoot "..\powershell\environment-variables.ps1")
-. (Join-Path $PSScriptRoot "..\powershell\functions.ps1")
-Write-Host $devConfigPath
-$conn = Get-ConnectionString -devPath ($devConfigPath) -defaultPath ($defaultConfigPath)
+$envFile = Join-Path $PSScriptRoot "environment-variables.ps1"
+if (Test-Path $envFile) {
+    . $envFile
+    Write-Host "Sourced environment variables from: $envFile"
+}
+else {
+    Write-Verbose "No environment-variables.ps1 found at $envFile; continuing without it."
+}
+
+# Dot-source functions helper if present
+$funcFile = Join-Path $PSScriptRoot "functions.ps1"
+if (Test-Path $funcFile) {
+    . $funcFile
+}
+else {
+    throw "Required helper script not found: $funcFile"
+}
+
+# Try to get connection string. environment-variables.ps1 may set $devConfigPath and $defaultConfigPath
+try {
+    if ($devConfigPath -and (Test-Path $devConfigPath)) {
+        $conn = Get-ConnectionString -SearchPaths @($devConfigPath) -Key 'capstoneDb'
+    }
+    elseif ($defaultConfigPath -and (Test-Path $defaultConfigPath)) {
+        $conn = Get-ConnectionString -SearchPaths @($defaultConfigPath) -Key 'capstoneDb'
+    }
+    else {
+        $conn = Get-ConnectionString
+    }
+}
+catch {
+    throw "Unable to determine connection string: $_"
+}
 
 if (Test-Path ($modelsFolder)) {
     Remove-Item -Recurse -Force ($modelsFolder)
@@ -13,33 +42,29 @@ if (Test-Path ($modelsFolder)) {
 }
 
 
-Write-Host $conn
-dotnet ef dbcontext scaffold $conn Microsoft.EntityFrameworkCore.SqlServer --project (Join-Path $PSScriptRoot "..\BusinessObjects") -o $modelsFolder -c CapstoneDbContext -f --data-annotations
+Write-Host "Connection: $($conn.Substring(0,[Math]::Min(80,$conn.Length)))"
+
+# Ensure the BusinessObjects project path and models folder are absolute
+$projectPath = Resolve-Path -Path (Join-Path $PSScriptRoot "..\BusinessObjects")
+if (-not $projectPath) { throw "BusinessObjects project folder not found." }
+$absModelsFolder = $modelsFolder
+if (-not (Test-Path $absModelsFolder)) {
+    New-Item -ItemType Directory -Path $absModelsFolder -Force | Out-Null
+}
+
+dotnet ef dbcontext scaffold "$conn" Microsoft.EntityFrameworkCore.SqlServer --project "$($projectPath.ProviderPath)" -o "$absModelsFolder" -c CapstoneDbContext -f --data-annotations
 Write-Host "|-------------------------------------------|"
 Write-Host "|-------Database scaffolding completed!-----|"
 Write-Host "|-------------------------------------------|"
 $dbContextPath = Join-Path $modelsFolder "CapstoneDbContext.cs"
 Write-Host $dbContextPath
 if (Test-Path $modelsFolder) {
-    $content = Get-Content $dbContextPath
-    $startLineIndex = -1
-
-    for ($i = 0; $i -lt $content.Count; $i++) {
-        if ($content[$i] -match 'protected override void OnConfiguring') {
-            $startLineIndex = $i
-            break
-        }
-    }
-    if ($startLineIndex -ne -1) {
-        $newContent = New-Object System.Collections.Generic.List[string]
-        for ($i = 0; $i -lt $content.Count; $i++) {
-            if ($i -lt $startLineIndex -or $i -gt ($startLineIndex + 2)) {
-                $newContent.Add($content[$i])
-            }
-        }
-        Start-Sleep -Seconds 5
-        $newContent | Out-File -FilePath $dbContextPath -Encoding UTF8 -Force
-    }
+    $text = Get-Content -Raw -Path $dbContextPath
+    # Remove the OnConfiguring override method block (handles multi-line bodies)
+    $pattern = '(?ms)protected\s+override\s+void\s+OnConfiguring\s*\([^)]*\)\s*\{.*?\n\s*\}'
+    $newText = [regex]::Replace($text, $pattern, '')
+    Start-Sleep -Seconds 1
+    $newText | Out-File -FilePath $dbContextPath -Encoding UTF8 -Force
 }
 
 
