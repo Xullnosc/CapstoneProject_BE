@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using BusinessObjects;
 using BusinessObjects.Models;
 using Google.Apis.Auth;
 using Microsoft.Extensions.Configuration;
@@ -61,10 +62,31 @@ namespace Services
             var fullName = payload.Name;
             var avatar = payload.Picture;
 
+            // 0. Validate if Campus is valid
+            if (string.IsNullOrEmpty(request.Campus) || !CampusConstants.All.Contains(request.Campus))
+            {
+                throw new UnauthorizedAccessException("Cơ sở không hợp lệ. Vui lòng chọn lại.");
+            }
+
             // 2. Check if user is in whitelist
             var whitelistEntry = await _whitelistRepository.GetByEmailAsync(email);
 
-            bool isAuthorized = whitelistEntry != null;
+            bool isAuthorized = false;
+            // Kiểm tra nếu không có trong Whitelist HOẶC sai Campus đã chọn
+            if (whitelistEntry == null)
+            {
+                isAuthorized = false;
+            }
+            else if (!string.Equals(whitelistEntry.Campus, request.Campus, StringComparison.OrdinalIgnoreCase))
+            {
+                // Trường hợp có trong Whitelist nhưng chọn sai Campus ở Dropdown
+                throw new UnauthorizedAccessException($"Tài khoản của bạn thuộc cơ sở {whitelistEntry.Campus}. Vui lòng chọn đúng cơ sở khi đăng nhập.");
+            }
+            else
+            {
+                isAuthorized = true;
+            }
+
             int? roleId = whitelistEntry?.RoleId;
             string? studentCode = whitelistEntry?.StudentCode;
             string? campus = whitelistEntry?.Campus;
