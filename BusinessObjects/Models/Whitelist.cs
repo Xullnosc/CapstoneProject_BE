@@ -3,9 +3,9 @@ using System.Collections.Generic;
 
 namespace BusinessObjects.Models;
 
-public partial class User
+public partial class Whitelist
 {
-    public int UserId { get; set; }
+    public int WhitelistId { get; set; }
 
     public string Email { get; set; } = null!;
 
@@ -13,17 +13,11 @@ public partial class User
 
     public string? FullName { get; set; }
 
-    public string? Avatar { get; set; }
-
     public int? RoleId { get; set; }
-
-    public bool? IsAuthorized { get; set; }
 
     public string? Campus { get; set; }
 
-    public DateTime? LastLogin { get; set; }
-
-    public DateTime? CreatedAt { get; set; }
+    public DateTime? AddedDate { get; set; }
 
     public virtual Role? Role { get; set; }
 }

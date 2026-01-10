@@ -7,8 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Implement\" />
-    <Folder Include="Interface\" />
+    <Compile Remove="Implement\**" />
+    <Compile Remove="Interface\**" />
+    <EmbeddedResource Remove="Implement\**" />
+    <EmbeddedResource Remove="Interface\**" />
+    <None Remove="Implement\**" />
+    <None Remove="Interface\**" />
   </ItemGroup>
 
   <ItemGroup>

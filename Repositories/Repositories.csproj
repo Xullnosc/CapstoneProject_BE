@@ -7,12 +7,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Interface\" />
-    <Folder Include="Implement\" />
+    <Compile Remove="Implement\**" />
+    <Compile Remove="Interface\**" />
+    <EmbeddedResource Remove="Implement\**" />
+    <EmbeddedResource Remove="Interface\**" />
+    <None Remove="Implement\**" />
+    <None Remove="Interface\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DataAccessLayer\DataAccessLayer.csproj" />
+    <ProjectReference Include="..\DataAccess\DataAccess.csproj" />
   </ItemGroup>
 
 </Project>
