@@ -52,17 +52,23 @@ if (-not (Test-Path $absModelsFolder)) {
     New-Item -ItemType Directory -Path $absModelsFolder -Force | Out-Null
 }
 
-dotnet ef dbcontext scaffold "$conn" Microsoft.EntityFrameworkCore.SqlServer --project "$($projectPath.ProviderPath)" -o "$absModelsFolder" -c CapstoneDbContext -f --data-annotations
+dotnet ef dbcontext scaffold "$conn" Microsoft.EntityFrameworkCore.SqlServer --project "$($projectPath.ProviderPath)" -o "$absModelsFolder" -c FctmsContext -f --data-annotations
 Write-Host "|-------------------------------------------|"
 Write-Host "|-------Database scaffolding completed!-----|"
 Write-Host "|-------------------------------------------|"
-$dbContextPath = Join-Path $modelsFolder "CapstoneDbContext.cs"
+$dbContextPath = Join-Path $modelsFolder "FctmsContext.cs"
 Write-Host $dbContextPath
 if (Test-Path $modelsFolder) {
     $text = Get-Content -Raw -Path $dbContextPath
-    # Remove the OnConfiguring override method block (handles multi-line bodies)
-    $pattern = '(?ms)protected\s+override\s+void\s+OnConfiguring\s*\([^)]*\)\s*\{.*?\n\s*\}'
+    # Remove the OnConfiguring override method (handles block and expression-bodied forms, and optional preprocessor warnings)
+    $pattern = '(?ms)protected\s+override\s+void\s+OnConfiguring\s*\([^)]*\)\s*(?:\{.*?\n\s*\}|(?:#.*\n\s*)*=>.*?;)'
     $newText = [regex]::Replace($text, $pattern, '')
+    # Remove any remaining UseSqlServer(...) fragments that may span lines
+    $newText = [regex]::Replace($newText, '(?ms).*UseSqlServer\(.+?\);', '')
+    # Also remove any stray fragments that start with 'Database=' left over
+    $newText = [regex]::Replace($newText, '(?m)^\s*Database=.*$', '')
+    # Collapse multiple blank lines to a reasonable amount
+    $newText = [regex]::Replace($newText, "(\r?\n){3,}", "`r`n`r`n")
     Start-Sleep -Seconds 1
     $newText | Out-File -FilePath $dbContextPath -Encoding UTF8 -Force
 }
