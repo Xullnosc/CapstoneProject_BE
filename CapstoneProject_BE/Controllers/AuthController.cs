@@ -23,8 +23,15 @@ namespace capstone_be.Controllers
         {
             try
             {
+                if (request == null)
+                {
+                    return BadRequest(new { message = "Request body is null" });
+                }
+                
                 if (string.IsNullOrWhiteSpace(request.IdToken))
                 {
+                    // Debugging: Log what we received
+                    Console.WriteLine($"Login failed. IdToken is empty. Campus: {request.Campus}");
                     return BadRequest(new { message = "IdToken is required" });
                 }
 

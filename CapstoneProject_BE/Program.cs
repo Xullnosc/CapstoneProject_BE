@@ -15,6 +15,16 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<FctmsContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("capstoneDb")));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHttpClient();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp",
+        builder => builder
+            .WithOrigins("http://localhost:5173")
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+});
 
 // Dependency injection
 //DAO (DataAccess Layer)
@@ -66,6 +76,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors("AllowReactApp");
 
 app.UseAuthentication();
 app.UseAuthorization();
