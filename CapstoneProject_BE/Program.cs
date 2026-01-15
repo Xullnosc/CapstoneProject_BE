@@ -58,14 +58,24 @@ builder.Services.AddAuthentication(options =>
 
 var app = builder.Build();
 
+// Allow enabling Swagger in non-development environments via config or env var.
+var enableSwagger = app.Environment.IsDevelopment()
+    || string.Equals(builder.Configuration["EnableSwagger"], "true", StringComparison.OrdinalIgnoreCase)
+    || string.Equals(Environment.GetEnvironmentVariable("ENABLE_SWAGGER"), "true", StringComparison.OrdinalIgnoreCase);
+
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (enableSwagger)
 {   
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// Only enable HTTPS redirection when an HTTPS URL is configured (e.g. container has a certificate).
+var configuredUrls = builder.Configuration["ASPNETCORE_URLS"] ?? Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+if (!string.IsNullOrEmpty(configuredUrls) && configuredUrls.Contains("https", StringComparison.OrdinalIgnoreCase))
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -75,6 +85,18 @@ var summaries = new[]
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
 };
 app.MapControllers();
+// Root endpoint: redirect to Swagger when Swagger is enabled, otherwise return a simple status JSON.
+app.MapGet("/", () =>
+{
+    if (enableSwagger)
+    {
+        return Results.Redirect("/swagger");
+    }
+    return Results.Json(new { status = "OK", message = "API running. Use /weatherforecast or /swagger when enabled." });
+});
+
+// Health endpoint for readiness checks
+app.MapGet("/health", () => Results.Ok(new { status = "Healthy" })).WithName("Health");
 app.MapGet("/weatherforecast", () =>
 {
     var forecast =  Enumerable.Range(1, 5).Select(index =>

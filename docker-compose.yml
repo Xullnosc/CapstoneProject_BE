@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: capstone_be:local
+    ports:
+      - "8080:8080"
+    environment:
+      Jwt__Key: ${JWT_KEY:-YourSuperSecretKeyForJWTTokenGenerationThatIsAtLeast32CharactersLong}
+      Jwt__Issuer: ${JWT_ISSUER:-FCTMSBackend}
+      Jwt__Audience: ${JWT_AUDIENCE:-FCTMSFrontend}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # If you need HTTPS with a mounted certificate, uncomment and map the volume below:
+    # volumes:
+    #   - ./certs/aspnetapp.pfx:/https/aspnetapp.pfx:ro
+    # environment:
+    #   ASPNETCORE_Kestrel__Certificates__Default__Path: /https/aspnetapp.pfx
+    #   ASPNETCORE_Kestrel__Certificates__Default__Password: ${PFX_PASSWORD}
