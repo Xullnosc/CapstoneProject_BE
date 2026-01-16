@@ -18,6 +18,16 @@ builder.Services.AddDbContext<FctmsContext>(options =>
 );
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHttpClient();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp",
+        builder => builder
+            .WithOrigins("http://localhost:5173")
+            .AllowAnyMethod()
+            .AllowAnyHeader());
+});
 
 // Dependency injection
 //DAO (DataAccess Layer)
@@ -97,6 +107,8 @@ if (
 {
     app.UseHttpsRedirection();
 }
+app.UseCors("AllowReactApp");
+
 
 app.UseAuthentication();
 app.UseAuthorization();

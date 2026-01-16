@@ -20,47 +20,64 @@ namespace Services
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly IMapper _mapper;
         private readonly IConfiguration _configuration;
+        private readonly HttpClient _httpClient;
 
         public AuthService(
             IUserRepository userRepository,
             IWhitelistRepository whitelistRepository,
+      
             IMapper mapper,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            HttpClient httpClient)
         {
             _userRepository = userRepository;
             _whitelistRepository = whitelistRepository;
             _mapper = mapper;
             _configuration = configuration;
+            _httpClient = httpClient;
         }
 
         public async Task<LoginResponseDTO> GoogleLoginAsync(LoginRequestDTO request)
         {
-            // 1. Validate Google IdToken
-            GoogleJsonWebSignature.Payload payload;
-            try
+            // 1. Validate Google Access Token
+            string email;
+            string fullName;
+            string avatar;
+
+            try 
             {
-                var googleClientId = _configuration["Google:ClientId"];
-                if (string.IsNullOrEmpty(googleClientId))
+                var userInfoEndpoint = "https://www.googleapis.com/oauth2/v3/userinfo";
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", request.IdToken); // "IdToken" in DTO actually holds Access Token
+                var response = await _httpClient.GetAsync(userInfoEndpoint);
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    throw new InvalidOperationException("Google Client ID is not configured in appsettings.json");
+                    throw new UnauthorizedAccessException("Invalid Google Access Token.");
                 }
 
-                var settings = new GoogleJsonWebSignature.ValidationSettings
+                var content = await response.Content.ReadAsStringAsync();
+                
+                // Parse JSON response (using Newtonsoft.Json or System.Text.Json)
+                // Assuming System.Text.Json is available or use a simple way if not. 
+                // Since this project uses Controllers and likely has System.Text.Json implicitly.
+                using (var doc = System.Text.Json.JsonDocument.Parse(content))
                 {
-                    // Tạm thời comment để test với Google Playground 
-                    // Audience = new[] { googleClientId } 
-                };
+                    var root = doc.RootElement;
+                    email = root.GetProperty("email").GetString() ?? "";
+                    fullName = root.GetProperty("name").GetString() ?? "";
+                    avatar = root.GetProperty("picture").GetString() ?? "";
+                }
 
-                payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
+                if (string.IsNullOrEmpty(email))
+                {
+                     throw new UnauthorizedAccessException("Could not retrieve email from Google.");
+                }
+
             }
-            catch (InvalidJwtException ex)
+            catch (Exception ex)
             {
-                throw new UnauthorizedAccessException($"Invalid Google token: {ex.Message}", ex);
+                 throw new UnauthorizedAccessException($"Failed to validate Google token: {ex.Message}", ex);
             }
-
-            var email = payload.Email;
-            var fullName = payload.Name;
-            var avatar = payload.Picture;
 
             // 0. Validate if Campus is valid
             if (string.IsNullOrEmpty(request.Campus) || !CampusConstants.All.Contains(request.Campus))
