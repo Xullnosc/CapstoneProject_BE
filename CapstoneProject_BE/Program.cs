@@ -35,16 +35,16 @@ builder.Services.AddCors(options =>
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
 builder.Services.AddScoped<IWhitelistDAO, WhitelistDAO>();
-builder.Services.AddScoped<ISemesterDAO, SemesterDAO>();
+//builder.Services.AddScoped<ISemesterDAO, SemesterDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IWhitelistRepository, WhitelistRepository>();
-builder.Services.AddScoped<ISemesterRepository, SemesterRepository>();
+//builder.Services.AddScoped<ISemesterRepository, SemesterRepository>();
 
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<ISemesterService, SemesterService>();
+//builder.Services.AddScoped<ISemesterService, SemesterService>();
 
 //Middleware
 // AutoMapper
@@ -118,19 +118,6 @@ app.UseCors("AllowReactApp");
 app.UseAuthentication();
 app.UseAuthorization();
 
-var summaries = new[]
-{
-    "Freezing",
-    "Bracing",
-    "Chilly",
-    "Cool",
-    "Mild",
-    "Warm",
-    "Balmy",
-    "Hot",
-    "Sweltering",
-    "Scorching",
-};
 app.MapControllers();
 
 // Root endpoint: redirect to Swagger when Swagger is enabled, otherwise return a simple status JSON.
