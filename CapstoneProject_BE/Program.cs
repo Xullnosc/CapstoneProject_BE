@@ -14,8 +14,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddControllers();
 builder.Services.AddDbContext<FctmsContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("capstoneDb"))
-);
+{
+    var connectionString = builder.Configuration.GetConnectionString("capstoneDb");
+    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();
@@ -33,13 +35,16 @@ builder.Services.AddCors(options =>
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
 builder.Services.AddScoped<IWhitelistDAO, WhitelistDAO>();
+//builder.Services.AddScoped<ISemesterDAO, SemesterDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IWhitelistRepository, WhitelistRepository>();
+//builder.Services.AddScoped<ISemesterRepository, SemesterRepository>();
 
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
+//builder.Services.AddScoped<ISemesterService, SemesterService>();
 
 //Middleware
 // AutoMapper
@@ -113,19 +118,6 @@ app.UseCors("AllowReactApp");
 app.UseAuthentication();
 app.UseAuthorization();
 
-var summaries = new[]
-{
-    "Freezing",
-    "Bracing",
-    "Chilly",
-    "Cool",
-    "Mild",
-    "Warm",
-    "Balmy",
-    "Hot",
-    "Sweltering",
-    "Scorching",
-};
 app.MapControllers();
 
 // Root endpoint: redirect to Swagger when Swagger is enabled, otherwise return a simple status JSON.
@@ -149,27 +141,5 @@ app.MapGet(
 
 // Health endpoint for readiness checks
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" })).WithName("Health");
-app.MapGet(
-        "/weatherforecast",
-        () =>
-        {
-            var forecast = Enumerable
-                .Range(1, 5)
-                .Select(index => new WeatherForecast(
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-                .ToArray();
-            return forecast;
-        }
-    )
-    .WithName("GetWeatherForecast")
-    .WithOpenApi();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

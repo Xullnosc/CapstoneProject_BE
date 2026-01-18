@@ -77,12 +77,29 @@ function Run-Flyway {
 
     if (-not $connString) { throw "capstoneDb connection string not found in $settingsPath" }
 
-    $server   = ($connString -replace '.*Server=([^;]+);.*', '$1')
-    $database = ($connString -replace '.*Database=([^;]+);.*', '$1')
-    $user     = ($connString -replace '.*User Id=([^;]+);.*', '$1')
-    $password = ($connString -replace '.*Password=([^;]+);.*', '$1')
+    Write-Host "Connection String: $connString"
+    
+    # Parse connection string by splitting on semicolons
+    $parts = $connString -split ';' | Where-Object { $_ -match '=' }
+    $parsedValues = @{}
+    foreach ($part in $parts) {
+        $key, $value = $part -split '=', 2
+        $parsedValues[$key.Trim()] = $value.Trim()
+    }
+    
+    $server   = $parsedValues['Server'] + ':3306'
+    $database = $parsedValues['Database']
+    $user     = $parsedValues['User']
+    if (-not $user) { $user = $parsedValues['User Id'] }
+    $password = $parsedValues['Password']
 
-    $jdbcUrl = "jdbc:sqlserver://$server;databaseName=$database;encrypt=false;trustServerCertificate=true"
+    Write-Host "Parsed - Server: $server, Database: $database, User: $user, Password: (hidden)"
+
+    if (-not $database) {
+        throw "Database value could not be parsed from connection string: $connString"
+    }
+
+    $jdbcUrl = "jdbc:mysql://" + $server + "/" + $database + "?useSSL=false&serverTimezone=UTC"
 
     $repoRoot = (Resolve-Path -Path (Join-Path $PSScriptRoot ".." )).ProviderPath
     $migrationLocation = Join-Path $repoRoot "BusinessObjects\db\migrations"
@@ -91,6 +108,10 @@ function Run-Flyway {
     if ($user -and $user -ne $connString) { $flywayCmd += ('-user="' + $user + '"') }
     if ($password -and $password -ne $connString) { $flywayCmd += ('-password="' + $password + '"') }
     $flywayCmd += ('-locations=filesystem:' + ($migrationLocation -replace '\\','/'))
+    # When the database already contains schema objects but not Flyway metadata,
+    # enable baseline on migrate so Flyway will record the current state instead
+    # of attempting to re-run initial migrations that would fail.
+    $flywayCmd += '-baselineOnMigrate=true'
     $flywayCmd += 'migrate'
 
     Write-Host "Running flyway with: $($flywayCmd -join ' ')"
