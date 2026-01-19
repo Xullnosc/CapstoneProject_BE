@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   app:
@@ -9,9 +9,11 @@ services:
     ports:
       - "8080:8080"
     environment:
-      Jwt__Key: ${JWT_KEY:-YourSuperSecretKeyForJWTTokenGenerationThatIsAtLeast32CharactersLong}
-      Jwt__Issuer: ${JWT_ISSUER:-FCTMSBackend}
-      Jwt__Audience: ${JWT_AUDIENCE:-FCTMSFrontend}
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__capstoneDb=${DEFAULT_CONNECTION}
+      - Jwt__Key=${JWT_KEY}
+      - Jwt__Issuer=${JWT_ISSUER}
+      - Jwt__Audience=${JWT_AUDIENCE}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]

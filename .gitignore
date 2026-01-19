@@ -84,4 +84,3 @@
 **/TestResults/
 *.vsix
 .vsconfig
-powershell/environment-variables.ps1
