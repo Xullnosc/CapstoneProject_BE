@@ -37,19 +37,30 @@ Clone the repository and navigate to the backend root directory:
 
 1. Navigate to: `..\CapstoneProject_BE\CapstoneProject_BE\`
 2. Create a new file named **`appsettings.Development.json`**.
-3. Go to the **Discord** server, find the thread **"Flyway file"**, and **copy the content** provided for this file.
-4. Paste the content into your newly created `appsettings.Development.json` and save.
-5. Open `..\CapstoneProject_BE\powershell\environment-variables.ps1` and ensure the paths/credentials match your local environment.
+3. Go to the **Discord** server, find the thread **"Flyway file"**, and **copy the content** provided.
+4. **Template Reference**: Your file should look like this (fill in your local credentials):
+   ```json
+   {
+     "ConnectionStrings": {
+       "capstoneDb": "Server=localhost;Database=fctms;User=YourUserName;Password=YourPassword;AutoEnlist=false"
+     }
+   }
+   ```
+5. Open `..\CapstoneProject_BE\powershell\environment-variables.ps1` and ensure the paths match your local environment.
 
 ---
 
 ### 2. Database & Migrations
 We use Flyway to manage database schema versions.
 
-1. Open PowerShell as Administrator.
-2. Navigate to the `powershell` directory:
+1. **Pre-requisite**: Open your MySQL client and create an empty database named **`fctms`**:
+   ```sql
+   CREATE DATABASE fctms;
+   ```
+2. Open PowerShell as Administrator.
+3. Navigate to the `powershell` directory:
    `..\CapstoneProject_BE\powershell`
-3. Run the migration script:
+4. Run the migration script:
    ```powershell
    ./run-flyway.ps1
    ```
@@ -63,9 +74,13 @@ To sync your C# Models with the MySQL database schema, run the scaffold command 
 1. Ensure your database is up-to-date (Step 2).
 2. Open PowerShell and navigate to the **BusinessObjects** project directory:
    `..\CapstoneProject_BE\BusinessObjects`
-3. Run the following command:
+3. **Restore Packages** (Critical: must be done before scaffolding or building):
    ```powershell
-   dotnet ef dbcontext scaffold "Server=localhost;Database=fctms;UID=root;PWD=YourPassword;AutoEnlist=false" Pomelo.EntityFrameworkCore.MySql --output-dir Models --no-onconfiguring
+   dotnet restore
+   ```
+4. Run the following command (replace `User` and `Password` with your credentials):
+   ```powershell
+   dotnet ef dbcontext scaffold "Server=localhost;Database=fctms;UID=Enter_Your_User;PWD=Enter_Your_Password;AutoEnlist=false" Pomelo.EntityFrameworkCore.MySql --output-dir Models --no-onconfiguring
    ```
    *This command regenerates the entity models in the `Models` folder within `BusinessObjects`.*
 
