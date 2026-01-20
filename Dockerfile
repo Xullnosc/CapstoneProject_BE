@@ -9,11 +9,11 @@ COPY ["Services/Services.csproj", "Services/"]
 COPY ["DataAccess/DataAccess.csproj", "DataAccess/"]
 COPY ["Repositories/Repositories.csproj", "Repositories/"]
 
-RUN dotnet restore
-
 COPY . .
 
 WORKDIR /src/CapstoneProject_BE
+# Show SDK info during build to help diagnose restore failures
+RUN dotnet restore
 RUN dotnet publish -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final

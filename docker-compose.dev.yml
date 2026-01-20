@@ -1,0 +1,15 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+    image: capstone_be_dev
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "5000:8080"
+    volumes:
+      - .:/src
+    working_dir: /src/CapstoneProject_BE
+    command: dotnet watch run --urls http://0.0.0.0:8080
