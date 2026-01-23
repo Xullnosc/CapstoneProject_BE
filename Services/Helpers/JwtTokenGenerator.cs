@@ -23,7 +23,7 @@ namespace Services.Helpers
             // Add role claim if user has a role
             if (user.Role != null && !string.IsNullOrEmpty(user.Role.RoleName))
             {
-                claims.Add(new Claim(ClaimTypes.Role, user.Role.RoleName));
+                claims.Add(new Claim("role", user.Role.RoleName));
             }
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key));

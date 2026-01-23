@@ -99,7 +99,7 @@ function Run-Flyway {
         throw "Database value could not be parsed from connection string: $connString"
     }
 
-    $jdbcUrl = "jdbc:mysql://" + $server + "/" + $database + "?useSSL=false&serverTimezone=UTC"
+    $jdbcUrl = "jdbc:mysql://" + $server + "/" + $database + "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
 
     $repoRoot = (Resolve-Path -Path (Join-Path $PSScriptRoot ".." )).ProviderPath
     $migrationLocation = Join-Path $repoRoot "BusinessObjects\db\migrations"

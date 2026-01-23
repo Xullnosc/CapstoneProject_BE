@@ -1,0 +1,98 @@
+using System;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using BusinessObjects.DTOs;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Services;
+
+namespace CapstoneProject_BE.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    [Authorize]
+    public class TeamController : ControllerBase
+    {
+        private readonly ITeamService _teamService;
+
+        public TeamController(ITeamService teamService)
+        {
+            _teamService = teamService;
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateTeam([FromBody] CreateTeamDTO createTeamDto)
+        {
+            try
+            {
+                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                var createdTeam = await _teamService.CreateTeamAsync(userId, createTeamDto);
+                return CreatedAtAction(nameof(GetTeamById), new { id = createdTeam.TeamId }, createdTeam);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetTeamById(int id)
+        {
+            try 
+            {
+                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                var team = await _teamService.GetTeamByIdAsync(id, userId);
+                if (team == null) return NotFound(new { message = "Team not found" });
+                return Ok(team);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("semester/{semesterId}")]
+        public async Task<IActionResult> GetTeamsBySemester(int semesterId)
+        {
+            var teams = await _teamService.GetTeamsBySemesterAsync(semesterId);
+            return Ok(teams);
+        }
+        [HttpGet("my-team")]
+        public async Task<IActionResult> GetMyTeam()
+        {
+            try
+            {
+                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                var team = await _teamService.GetTeamByStudentIdAsync(userId);
+                if (team == null) return NotFound(new { message = "You are not in any team" });
+                return Ok(team);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpDelete("{id}/disband")]
+        public async Task<IActionResult> DisbandTeam(int id)
+        {
+            try
+            {
+                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                bool result = await _teamService.DisbandTeamAsync(id, userId);
+                
+                if (!result) return NotFound(new { message = "Team not found or could not be disbanded" });
+
+                return Ok(new { message = "Team disbanded successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+    }
+}

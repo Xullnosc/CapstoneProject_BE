@@ -22,6 +22,11 @@ namespace Repositories
             return await _userDAO.GetByEmailAsync(email);
         }
 
+        public async Task<User?> GetByIdAsync(int id)
+        {
+            return await _userDAO.GetByIdAsync(id);
+        }
+
         public async Task<User> AddAsync(User user)
         {
             return await _userDAO.AddAsync(user);
