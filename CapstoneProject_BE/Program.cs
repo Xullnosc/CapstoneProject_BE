@@ -12,7 +12,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
 builder.Services.AddDbContext<FctmsContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("capstoneDb");
@@ -32,19 +36,26 @@ builder.Services.AddCors(options =>
 });
 
 // Dependency injection
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ISemesterService, SemesterService>();
+//builder.Services.AddScoped<ITeamService, TeamService>();
+builder.Services.AddScoped<IArchivingService, ArchivingService>();
+
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
 builder.Services.AddScoped<IWhitelistDAO, WhitelistDAO>();
-//builder.Services.AddScoped<ISemesterDAO, SemesterDAO>();
+builder.Services.AddScoped<ISemesterDAO, SemesterDAO>();
+//builder.Services.AddScoped<ITeamDAO, TeamDAO>();
+builder.Services.AddScoped<ArchivedWhitelistDAO>();
+//builder.Services.AddScoped<ArchivedTeamDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IWhitelistRepository, WhitelistRepository>();
-//builder.Services.AddScoped<ISemesterRepository, SemesterRepository>();
+builder.Services.AddScoped<ISemesterRepository, SemesterRepository>();
+//builder.Services.AddScoped<ITeamRepository, TeamRepository>();
+builder.Services.AddScoped<IArchivingRepository, ArchivingRepository>();
 
-// Services
-builder.Services.AddScoped<IAuthService, AuthService>();
-//builder.Services.AddScoped<ISemesterService, SemesterService>();
 
 //Middleware
 // AutoMapper
