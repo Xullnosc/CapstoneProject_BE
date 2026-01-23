@@ -24,6 +24,13 @@ namespace DataAccess
                 .FirstOrDefaultAsync(u => u.Email == email);
         }
 
+        public async Task<User?> GetByIdAsync(int id)
+        {
+            return await _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.UserId == id);
+        }
+
         public async Task<User> AddAsync(User user)
         {
             await _context.Users.AddAsync(user);
@@ -39,6 +46,9 @@ namespace DataAccess
         {
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
+            
+            // Reload to get navigation properties esp. Role
+            await _context.Entry(user).Reference(u => u.Role).LoadAsync();
         }
     }
 }

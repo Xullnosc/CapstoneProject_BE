@@ -152,8 +152,10 @@ namespace Services
             // 4. Check authorization
             if (user.IsAuthorized == false)
             {
+                var supportEmail = _configuration["Support:Email"];
+                var supportPhone = _configuration["Support:Phone"];
                 throw new UnauthorizedAccessException(
-                    "Bạn chưa được phân quyền vào hệ thống. Vui lòng liên hệ longnx6@fe.edu.vn / 0905 764750");
+                    $"Bạn chưa được phân quyền vào hệ thống. Vui lòng liên hệ {supportEmail} / {supportPhone}");
             }
 
             // 5. Generate JWT Token
@@ -164,6 +166,7 @@ namespace Services
                 Audience = _configuration["Jwt:Audience"]!,
                 ExpireMinutes = int.Parse(_configuration["Jwt:ExpireMinutes"]!)
             };
+            
 
             var token = JwtTokenGenerator.GenerateToken(user, jwtSettings);
 
