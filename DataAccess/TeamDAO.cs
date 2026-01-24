@@ -69,5 +69,10 @@ namespace DataAccess
                 .Where(t => t.SemesterId == semesterId && t.Status != "Disbanded")
                 .FirstOrDefaultAsync(t => t.Teammembers.Any(tm => tm.StudentId == studentId));
         }
+        public async Task<bool> UpdateAsync(Team team)
+        {
+            _context.Teams.Update(team);
+            return await _context.SaveChangesAsync() > 0;
+        }
     }
 }

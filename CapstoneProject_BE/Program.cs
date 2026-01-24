@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.OpenApi.Models;
 using BusinessObjects.Models;
 using DataAccess;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -7,6 +8,10 @@ using Microsoft.IdentityModel.Tokens;
 using Repositories;
 using Services;
 using Services.Mappings;
+
+using dotenv.net;
+
+DotEnv.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,7 +28,34 @@ builder.Services.AddDbContext<FctmsContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
 });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Capstone Project API", Version = "v1" });
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
 builder.Services.AddHttpClient();
 
 builder.Services.AddCors(options =>
@@ -40,6 +72,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ISemesterService, SemesterService>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IArchivingService, ArchivingService>();
+builder.Services.AddScoped<Services.Helpers.CloudinaryHelper>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();

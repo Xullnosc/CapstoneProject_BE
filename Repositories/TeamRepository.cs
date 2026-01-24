@@ -48,5 +48,10 @@ namespace Repositories
         {
             return await _teamDAO.GetTeamByStudentIdAsync(studentId, semesterId);
         }
+
+        public async Task<bool> UpdateAsync(Team team)
+        {
+            return await _teamDAO.UpdateAsync(team);
+        }
     }
 }
