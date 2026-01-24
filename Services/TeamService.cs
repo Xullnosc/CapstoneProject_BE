@@ -73,8 +73,23 @@ namespace Services
 
         private async Task<string> GenerateTeamCodeAsync(int semesterId, string semesterName)
         {
-            int teamCount = await _teamRepository.CountTeamsInSemesterAsync(semesterId);
-            return $"{DateTime.Now.Year}-{semesterName}-{teamCount + 1:D3}";
+            var teamCodes = await _teamRepository.GetTeamCodesBySemesterAsync(semesterId);
+            if (teamCodes == null || !teamCodes.Any())
+            {
+                return $"{DateTime.Now.Year}-{semesterName}-001";
+            }
+
+            int maxId = 0;
+            foreach (var code in teamCodes)
+            {
+                string[] parts = code.Split('-');
+                if (parts.Length > 0 && int.TryParse(parts.Last(), out int id))
+                {
+                    if (id > maxId) maxId = id;
+                }
+            }
+
+            return $"{DateTime.Now.Year}-{semesterName}-{maxId + 1:D3}";
         }
 
         public async Task<TeamDTO?> GetTeamByIdAsync(int teamId, int userId)

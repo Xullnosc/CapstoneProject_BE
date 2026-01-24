@@ -1,4 +1,5 @@
 using BusinessObjects.Models;
+using BusinessObjects;
 using Microsoft.AspNetCore.Mvc;
 using Services;
 using System.Collections.Generic;
@@ -10,7 +11,7 @@ namespace CapstoneProject_BE.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "HOD")]
+    [Authorize(Roles = CampusConstants.Roles.HOD)]
     public class SemesterController : ControllerBase
     {
         private readonly ISemesterService _semesterService;

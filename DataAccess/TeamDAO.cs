@@ -61,6 +61,14 @@ namespace DataAccess
              return await _context.Teams.CountAsync(t => t.SemesterId == semesterId);
         }
 
+        public async Task<List<string>> GetTeamCodesBySemesterAsync(int semesterId)
+        {
+            return await _context.Teams
+                .Where(t => t.SemesterId == semesterId)
+                .Select(t => t.TeamCode)
+                .ToListAsync();
+        }
+
         public async Task<Team?> GetTeamByStudentIdAsync(int studentId, int semesterId)
         {
             return await _context.Teams
