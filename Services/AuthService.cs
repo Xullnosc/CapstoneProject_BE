@@ -129,8 +129,8 @@ namespace Services
                     StudentCode = studentCode,
                     Campus = campus,
                     IsAuthorized = isAuthorized,
-                    LastLogin = DateTime.Now,
-                    CreatedAt = DateTime.Now
+                    LastLogin = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
                 };
 
                 user = await _userRepository.AddAsync(user);
@@ -144,7 +144,7 @@ namespace Services
                 user.StudentCode = studentCode;
                 user.Campus = campus;
                 user.IsAuthorized = isAuthorized;
-                user.LastLogin = DateTime.Now;
+                user.LastLogin = DateTime.UtcNow;
 
                 await _userRepository.UpdateAsync(user);
             }

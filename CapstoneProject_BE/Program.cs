@@ -79,8 +79,8 @@ builder.Services.AddScoped<IUserDAO, UserDAO>();
 builder.Services.AddScoped<IWhitelistDAO, WhitelistDAO>();
 builder.Services.AddScoped<ISemesterDAO, SemesterDAO>();
 builder.Services.AddScoped<ITeamDAO, TeamDAO>();
-builder.Services.AddScoped<ArchivedWhitelistDAO>();
-builder.Services.AddScoped<ArchivedTeamDAO>();
+builder.Services.AddScoped<IArchivedWhitelistDAO, ArchivedWhitelistDAO>();
+builder.Services.AddScoped<IArchivedTeamDAO, ArchivedTeamDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();

@@ -79,7 +79,7 @@ namespace Services
             var teamCodes = await _teamRepository.GetTeamCodesBySemesterAsync(semesterId);
             if (teamCodes == null || !teamCodes.Any())
             {
-                return $"{DateTime.Now.Year}-{semesterName}-001";
+                return $"{DateTime.UtcNow.Year}-{semesterName}-001";
             }
 
             int maxId = 0;
@@ -92,7 +92,7 @@ namespace Services
                 }
             }
 
-            return $"{DateTime.Now.Year}-{semesterName}-{maxId + 1:D3}";
+            return $"{DateTime.UtcNow.Year}-{semesterName}-{maxId + 1:D3}";
         }
 
         public async Task<TeamDTO?> GetTeamByIdAsync(int teamId, int userId)

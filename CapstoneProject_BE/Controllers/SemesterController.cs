@@ -1,4 +1,4 @@
-using BusinessObjects.Models;
+using BusinessObjects.DTOs;
 using BusinessObjects;
 using Microsoft.AspNetCore.Mvc;
 using Services;
@@ -22,13 +22,13 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Semester>>> GetSemesters()
+        public async Task<ActionResult<IEnumerable<SemesterDTO>>> GetSemesters()
         {
             return await _semesterService.GetAllSemestersAsync();
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Semester>> GetSemester(int id)
+        public async Task<ActionResult<SemesterDTO>> GetSemester(int id)
         {
             var semester = await _semesterService.GetSemesterByIdAsync(id);
             if (semester == null)
@@ -39,20 +39,20 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Semester>> CreateSemester(Semester semester)
+        public async Task<ActionResult<SemesterDTO>> CreateSemester(SemesterCreateDTO semesterCreateDTO)
         {
-            var created = await _semesterService.CreateSemesterAsync(semester);
+            var created = await _semesterService.CreateSemesterAsync(semesterCreateDTO);
             return CreatedAtAction(nameof(GetSemester), new { id = created.SemesterId }, created);
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateSemester(int id, Semester semester)
+        public async Task<IActionResult> UpdateSemester(int id, SemesterCreateDTO semesterCreateDTO)
         {
-            if (id != semester.SemesterId)
+            if (id != semesterCreateDTO.SemesterId)
             {
                 return BadRequest();
             }
-            await _semesterService.UpdateSemesterAsync(semester);
+            await _semesterService.UpdateSemesterAsync(semesterCreateDTO);
             return NoContent();
         }
 

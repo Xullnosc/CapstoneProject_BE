@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace DataAccess
 {
-    public class ArchivedWhitelistDAO
+    public class ArchivedWhitelistDAO : IArchivedWhitelistDAO
     {
         private readonly FctmsContext _context;
 

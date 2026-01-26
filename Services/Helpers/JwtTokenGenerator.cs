@@ -33,7 +33,7 @@ namespace Services.Helpers
                 issuer: jwtSettings.Issuer,
                 audience: jwtSettings.Audience,
                 claims: claims,
-                expires: DateTime.Now.AddMinutes(jwtSettings.ExpireMinutes),
+                expires: DateTime.UtcNow.AddMinutes(jwtSettings.ExpireMinutes),
                 signingCredentials: credentials
             );
 

@@ -11,6 +11,10 @@ public partial class FctmsContext : DbContext
     {
     }
 
+    public virtual DbSet<ArchivedTeam> ArchivedTeams { get; set; }
+
+    public virtual DbSet<ArchivedWhitelist> ArchivedWhitelists { get; set; }
+
     public virtual DbSet<FlywaySchemaHistory> FlywaySchemaHistories { get; set; }
 
     public virtual DbSet<Role> Roles { get; set; }
@@ -27,15 +31,49 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<Whitelist> Whitelists { get; set; }
 
-    public virtual DbSet<ArchivedWhitelist> ArchivedWhitelists { get; set; }
-
-    public virtual DbSet<ArchivedTeam> ArchivedTeams { get; set; }
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
             .UseCollation("utf8mb4_0900_ai_ci")
             .HasCharSet("utf8mb4");
+
+        modelBuilder.Entity<ArchivedTeam>(entity =>
+        {
+            entity.HasKey(e => e.ArchivedTeamId).HasName("PRIMARY");
+
+            entity.ToTable("archived_teams");
+
+            entity.HasIndex(e => e.OriginalTeamId, "IX_ArchivedTeam_Original");
+
+            entity.HasIndex(e => e.SemesterId, "IX_ArchivedTeam_Semester");
+
+            entity.Property(e => e.ArchivedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.JsonData).HasColumnType("json");
+            entity.Property(e => e.Status).HasMaxLength(50);
+            entity.Property(e => e.TeamCode).HasMaxLength(50);
+            entity.Property(e => e.TeamName).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<ArchivedWhitelist>(entity =>
+        {
+            entity.HasKey(e => e.ArchivedWhitelistId).HasName("PRIMARY");
+
+            entity.ToTable("archived_whitelists");
+
+            entity.HasIndex(e => e.SemesterId, "IX_ArchivedWhitelist_Semester");
+
+            entity.HasIndex(e => e.StudentCode, "IX_ArchivedWhitelist_Student");
+
+            entity.Property(e => e.ArchivedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Campus).HasMaxLength(50);
+            entity.Property(e => e.Email).HasMaxLength(100);
+            entity.Property(e => e.FullName).HasMaxLength(100);
+            entity.Property(e => e.StudentCode).HasMaxLength(50);
+        });
 
         modelBuilder.Entity<FlywaySchemaHistory>(entity =>
         {
@@ -236,6 +274,8 @@ public partial class FctmsContext : DbContext
 
             entity.ToTable("whitelist");
 
+            entity.HasIndex(e => e.SemesterId, "FK_Whitelist_Semester");
+
             entity.HasIndex(e => e.RoleId, "IX_Whitelist_RoleID");
 
             entity.HasIndex(e => e.Email, "UQ__Whitelis__A9D10534BDF4FDF3").IsUnique();
@@ -253,22 +293,10 @@ public partial class FctmsContext : DbContext
             entity.HasOne(d => d.Role).WithMany(p => p.Whitelists)
                 .HasForeignKey(d => d.RoleId)
                 .HasConstraintName("FK__Whitelist__RoleI__5070F446");
-            
-            entity.HasOne(d => d.Semester).WithMany()
+
+            entity.HasOne(d => d.Semester).WithMany(p => p.Whitelists)
                 .HasForeignKey(d => d.SemesterId)
                 .HasConstraintName("FK_Whitelist_Semester");
-        });
-
-        modelBuilder.Entity<ArchivedWhitelist>(entity => {
-            entity.HasKey(e => e.ArchivedWhitelistId).HasName("PRIMARY");
-            entity.ToTable("ArchivedWhitelists");
-            entity.Property(e => e.ArchivedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-        });
-
-        modelBuilder.Entity<ArchivedTeam>(entity => {
-            entity.HasKey(e => e.ArchivedTeamId).HasName("PRIMARY");
-            entity.ToTable("ArchivedTeams");
-            entity.Property(e => e.ArchivedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -82,5 +82,28 @@ namespace DataAccess
             _context.Teams.Update(team);
             return await _context.SaveChangesAsync() > 0;
         }
+
+        public async Task<List<Team>> GetForArchivingAsync(int semesterId)
+        {
+            return await _context.Teams
+                .Where(t => t.SemesterId == semesterId)
+                .Include(t => t.Teammembers)
+                .Include(t => t.Teaminvitations)
+                .ToListAsync();
+        }
+
+        public async Task DeleteRangeAsync(IEnumerable<Team> teams)
+        {
+            foreach (var team in teams)
+            {
+                if (team.Teammembers.Any())
+                    _context.Teammembers.RemoveRange(team.Teammembers);
+                    
+                if (team.Teaminvitations.Any())
+                    _context.Teaminvitations.RemoveRange(team.Teaminvitations);
+            }
+            _context.Teams.RemoveRange(teams);
+            await _context.SaveChangesAsync();
+        }
     }
 }
