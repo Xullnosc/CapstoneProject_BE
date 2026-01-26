@@ -18,5 +18,13 @@ namespace BusinessObjects
         {
         HoaLac, HoChiMinh, DaNang, CanTho, QuyNhon
         };
+
+        public static class Roles
+        {
+            public const string HOD = "HOD";
+            public const string Student = "Student";
+            public const string Lecturer = "Lecturer";
+            public const string Admin = "Admin";
+        }
     }
 }

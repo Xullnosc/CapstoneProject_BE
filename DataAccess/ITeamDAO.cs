@@ -12,6 +12,7 @@ namespace DataAccess
         Task<List<Team>> GetBySemesterAsync(int semesterId);
         Task<bool> UpdateStatusAsync(int teamId, string status);
         Task<int> CountTeamsInSemesterAsync(int semesterId);
+        Task<List<string>> GetTeamCodesBySemesterAsync(int semesterId);
         Task<Team?> GetTeamByStudentIdAsync(int studentId, int semesterId);
         Task<bool> UpdateAsync(Team team);
     }
