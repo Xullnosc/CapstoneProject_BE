@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace BusinessObjects.DTOs
 {
@@ -9,6 +10,8 @@ namespace BusinessObjects.DTOs
 
         public string Description { get; set; }
 
-        public string TeamAvatar { get; set; }
+        public string? TeamAvatar { get; set; }
+
+        public IFormFile? AvatarFile { get; set; }
     }
 }

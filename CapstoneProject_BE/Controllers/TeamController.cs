@@ -47,7 +47,7 @@ namespace CapstoneProject_BE.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -88,6 +88,29 @@ namespace CapstoneProject_BE.Controllers
                 if (!result) return NotFound(new { message = "Team not found or could not be disbanded" });
 
                 return Ok(new { message = "Team disbanded successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateTeam(int id, [FromForm] UpdateTeamDTO updateTeamDto)
+        {
+             try
+            {
+                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                var updatedTeam = await _teamService.UpdateTeamAsync(id, userId, updateTeamDto);
+                return Ok(updatedTeam);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { message = ex.Message });
             }
             catch (Exception ex)
             {

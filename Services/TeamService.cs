@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Repositories;
+using Services.Helpers;
 
 namespace Services
 {
@@ -13,12 +14,14 @@ namespace Services
         private readonly ITeamRepository _teamRepository;
         private readonly ISemesterRepository _semesterRepository;
         private readonly IUserRepository _userRepository;
+        private readonly CloudinaryHelper _cloudinaryHelper;
 
-        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository)
+        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, CloudinaryHelper cloudinaryHelper)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
             _userRepository = userRepository;
+            _cloudinaryHelper = cloudinaryHelper;
         }
 
         public async Task<TeamDTO> CreateTeamAsync(int leaderId, CreateTeamDTO createTeamDto)
@@ -149,6 +152,30 @@ namespace Services
                     JoinedAt = tm.JoinedAt ?? DateTime.UtcNow
                 }).ToList()
             };
+        }
+
+        public async Task<TeamDTO> UpdateTeamAsync(int teamId, int leaderId, UpdateTeamDTO updateTeamDto)
+        {
+            var team = await _teamRepository.GetByIdAsync(teamId);
+            if (team == null) throw new KeyNotFoundException("Team not found");
+
+            if (team.LeaderId != leaderId)
+            {
+                throw new UnauthorizedAccessException("Only the team leader can update team information.");
+            }
+
+            team.TeamName = updateTeamDto.TeamName;
+            team.Description = updateTeamDto.Description;
+            team.UpdatedAt = DateTime.UtcNow;
+
+            if (updateTeamDto.AvatarFile != null)
+            {
+                string avatarUrl = await _cloudinaryHelper.UploadImageAsync(updateTeamDto.AvatarFile);
+                team.TeamAvatar = avatarUrl;
+            }
+
+            await _teamRepository.UpdateAsync(team);
+            return MapToDTO(team);
         }
     }
 }

@@ -13,5 +13,6 @@ namespace Repositories
         Task<bool> UpdateStatusAsync(int teamId, string status);
         Task<int> CountTeamsInSemesterAsync(int semesterId);
         Task<Team?> GetTeamByStudentIdAsync(int studentId, int semesterId);
+        Task<bool> UpdateAsync(Team team);
     }
 }
