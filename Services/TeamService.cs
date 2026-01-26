@@ -48,8 +48,8 @@ namespace Services
             {
                 TeamCode = teamCode,
                 TeamName = createTeamDto.TeamName,
-                Description = createTeamDto.Description,
-                TeamAvatar = "https://cdn.haitrieu.com/wp-content/uploads/2021/10/Logo-Dai-hoc-FPT.png", // Default FPT Logo
+                Description = !string.IsNullOrEmpty(createTeamDto.Description) ? createTeamDto.Description : "A proactively created team for Capstone Project.",
+                TeamAvatar = "https://ui-avatars.com/api/?name=" + Uri.EscapeDataString(createTeamDto.TeamName) + "&background=random&color=fff",
                 SemesterId = currentSemester.SemesterId,
                 LeaderId = leaderId,
                 Status = "Insufficient",
