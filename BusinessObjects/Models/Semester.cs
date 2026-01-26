@@ -16,4 +16,6 @@ public partial class Semester
     public bool IsActive { get; set; }
 
     public virtual ICollection<Team> Teams { get; set; } = new List<Team>();
+
+    public virtual ICollection<Whitelist> Whitelists { get; set; } = new List<Whitelist>();
 }

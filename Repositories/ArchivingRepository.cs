@@ -16,10 +16,23 @@ namespace Repositories
     public class ArchivingRepository : IArchivingRepository
     {
         private readonly FctmsContext _context;
+        private readonly ITeamDAO _teamDAO;
+        private readonly IWhitelistDAO _whitelistDAO;
+        private readonly IArchivedTeamDAO _archivedTeamDAO;
+        private readonly IArchivedWhitelistDAO _archivedWhitelistDAO;
 
-        public ArchivingRepository(FctmsContext context)
+        public ArchivingRepository(
+            FctmsContext context,
+            ITeamDAO teamDAO,
+            IWhitelistDAO whitelistDAO,
+            IArchivedTeamDAO archivedTeamDAO,
+            IArchivedWhitelistDAO archivedWhitelistDAO)
         {
             _context = context;
+            _teamDAO = teamDAO;
+            _whitelistDAO = whitelistDAO;
+            _archivedTeamDAO = archivedTeamDAO;
+            _archivedWhitelistDAO = archivedWhitelistDAO;
         }
 
         public async Task ArchiveSemesterAsync(int semesterId)
@@ -28,9 +41,7 @@ namespace Repositories
             try
             {
                 // 1. Archive Whitelists
-                var whitelistsToArchive = await _context.Whitelists
-                    .Where(w => w.SemesterId == semesterId)
-                    .ToListAsync();
+                var whitelistsToArchive = await _whitelistDAO.GetBySemesterIdAsync(semesterId);
 
                 if (whitelistsToArchive.Any())
                 {
@@ -46,19 +57,12 @@ namespace Repositories
                         ArchivedAt = DateTime.UtcNow
                     });
 
-                    await _context.ArchivedWhitelists.AddRangeAsync(archivedWhitelists);
-                    _context.Whitelists.RemoveRange(whitelistsToArchive);
+                    await _archivedWhitelistDAO.AddRangeAsync(archivedWhitelists);
+                    await _whitelistDAO.DeleteRangeAsync(whitelistsToArchive);
                 }
 
-                // 2. Archive Completed/Disbanded Teams
-                // Policy: Archive ALL teams of the semester when it ends? 
-                // Or only certain statuses? 
-                // Assumption: When semester ends, ALL teams should be archived to clear the board.
-                var teamsToArchive = await _context.Teams
-                    .Where(t => t.SemesterId == semesterId)
-                    .Include(t => t.Teammembers)
-                    .Include(t => t.Teaminvitations)
-                    .ToListAsync();
+                // 2. Archive Teams
+                var teamsToArchive = await _teamDAO.GetForArchivingAsync(semesterId);
 
                 if (teamsToArchive.Any())
                 {
@@ -78,18 +82,10 @@ namespace Repositories
                         })
                     });
 
-                    await _context.ArchivedTeams.AddRangeAsync(archivedTeams);
-                    
-                    // Delete relationships first due to FKs
-                    foreach (var team in teamsToArchive)
-                    {
-                        _context.Teammembers.RemoveRange(team.Teammembers);
-                        _context.Teaminvitations.RemoveRange(team.Teaminvitations);
-                    }
-                    _context.Teams.RemoveRange(teamsToArchive);
+                    await _archivedTeamDAO.AddRangeAsync(archivedTeams);
+                    await _teamDAO.DeleteRangeAsync(teamsToArchive);
                 }
 
-                await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
             catch (Exception)

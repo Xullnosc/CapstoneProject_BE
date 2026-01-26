@@ -1,7 +1,9 @@
+using BusinessObjects.DTOs;
 using BusinessObjects.Models;
-using Repositories;
+using AutoMapper;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Repositories;
 
 namespace Services
 {
@@ -9,32 +11,37 @@ namespace Services
     {
         private readonly ISemesterRepository _semesterRepository;
         private readonly IArchivingService _archivingService;
+        private readonly IMapper _mapper;
 
-        public SemesterService(ISemesterRepository semesterRepository, IArchivingService archivingService)
+        public SemesterService(ISemesterRepository semesterRepository, IArchivingService archivingService, IMapper mapper)
         {
             _semesterRepository = semesterRepository;
             _archivingService = archivingService;
+            _mapper = mapper;
         }
 
-        public async Task<List<Semester>> GetAllSemestersAsync()
+        public async Task<List<SemesterDTO>> GetAllSemestersAsync()
         {
-            return await _semesterRepository.GetAllSemestersAsync();
+            var semesters = await _semesterRepository.GetAllSemestersAsync();
+            return _mapper.Map<List<SemesterDTO>>(semesters);
         }
 
-        public async Task<Semester?> GetSemesterByIdAsync(int id)
+        public async Task<SemesterDTO?> GetSemesterByIdAsync(int id)
         {
-            return await _semesterRepository.GetSemesterByIdAsync(id);
+            var semester = await _semesterRepository.GetSemesterByIdAsync(id);
+            return _mapper.Map<SemesterDTO>(semester);
         }
 
-        public async Task<Semester> CreateSemesterAsync(Semester semester)
+        public async Task<SemesterDTO> CreateSemesterAsync(SemesterCreateDTO semesterCreateDTO)
         {
-            // Business logic validation can be added here
-            return await _semesterRepository.CreateSemesterAsync(semester);
+            var semester = _mapper.Map<Semester>(semesterCreateDTO);
+            var createdSemester = await _semesterRepository.CreateSemesterAsync(semester);
+            return _mapper.Map<SemesterDTO>(createdSemester);
         }
 
-        public async Task UpdateSemesterAsync(Semester semester)
+        public async Task UpdateSemesterAsync(SemesterCreateDTO semesterCreateDTO)
         {
-             // Business logic validation can be added here
+            var semester = _mapper.Map<Semester>(semesterCreateDTO);
             await _semesterRepository.UpdateSemesterAsync(semester);
         }
 

@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace DataAccess
 {
-    public class ArchivedTeamDAO
+    public class ArchivedTeamDAO : IArchivedTeamDAO
     {
         private readonly FctmsContext _context;
 

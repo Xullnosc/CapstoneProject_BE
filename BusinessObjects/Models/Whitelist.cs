@@ -21,7 +21,7 @@ public partial class Whitelist
 
     public int? SemesterId { get; set; }
 
-    public virtual Semester? Semester { get; set; }
-
     public virtual Role? Role { get; set; }
+
+    public virtual Semester? Semester { get; set; }
 }

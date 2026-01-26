@@ -15,5 +15,7 @@ namespace DataAccess
         Task<List<string>> GetTeamCodesBySemesterAsync(int semesterId);
         Task<Team?> GetTeamByStudentIdAsync(int studentId, int semesterId);
         Task<bool> UpdateAsync(Team team);
+        Task<List<Team>> GetForArchivingAsync(int semesterId);
+        Task DeleteRangeAsync(IEnumerable<Team> teams);
     }
 }
