@@ -33,7 +33,7 @@ jobs:
         run: |
           dotnet test FCTMS.Tests/FCTMS.Tests.csproj \
             --configuration Release \
-            --no-build
+            --verbosity normal
   deploy-test:
     needs: build-test
     runs-on: ubuntu-latest
