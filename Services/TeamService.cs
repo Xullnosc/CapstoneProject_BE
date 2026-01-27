@@ -14,9 +14,9 @@ namespace Services
         private readonly ITeamRepository _teamRepository;
         private readonly ISemesterRepository _semesterRepository;
         private readonly IUserRepository _userRepository;
-        private readonly CloudinaryHelper _cloudinaryHelper;
+        private readonly ICloudinaryHelper _cloudinaryHelper;
 
-        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, CloudinaryHelper cloudinaryHelper)
+        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, ICloudinaryHelper cloudinaryHelper)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
