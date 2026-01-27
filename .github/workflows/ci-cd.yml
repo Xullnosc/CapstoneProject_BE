@@ -2,13 +2,14 @@ name: ASP.NET Web API CI
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: Test
 
     steps:
       - name: Checkout repository
@@ -17,7 +18,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'   # change to 7.0.x if needed
+          dotnet-version: "8.0.x" # change to 7.0.x if needed
 
       - name: Restore dependencies
         run: dotnet restore
@@ -26,7 +27,8 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
       - name: Run tests
-        run: dotnet test --no-build --verbosity normal
+        run:
+          dotnet test --no-build --verbosity normal
 
           # ---- Docker ----
       - name: Login to Docker Hub
@@ -41,11 +43,11 @@ jobs:
       - name: Azure Login
         uses: azure/login@v1
         with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Container App
         run: |
-        az containerapp update \
+          az containerapp update \
             --name fctmscapstone \
             --resource-group capstoneResourceGroup \
             --image docker.io/${{ secrets.DOCKER_USERNAME }}/capstone_be:2.0
