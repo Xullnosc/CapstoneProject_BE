@@ -1,24 +1,25 @@
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Threading.Tasks;
 
 namespace Services.Helpers
 {
-    public class CloudinaryHelper
+    public class CloudinaryHelper : ICloudinaryHelper
     {
         private readonly Cloudinary _cloudinary;
 
-        public CloudinaryHelper()
+        public CloudinaryHelper(IConfiguration configuration)
         {
-            var cloudName = Environment.GetEnvironmentVariable("CLOUDNAME");
-            var apiKey = Environment.GetEnvironmentVariable("APIKEY");
-            var apiSecret = Environment.GetEnvironmentVariable("APISECRET");
+            var cloudName = configuration["Cloudinary:CloudName"];
+            var apiKey = configuration["Cloudinary:ApiKey"];
+            var apiSecret = configuration["Cloudinary:ApiSecret"];
 
             if (string.IsNullOrEmpty(cloudName) || string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(apiSecret))
             {
-                throw new Exception("Cloudinary settings are missing in Environment Variables");
+                throw new Exception("Cloudinary settings are missing in Configuration");
             }
 
             var account = new Account(cloudName, apiKey, apiSecret);

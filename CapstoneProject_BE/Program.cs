@@ -1,16 +1,17 @@
 using System.Text;
 using BusinessObjects.Models;
 using DataAccess;
-using dotenv.net;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Repositories;
+using Services.Helpers;
 using Services;
 using Services.Mappings;
 
-DotEnv.Load();
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,7 +84,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ISemesterService, SemesterService>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IArchivingService, ArchivingService>();
-builder.Services.AddScoped<Services.Helpers.CloudinaryHelper>();
+builder.Services.AddScoped<ICloudinaryHelper, Services.Helpers.CloudinaryHelper>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
