@@ -7,7 +7,7 @@ COPY ["Services/Services.csproj", "Services/"]
 COPY ["DataAccess/DataAccess.csproj", "DataAccess/"]
 COPY ["Repositories/Repositories.csproj", "Repositories/"]
 
-RUN dotnet restore
+RUN dotnet restore CapstoneProject_BE/capstone_be.csproj
 
 COPY . .
 
