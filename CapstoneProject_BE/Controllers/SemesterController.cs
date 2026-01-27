@@ -11,7 +11,7 @@ namespace CapstoneProject_BE.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = CampusConstants.Roles.HOD)]
+    [Authorize]
     public class SemesterController : ControllerBase
     {
         private readonly ISemesterService _semesterService;
@@ -39,6 +39,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = CampusConstants.Roles.HOD)]
         public async Task<ActionResult<SemesterDTO>> CreateSemester(SemesterCreateDTO semesterCreateDTO)
         {
             var created = await _semesterService.CreateSemesterAsync(semesterCreateDTO);
@@ -46,6 +47,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = CampusConstants.Roles.HOD)]
         public async Task<IActionResult> UpdateSemester(int id, SemesterCreateDTO semesterCreateDTO)
         {
             if (id != semesterCreateDTO.SemesterId)
@@ -57,6 +59,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = CampusConstants.Roles.HOD)]
         public async Task<IActionResult> DeleteSemester(int id)
         {
             await _semesterService.DeleteSemesterAsync(id);
@@ -64,6 +67,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpPost("{id}/end")]
+        [Authorize(Roles = CampusConstants.Roles.HOD)]
         public async Task<IActionResult> EndSemester(int id)
         {
             try

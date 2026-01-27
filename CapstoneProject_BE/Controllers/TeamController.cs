@@ -1,16 +1,17 @@
-using System;
-using System.Security.Claims;
-using System.Threading.Tasks;
+using BusinessObjects;
 using BusinessObjects.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Services;
+using System;
+using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace CapstoneProject_BE.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    [Authorize(Roles = CampusConstants.Roles.Student)]
     public class TeamController : ControllerBase
     {
         private readonly ITeamService _teamService;
