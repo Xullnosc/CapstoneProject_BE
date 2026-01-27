@@ -1,0 +1,10 @@
+global using Xunit;
+global using Moq;
+global using FluentAssertions;
+global using Microsoft.AspNetCore.Mvc;
+global using BusinessObjects.Models;
+global using Services.DTOs;
+global using Services;
+global using Repositories;
+global using capstone_be.Controllers;
+global using CapstoneProject_BE.Controllers;
