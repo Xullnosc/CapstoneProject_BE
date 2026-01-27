@@ -1,13 +1,13 @@
-name: ASP.NET Web API CI
+name: ASP.NET Web API CI (Test)
 
 on:
-  push:
-    branches: ["master"]
   pull_request:
+    branches: ["master"]
+  push:
     branches: ["master"]
 
 jobs:
-  build:
+  build-test:
     runs-on: ubuntu-latest
     environment: Test
 
@@ -18,7 +18,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x" # change to 7.0.x if needed
+          dotnet-version: "8.0.x"
 
       - name: Restore dependencies
         run: dotnet restore
@@ -27,10 +27,20 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
       - name: Run tests
-        run:
-          dotnet test --no-build --verbosity normal
+        run: dotnet test --no-build --verbosity normal
 
-          # ---- Docker ----
+  deploy-test:
+    needs: build-test
+    runs-on: ubuntu-latest
+    environment: Test
+
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---- Docker ----
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
