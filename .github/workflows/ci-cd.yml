@@ -20,15 +20,20 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Restore dependencies
+      - name: Restore all projects
         run: dotnet restore
 
-      - name: Build
-        run: dotnet build --no-restore --configuration Release
+      - name: Build API (builds dependencies automatically)
+        run: |
+          dotnet build CapstoneProject_BE/capstone_be.csproj \
+            --configuration Release \
+            --no-restore
 
-      - name: Run tests
-        run: dotnet test --no-build --verbosity normal
-
+      - name: Test
+        run: |
+          dotnet test FCTMS.Tests/FCTMS.Tests.csproj \
+            --configuration Release \
+            --verbosity normal
   deploy-test:
     needs: build-test
     runs-on: ubuntu-latest

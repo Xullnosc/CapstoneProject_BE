@@ -1,8 +1,6 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
 WORKDIR /src
-
-COPY ["capstone_be.sln", "."]
 COPY ["CapstoneProject_BE/capstone_be.csproj", "CapstoneProject_BE/"]
 COPY ["BusinessObjects/BusinessObjects.csproj", "BusinessObjects/"]
 COPY ["Services/Services.csproj", "Services/"]
