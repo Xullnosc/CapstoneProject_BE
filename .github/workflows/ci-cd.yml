@@ -24,12 +24,14 @@ jobs:
         run: dotnet restore
 
       - name: Build API (builds dependencies automatically)
-        run: dotnet build CapstoneProject_BE/capstone_be.csproj \
+        run: |
+          dotnet build CapstoneProject_BE/capstone_be.csproj \
           --configuration Release \
           --no-restore
 
       - name: Test
-        run: dotnet test FCTMS.Tests/FCTMS.Tests.csproj \
+        run: |
+          dotnet test FCTMS.Tests/FCTMS.Tests.csproj \
           --configuration Release \
           --no-build
   deploy-test:
