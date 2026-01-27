@@ -58,14 +58,19 @@ builder.Services.AddSwaggerGen(c =>
 });
 builder.Services.AddHttpClient();
 
-builder.Services.AddCors(options =>
+var allowedOrigins = builder.Configuration["AllowedOrigins"];
+
+if (!string.IsNullOrEmpty(allowedOrigins))
 {
-    options.AddPolicy("AllowReactApp",
-        builder => builder
-            .WithOrigins("http://localhost:5173")
-            .AllowAnyMethod()
-            .AllowAnyHeader());
-});
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("AllowReactApp",
+            builder => builder
+                .WithOrigins(allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                .AllowAnyMethod()
+                .AllowAnyHeader());
+    });
+}
 
 // Dependency injection
 builder.Services.AddScoped<IAuthService, AuthService>();
