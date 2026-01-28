@@ -26,5 +26,27 @@ namespace BusinessObjects
             public const string Lecturer = "Lecturer";
             public const string Admin = "Admin";
         }
+
+        public static class InvitationStatus
+        {
+            public const string Pending = "Pending";
+            public const string Accepted = "Accepted";
+            public const string Declined = "Declined";
+            public const string Cancelled = "Cancelled";
+        }
+
+        public static class TeamStatus
+        {
+            public const string Pending = "Pending";
+            public const string Insufficient = "Insufficient";
+            public const string Disbanded = "Disbanded";
+            public const string Active = "Active"; // Assuming 'Active' exists or will be used
+        }
+
+        public static class TeamRole
+        {
+            public const string Leader = "Leader";
+            public const string Member = "Member";
+        }
     }
 }

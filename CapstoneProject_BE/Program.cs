@@ -79,12 +79,13 @@ if (!string.IsNullOrEmpty(allowedOrigins))
     });
 }
 
-// Dependency injection
+//Services (Services Layer)
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ISemesterService, SemesterService>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IArchivingService, ArchivingService>();
 builder.Services.AddScoped<ICloudinaryHelper, Services.Helpers.CloudinaryHelper>();
+builder.Services.AddScoped<ITeamInvitationService, TeamInvitationService>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
@@ -93,6 +94,8 @@ builder.Services.AddScoped<ISemesterDAO, SemesterDAO>();
 builder.Services.AddScoped<ITeamDAO, TeamDAO>();
 builder.Services.AddScoped<IArchivedWhitelistDAO, ArchivedWhitelistDAO>();
 builder.Services.AddScoped<IArchivedTeamDAO, ArchivedTeamDAO>();
+builder.Services.AddScoped<ITeamInvitationDAO, TeamInvitationDAO>();
+builder.Services.AddScoped<ITeamMemberDAO, TeamMemberDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -100,6 +103,8 @@ builder.Services.AddScoped<IWhitelistRepository, WhitelistRepository>();
 builder.Services.AddScoped<ISemesterRepository, SemesterRepository>();
 builder.Services.AddScoped<ITeamRepository, TeamRepository>();
 builder.Services.AddScoped<IArchivingRepository, ArchivingRepository>();
+builder.Services.AddScoped<ITeamInvitationRepository, TeamInvitationRepository>();
+builder.Services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
 
 //Middleware
 // AutoMapper
