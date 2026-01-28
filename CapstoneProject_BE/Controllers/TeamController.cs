@@ -123,8 +123,12 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-                
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (!int.TryParse(userIdClaim, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
+
                 // Check if user is leader
                 var team = await _teamService.GetTeamByIdAsync(id, userId);
                 if (team != null && team.LeaderId == userId)
@@ -140,7 +144,7 @@ namespace CapstoneProject_BE.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return StatusCode(500,new { message = ex.Message });
             }
         }
     }
