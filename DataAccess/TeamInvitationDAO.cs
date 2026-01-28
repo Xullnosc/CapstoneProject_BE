@@ -30,6 +30,7 @@ namespace DataAccess
                 .Include(i => i.Team)
                 .Include(i => i.InvitedByNavigation)
                 .Include(i => i.Student)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.InvitationId == invitationId);
         }
 
@@ -42,6 +43,7 @@ namespace DataAccess
                     .ThenInclude(t => t.Leader)
                 .Include(i => i.InvitedByNavigation)
                 .Include(i => i.Student)
+                .AsNoTracking()
                 .Where(i => i.StudentId == studentId)
                 .OrderByDescending(i => i.CreatedAt)
                 .ToListAsync();
@@ -53,6 +55,7 @@ namespace DataAccess
                 .Include(i => i.Team)
                 .Include(i => i.InvitedByNavigation)
                 .Include(i => i.Student)
+                .AsNoTracking()
                 .Where(i => i.TeamId == teamId)
                 .ToListAsync();
         }
@@ -91,6 +94,7 @@ namespace DataAccess
                     .ThenInclude(t => t.Leader)
                 .Include(i => i.InvitedByNavigation)
                 .Include(i => i.Student)
+                 .AsNoTracking()
                  .Where(i => i.StudentId == studentId && i.Status == CampusConstants.InvitationStatus.Pending)
                  .OrderByDescending(i => i.CreatedAt)
                  .ToListAsync();
