@@ -26,13 +26,16 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                if (!int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user token." });
+                }
                 var invitations = await _invitationService.GetMyInvitationsAsync(userId);
                 return Ok(invitations);
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return StatusCode(500, new { message = "An internal server error occurred.", details = ex.Message });
             }
         }
 
@@ -41,7 +44,10 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                if (!int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user token." });
+                }
                 await _invitationService.AcceptInvitationAsync(id, userId);
                 return Ok(new { message = "Invitation accepted successfully" });
             }
@@ -59,7 +65,7 @@ namespace CapstoneProject_BE.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return StatusCode(500, new { message = "An internal server error occurred.", details = ex.Message });
             }
         }
 
@@ -68,7 +74,10 @@ namespace CapstoneProject_BE.Controllers
         {
              try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                if (!int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user token." });
+                }
                 await _invitationService.DeclineInvitationAsync(id, userId);
                 return Ok(new { message = "Invitation declined successfully" });
             }
@@ -86,7 +95,7 @@ namespace CapstoneProject_BE.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return StatusCode(500, new { message = "An internal server error occurred.", details = ex.Message });
             }
         }
     }
