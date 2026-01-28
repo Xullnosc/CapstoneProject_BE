@@ -17,5 +17,6 @@ namespace DataAccess
         Task<bool> UpdateAsync(Team team);
         Task<List<Team>> GetForArchivingAsync(int semesterId);
         Task DeleteRangeAsync(IEnumerable<Team> teams);
+        Task DeleteAsync(Team team);
     }
 }

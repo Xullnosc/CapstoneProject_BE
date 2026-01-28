@@ -79,6 +79,7 @@ namespace DataAccess
         }
         public async Task<bool> UpdateAsync(Team team)
         {
+            if (team == null) throw new ArgumentNullException(nameof(team));
             _context.Teams.Update(team);
             return await _context.SaveChangesAsync() > 0;
         }
@@ -103,6 +104,20 @@ namespace DataAccess
                     _context.Teaminvitations.RemoveRange(team.Teaminvitations);
             }
             _context.Teams.RemoveRange(teams);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(Team team)
+        {
+            if (team == null) throw new ArgumentNullException(nameof(team));
+
+            if (team.Teammembers.Any())
+                _context.Teammembers.RemoveRange(team.Teammembers);
+
+            if (team.Teaminvitations.Any())
+                _context.Teaminvitations.RemoveRange(team.Teaminvitations);
+
+            _context.Teams.Remove(team);
             await _context.SaveChangesAsync();
         }
     }

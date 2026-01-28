@@ -15,15 +15,15 @@ namespace Services
         private readonly ISemesterRepository _semesterRepository;
         private readonly IUserRepository _userRepository;
         private readonly ICloudinaryHelper _cloudinaryHelper;
-
+        private readonly IArchivingRepository _archivingRepository;
         private readonly ITeamMemberRepository _teamMemberRepository;
-
-        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, ICloudinaryHelper cloudinaryHelper, ITeamMemberRepository teamMemberRepository)
+        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, ICloudinaryHelper cloudinaryHelper, IArchivingRepository archivingRepository, ITeamMemberRepository teamMemberRepository)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
             _userRepository = userRepository;
             _cloudinaryHelper = cloudinaryHelper;
+            _archivingRepository = archivingRepository;
             _teamMemberRepository = teamMemberRepository;
         }
 
@@ -132,7 +132,8 @@ namespace Services
             // TODO: Check if team has matched topic (when Topic module implemented)
             // if (team.TopicId != null && !semesterEnded) throw ...
 
-            return await _teamRepository.UpdateStatusAsync(teamId, "Disbanded");
+            await _archivingRepository.ArchiveTeamAsync(team);
+            return true;
         }
 
         public async Task<TeamDTO?> GetTeamByStudentIdAsync(int studentId)

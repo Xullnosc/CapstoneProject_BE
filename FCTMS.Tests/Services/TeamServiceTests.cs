@@ -1,10 +1,14 @@
-using System.Security.Claims;
 using BusinessObjects.DTOs;
-using CapstoneProject_BE.Controllers;
-using Services.Helpers;
-using Services;
-using Repositories;
 using BusinessObjects.Models;
+using Moq;
+using Repositories;
+using Services;
+using Services.Helpers;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Xunit;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 
 namespace FCTMS.Tests.Services
@@ -15,6 +19,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ISemesterRepository> _mockSemesterRepository;
         private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<ICloudinaryHelper> _mockCloudinaryHelper;
+        private readonly Mock<IArchivingRepository> _mockArchivingRepository;
         private readonly Mock<ITeamMemberRepository> _mockTeamMemberRepository;
         private readonly TeamService _teamService;
 
@@ -24,6 +29,7 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository = new Mock<ISemesterRepository>();
             _mockUserRepository = new Mock<IUserRepository>();
             _mockCloudinaryHelper = new Mock<ICloudinaryHelper>();
+            _mockArchivingRepository = new Mock<IArchivingRepository>();
             _mockTeamMemberRepository = new Mock<ITeamMemberRepository>();
 
             _teamService = new TeamService(
@@ -31,10 +37,58 @@ namespace FCTMS.Tests.Services
                 _mockSemesterRepository.Object,
                 _mockUserRepository.Object,
                 _mockCloudinaryHelper.Object,
+                _mockArchivingRepository.Object,
                 _mockTeamMemberRepository.Object
             );
         }
 
+        [Fact]
+        public async Task DisbandTeamAsync_ArchivesTeam_WhenLeaderRequests()
+        {
+            // Arrange
+            int teamId = 1;
+            int leaderId = 100;
+            var team = new Team
+            {
+                TeamId = teamId,
+                LeaderId = leaderId,
+                Status = "Insufficient",
+                Teammembers = new List<Teammember>() // Empty list is fine for this test, ArchivingRepo handles serialization
+            };
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId))
+                .ReturnsAsync(team);
+            _mockArchivingRepository.Setup(r => r.ArchiveTeamAsync(It.IsAny<Team>()))
+                .Returns(Task.CompletedTask);
+            // Act
+            var result = await _teamService.DisbandTeamAsync(teamId, leaderId);
+            // Assert
+            Assert.True(result);
+            _mockArchivingRepository.Verify(r => r.ArchiveTeamAsync(team), Times.Once);
+            _mockTeamRepository.Verify(r => r.UpdateStatusAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+        }
+        [Fact]
+        public async Task DisbandTeamAsync_ReturnsFalse_WhenTeamNotFound()
+        {
+            // Arrange
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(1))
+                .ReturnsAsync((Team)null);
+            // Act
+            var result = await _teamService.DisbandTeamAsync(1, 1);
+            // Assert
+            Assert.False(result);
+            _mockArchivingRepository.Verify(r => r.ArchiveTeamAsync(It.IsAny<Team>()), Times.Never);
+        }
+        [Fact]
+        public async Task DisbandTeamAsync_ThrowsException_WhenNotLeader()
+        {
+            // Arrange
+            var team = new Team { TeamId = 1, LeaderId = 999 };
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(1))
+                .ReturnsAsync(team);
+            // Act & Assert
+            await Assert.ThrowsAsync<Exception>(() => _teamService.DisbandTeamAsync(1, 1));
+            _mockArchivingRepository.Verify(r => r.ArchiveTeamAsync(It.IsAny<Team>()), Times.Never);
+        }
         [Fact]
         public async Task UpdateTeamAsync_ShouldUpdateNameAndDescription_WhenValid()
         {
