@@ -118,5 +118,31 @@ namespace CapstoneProject_BE.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+        [HttpDelete("{id}/leave")]
+        public async Task<IActionResult> LeaveTeam(int id)
+        {
+            try
+            {
+                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                
+                // Check if user is leader
+                var team = await _teamService.GetTeamByIdAsync(id, userId);
+                if (team != null && team.LeaderId == userId)
+                {
+                    return BadRequest(new { message = "You are the team leader. You must transfer leadership before leaving the team." });
+                }
+
+                bool result = await _teamService.RemoveMemberAsync(id, userId);
+
+                if (!result) return NotFound(new { message = "You are not in this team or could not leave." });
+
+                return Ok(new { message = "Left team successfully" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }
+
