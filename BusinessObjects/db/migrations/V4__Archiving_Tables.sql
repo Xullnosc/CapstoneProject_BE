@@ -8,7 +8,7 @@ ADD COLUMN SemesterId INT NULL,
 ADD CONSTRAINT FK_Whitelist_Semester FOREIGN KEY (SemesterId) REFERENCES Semesters(SemesterId);
 
 -- 2. Create ArchivedWhitelists Table
-CREATE TABLE archived_whitelists (
+CREATE TABLE IF NOT EXISTS archived_whitelists (
     ArchivedWhitelistId INT AUTO_INCREMENT PRIMARY KEY,
     OriginalWhitelistId INT NOT NULL, -- Keep reference to original ID if needed, or just for audit
     StudentCode VARCHAR(50),
@@ -24,7 +24,7 @@ CREATE TABLE archived_whitelists (
 );
 
 -- 3. Create ArchivedTeams Table
-CREATE TABLE archived_teams (
+CREATE TABLE IF NOT EXISTS archived_teams (
     ArchivedTeamId INT AUTO_INCREMENT PRIMARY KEY,
     OriginalTeamId INT NOT NULL,
     TeamCode VARCHAR(50),
