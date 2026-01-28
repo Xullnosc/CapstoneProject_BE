@@ -15,27 +15,27 @@ namespace FCTMS.Tests.Services
 {
     public class TeamServiceTests
     {
-        private readonly Mock<ITeamRepository> _mockTeamRepo;
-        private readonly Mock<ISemesterRepository> _mockSemesterRepo;
-        private readonly Mock<IUserRepository> _mockUserRepo;
+        private readonly Mock<ITeamRepository> _mockTeamRepository;
+        private readonly Mock<ISemesterRepository> _mockSemesterRepository;
+        private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<ICloudinaryHelper> _mockCloudinaryHelper;
-        private readonly Mock<IArchivingRepository> _mockArchivingRepo;
+        private readonly Mock<IArchivingRepository> _mockArchivingRepository;
         private readonly TeamService _teamService;
 
         public TeamServiceTests()
         {
-            _mockTeamRepo = new Mock<ITeamRepository>();
-            _mockSemesterRepo = new Mock<ISemesterRepository>();
-            _mockUserRepo = new Mock<IUserRepository>();
+            _mockTeamRepository = new Mock<ITeamRepository>();
+            _mockSemesterRepository = new Mock<ISemesterRepository>();
+            _mockUserRepository = new Mock<IUserRepository>();
             _mockCloudinaryHelper = new Mock<ICloudinaryHelper>();
-            _mockArchivingRepo = new Mock<IArchivingRepository>();
+            _mockArchivingRepository = new Mock<IArchivingRepository>();
 
             _teamService = new TeamService(
-                _mockTeamRepo.Object,
-                _mockSemesterRepo.Object,
-                _mockUserRepo.Object,
+                _mockTeamRepository.Object,
+                _mockSemesterRepository.Object,
+                _mockUserRepository.Object,
                 _mockCloudinaryHelper.Object,
-                _mockArchivingRepo.Object
+                _mockArchivingRepository.Object
             );
         }
 
@@ -45,7 +45,6 @@ namespace FCTMS.Tests.Services
             // Arrange
             int teamId = 1;
             int leaderId = 100;
-
             var team = new Team
             {
                 TeamId = teamId,
@@ -53,48 +52,39 @@ namespace FCTMS.Tests.Services
                 Status = "Insufficient",
                 Teammembers = new List<Teammember>() // Empty list is fine for this test, ArchivingRepo handles serialization
             };
-
-            _mockTeamRepo.Setup(r => r.GetByIdAsync(teamId))
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId))
                 .ReturnsAsync(team);
-
-            _mockArchivingRepo.Setup(r => r.ArchiveTeamAsync(It.IsAny<Team>()))
+            _mockArchivingRepository.Setup(r => r.ArchiveTeamAsync(It.IsAny<Team>()))
                 .Returns(Task.CompletedTask);
-
             // Act
             var result = await _teamService.DisbandTeamAsync(teamId, leaderId);
-
             // Assert
             Assert.True(result);
-            _mockArchivingRepo.Verify(r => r.ArchiveTeamAsync(team), Times.Once);
-            _mockTeamRepo.Verify(r => r.UpdateStatusAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+            _mockArchivingRepository.Verify(r => r.ArchiveTeamAsync(team), Times.Once);
+            _mockTeamRepository.Verify(r => r.UpdateStatusAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
         }
-
         [Fact]
         public async Task DisbandTeamAsync_ReturnsFalse_WhenTeamNotFound()
         {
             // Arrange
-            _mockTeamRepo.Setup(r => r.GetByIdAsync(1))
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(1))
                 .ReturnsAsync((Team)null);
-
             // Act
             var result = await _teamService.DisbandTeamAsync(1, 1);
-
             // Assert
             Assert.False(result);
-            _mockArchivingRepo.Verify(r => r.ArchiveTeamAsync(It.IsAny<Team>()), Times.Never);
+            _mockArchivingRepository.Verify(r => r.ArchiveTeamAsync(It.IsAny<Team>()), Times.Never);
         }
-
         [Fact]
         public async Task DisbandTeamAsync_ThrowsException_WhenNotLeader()
         {
             // Arrange
             var team = new Team { TeamId = 1, LeaderId = 999 };
-            _mockTeamRepo.Setup(r => r.GetByIdAsync(1))
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(1))
                 .ReturnsAsync(team);
-
             // Act & Assert
             await Assert.ThrowsAsync<Exception>(() => _teamService.DisbandTeamAsync(1, 1));
-            _mockArchivingRepo.Verify(r => r.ArchiveTeamAsync(It.IsAny<Team>()), Times.Never);
+            _mockArchivingRepository.Verify(r => r.ArchiveTeamAsync(It.IsAny<Team>()), Times.Never);
         }
         [Fact]
         public async Task UpdateTeamAsync_ShouldUpdateNameAndDescription_WhenValid()
@@ -117,7 +107,7 @@ namespace FCTMS.Tests.Services
                 Teammembers = new List<Teammember>() // Prevent NullReferenceException in MapToDTO
             };
 
-            _mockTeamRepo.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
 
             // Act
             var result = await _teamService.UpdateTeamAsync(teamId, leaderId, updateDto);
@@ -125,7 +115,7 @@ namespace FCTMS.Tests.Services
             // Assert
             result.TeamName.Should().Be("Updated Name");
             result.Description.Should().Be("Updated Description");
-            _mockTeamRepo.Verify(x => x.UpdateAsync(existingTeam), Times.Once);
+            _mockTeamRepository.Verify(x => x.UpdateAsync(existingTeam), Times.Once);
         }
 
         [Fact]
@@ -150,7 +140,7 @@ namespace FCTMS.Tests.Services
                 Teammembers = new List<Teammember>()
             };
 
-            _mockTeamRepo.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
             _mockCloudinaryHelper.Setup(x => x.UploadImageAsync(mockFile.Object)).ReturnsAsync("new_secure_url");
 
             // Act
@@ -167,7 +157,7 @@ namespace FCTMS.Tests.Services
         {
             // Arrange
             int teamId = 99;
-            _mockTeamRepo.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync((Team)null!);
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync((Team)null!);
 
             // Act
             Func<Task> act = async () => await _teamService.UpdateTeamAsync(teamId, 1, new UpdateTeamDTO());
@@ -191,7 +181,7 @@ namespace FCTMS.Tests.Services
                 Teammembers = new List<Teammember>()
             };
 
-            _mockTeamRepo.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
 
             // Act
             Func<Task> act = async () => await _teamService.UpdateTeamAsync(teamId, otherUserId, new UpdateTeamDTO());

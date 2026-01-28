@@ -170,5 +170,20 @@ namespace FCTMS.Tests.Controllers
             var objectResult = Assert.IsType<ObjectResult>(result);
             Assert.Equal(403, objectResult.StatusCode);
         }
+
+        [Fact]
+        public async Task AcceptInvitation_Returns500_WhenGenericException()
+        {
+             // Arrange
+            _mockInvitationService.Setup(s => s.AcceptInvitationAsync(1, 1))
+                .ThrowsAsync(new Exception("Database error"));
+
+            // Act
+            var result = await _controller.AcceptInvitation(1);
+
+            // Assert
+            var objectResult = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(500, objectResult.StatusCode);
+        }
     }
 }

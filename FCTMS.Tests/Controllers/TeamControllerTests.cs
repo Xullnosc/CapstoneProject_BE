@@ -6,6 +6,7 @@ using Services;
 using Repositories;
 using BusinessObjects.Models;
 using Microsoft.AspNetCore.Http;
+using Services.Helpers;
 
 namespace FCTMS.Tests.Controllers
 {
@@ -207,6 +208,66 @@ namespace FCTMS.Tests.Controllers
             // Note: TeamController catches Exception and returns BadRequest, NOT 500.
             var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
             badRequestResult.Value.Should().BeEquivalentTo(new { message = "Database connection failed" });
+        }
+        [Fact]
+        public async Task LeaveTeam_LeaderAttemptingToLeave_ReturnsBadRequest()
+        {
+            // Arrange
+            int teamId = 1;
+            int userId = 1; // From constructor claims
+            var team = new TeamDTO { TeamId = teamId, LeaderId = userId };
+
+            _mockTeamService.Setup(x => x.GetTeamByIdAsync(teamId, userId))
+                .ReturnsAsync(team);
+
+            // Act
+            var result = await _controller.LeaveTeam(teamId);
+
+            // Assert
+            var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            badRequestResult.Value.ToString().Should().Contain("You are the team leader");
+        }
+
+        [Fact]
+        public async Task LeaveTeam_MemberLeaving_ReturnsOk()
+        {
+            // Arrange
+            int teamId = 1;
+            int userId = 1; // From constructor claims
+            int leaderId = 2;
+            var team = new TeamDTO { TeamId = teamId, LeaderId = leaderId };
+
+            _mockTeamService.Setup(x => x.GetTeamByIdAsync(teamId, userId))
+                .ReturnsAsync(team);
+            _mockTeamService.Setup(x => x.RemoveMemberAsync(teamId, userId))
+                .ReturnsAsync(true);
+
+            // Act
+            var result = await _controller.LeaveTeam(teamId);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.ToString().Should().Contain("Left team successfully");
+        }
+
+        [Fact]
+        public async Task LeaveTeam_ServiceFails_ReturnsNotFound()
+        {
+            // Arrange
+            int teamId = 1;
+            int userId = 1;
+            
+            // Case where GetTeamById returns null (or fails) OR RemoveMember returns false
+            _mockTeamService.Setup(x => x.GetTeamByIdAsync(teamId, userId))
+                .ReturnsAsync((TeamDTO)null!);
+            _mockTeamService.Setup(x => x.RemoveMemberAsync(teamId, userId))
+                .ReturnsAsync(false);
+
+            // Act
+            var result = await _controller.LeaveTeam(teamId);
+
+            // Assert
+            result.Should().BeOfType<NotFoundObjectResult>();
         }
     }
 
