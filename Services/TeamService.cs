@@ -157,19 +157,19 @@ namespace Services
                 SemesterId = team.SemesterId,
                 LeaderId = team.LeaderId,
                 Status = team.Status,
-                MemberCount = team.Teammembers.Count,
+                MemberCount = team.Teammembers?.Count ?? 0,
                 CreatedAt = team.CreatedAt ?? DateTime.UtcNow,
-                Members = team.Teammembers.Select(tm => new TeamMemberDTO
+                Members = team.Teammembers?.Select(tm => new TeamMemberDTO
                 {
                     TeamMemberId = tm.TeamMemberId,
                     StudentId = tm.StudentId,
-                    StudentCode = tm.Student.StudentCode, 
-                    FullName = tm.Student.FullName,
-                    Email = tm.Student.Email,
-                    Avatar = tm.Student.Avatar,
+                    StudentCode = tm.Student?.StudentCode ?? "N/A", 
+                    FullName = tm.Student?.FullName ?? "Unknown",
+                    Email = tm.Student?.Email ?? "N/A",
+                    Avatar = tm.Student?.Avatar,
                     Role = tm.Role,
                     JoinedAt = tm.JoinedAt ?? DateTime.UtcNow
-                }).ToList()
+                }).ToList() ?? new List<TeamMemberDTO>()
             };
         }
 
