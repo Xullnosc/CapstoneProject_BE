@@ -146,17 +146,17 @@ namespace Services
                 TeamId = inv.TeamId,
                 Team = new TeamInfoDTO
                 {
-                    TeamId = inv.Team.TeamId,
-                    TeamName = inv.Team.TeamName,
-                    TeamAvatar = inv.Team.TeamAvatar,
-                    MemberCount = inv.Team.Teammembers.Count,
-                    LeaderName = inv.Team.Leader?.FullName ?? "Unknown" 
+                    TeamId = inv.Team?.TeamId ?? 0,
+                    TeamName = inv.Team?.TeamName ?? "Unknown Team",
+                    TeamAvatar = inv.Team?.TeamAvatar,
+                    MemberCount = inv.Team?.Teammembers?.Count ?? 0,
+                    LeaderName = inv.Team?.Leader?.FullName ?? "Unknown" 
                 },
                 StudentId = inv.StudentId,
                 InvitedBy = new InvitedByDTO
                 {
                     UserId = inv.InvitedBy,
-                    Name = inv.InvitedByNavigation.FullName
+                    Name = inv.InvitedByNavigation?.FullName ?? "Unknown"
                 },
                 Status = inv.Status,
                 CreatedAt = inv.CreatedAt ?? DateTime.UtcNow
