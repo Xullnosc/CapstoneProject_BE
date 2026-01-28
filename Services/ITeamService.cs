@@ -12,5 +12,6 @@ namespace Services
         Task<bool> DisbandTeamAsync(int teamId, int leaderId);
         Task<TeamDTO?> GetTeamByStudentIdAsync(int studentId);
         Task<TeamDTO> UpdateTeamAsync(int teamId, int leaderId, BusinessObjects.DTOs.UpdateTeamDTO updateTeamDto);
+        Task<bool> RemoveMemberAsync(int teamId, int studentId);
     }
 }

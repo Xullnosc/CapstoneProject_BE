@@ -16,12 +16,15 @@ namespace Services
         private readonly IUserRepository _userRepository;
         private readonly ICloudinaryHelper _cloudinaryHelper;
 
-        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, ICloudinaryHelper cloudinaryHelper)
+        private readonly ITeamMemberRepository _teamMemberRepository;
+
+        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, ICloudinaryHelper cloudinaryHelper, ITeamMemberRepository teamMemberRepository)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
             _userRepository = userRepository;
             _cloudinaryHelper = cloudinaryHelper;
+            _teamMemberRepository = teamMemberRepository;
         }
 
         public async Task<TeamDTO> CreateTeamAsync(int leaderId, CreateTeamDTO createTeamDto)
@@ -191,6 +194,11 @@ namespace Services
 
             await _teamRepository.UpdateAsync(team);
             return MapToDTO(team);
+        }
+
+        public async Task<bool> RemoveMemberAsync(int teamId, int studentId)
+        {
+            return await _teamMemberRepository.RemoveMemberAsync(teamId, studentId);
         }
     }
 }
