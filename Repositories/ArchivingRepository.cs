@@ -11,6 +11,7 @@ namespace Repositories
     public interface IArchivingRepository
     {
         Task ArchiveSemesterAsync(int semesterId);
+        Task ArchiveTeamAsync(Team team);
     }
 
     public class ArchivingRepository : IArchivingRepository
@@ -85,6 +86,39 @@ namespace Repositories
                     await _archivedTeamDAO.AddRangeAsync(archivedTeams);
                     await _teamDAO.DeleteRangeAsync(teamsToArchive);
                 }
+
+                await transaction.CommitAsync();
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+        public async Task ArchiveTeamAsync(Team team)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var archivedTeam = new ArchivedTeam
+                {
+                    OriginalTeamId = team.TeamId,
+                    TeamCode = team.TeamCode,
+                    TeamName = team.TeamName,
+                    SemesterId = team.SemesterId,
+                    LeaderId = team.LeaderId,
+                    Status = "Disbanded", // Force status to Disbanded since this action is only for Disband
+                    ArchivedAt = DateTime.UtcNow,
+                    JsonData = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        Members = team.Teammembers.Select(m => new { m.StudentId, m.Role }),
+                        TopicId = 0 
+                    })
+                };
+
+                await _archivedTeamDAO.AddAsync(archivedTeam);
+                await _teamDAO.DeleteAsync(team);
 
                 await transaction.CommitAsync();
             }

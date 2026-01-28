@@ -21,6 +21,12 @@ namespace DataAccess
             await _context.SaveChangesAsync();
         }
 
+        public async Task AddAsync(ArchivedTeam archivedTeam)
+        {
+            _context.ArchivedTeams.Add(archivedTeam);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<List<ArchivedTeam>> GetBySemesterIdAsync(int semesterId)
         {
             return await _context.ArchivedTeams
