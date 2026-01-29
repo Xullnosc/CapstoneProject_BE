@@ -90,7 +90,7 @@ namespace FCTMS.Tests.Services
         public async Task CreateSemesterAsync_ShouldThrow_WhenCodeExists()
         {
             // Arrange
-            var createDto = new SemesterCreateDTO { SemesterCode = "SP26" };
+            var createDto = new SemesterCreateDTO { SemesterCode = "SP26", SemesterName = "Spring 2026" };
             var existingSemester = new Semester { SemesterId = 99, SemesterCode = "SP26" };
 
             // Setup: GetSemesterByCodeAsync returns an existing semester
@@ -115,7 +115,7 @@ namespace FCTMS.Tests.Services
         public async Task UpdateSemesterAsync_ShouldSucceed_WhenCodeIsUnique()
         {
             // Arrange
-            var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SU26" };
+            var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SU26", SemesterName = "Summer 2026" };
 
             // Setup: GetSemesterByCodeAsync returns null
             _mockSemesterRepository.Setup(r => r.GetSemesterByCodeAsync(updateDto.SemesterCode))
@@ -135,7 +135,7 @@ namespace FCTMS.Tests.Services
         public async Task UpdateSemesterAsync_ShouldThrow_WhenCodeExistsAndNotSameId()
         {
             // Arrange
-            var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26" };
+            var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026" };
             
             // Existing semester with same code but DIFFERENT ID
             var conflictSemester = new Semester { SemesterId = 2, SemesterCode = "SP26" };
@@ -157,7 +157,7 @@ namespace FCTMS.Tests.Services
         public async Task UpdateSemesterAsync_ShouldSucceed_WhenCodeExistsButIsSameId()
         {
             // Arrange
-            var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26" };
+            var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026" };
 
             // Existing semester is SELF (same ID)
             var selfSemester = new Semester { SemesterId = 1, SemesterCode = "SP26" };
@@ -195,6 +195,8 @@ namespace FCTMS.Tests.Services
             };
 
             _mockSemesterRepository.Setup(r => r.GetAllSemestersAsync()).ReturnsAsync(semesters);
+            _mockArchivingService.Setup(s => s.GetArchivedTeamsBySemesterIdsAsync(It.IsAny<List<int>>()))
+                .ReturnsAsync(new List<ArchivedTeam>());
             _mockMapper.Setup(m => m.Map<List<SemesterDTO>>(semesters)).Returns(semesterDTOs);
 
             // Act
@@ -214,6 +216,8 @@ namespace FCTMS.Tests.Services
             var semesterDTOs = new List<SemesterDTO>();
 
             _mockSemesterRepository.Setup(r => r.GetAllSemestersAsync()).ReturnsAsync(semesters);
+            _mockArchivingService.Setup(s => s.GetArchivedTeamsBySemesterIdsAsync(It.IsAny<List<int>>()))
+                .ReturnsAsync(new List<ArchivedTeam>());
             _mockMapper.Setup(m => m.Map<List<SemesterDTO>>(semesters)).Returns(semesterDTOs);
 
             // Act
