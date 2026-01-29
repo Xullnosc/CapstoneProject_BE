@@ -147,6 +147,97 @@ namespace CapstoneProject_BE.Controllers
                 return StatusCode(500,new { message = ex.Message });
             }
         }
+
+
+        [HttpDelete("{id}/members/{memberId}")]
+        public async Task<IActionResult> RemoveMember(int id, int memberId)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (!int.TryParse(userIdClaim, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
+
+                // Get team to verify leader
+                var team = await _teamService.GetTeamByIdAsync(id, userId);
+                if (team == null)
+                {
+                    return NotFound(new { message = "Team not found." });
+                }
+
+                // Check if current user is the leader
+                if (team.LeaderId != userId)
+                {
+                    return StatusCode(403, new { message = "Only the team leader can remove members." });
+                }
+
+                // Check if trying to remove the leader
+                if (team.LeaderId == memberId)
+                {
+                    return BadRequest(new { message = "Cannot remove the team leader. Transfer leadership first." });
+                }
+
+                // Check if member exists in team
+                var memberExists = team.Members?.Any(m => m.StudentId == memberId) ?? false;
+                if (!memberExists)
+                {
+                    return NotFound(new { message = "Member not found in this team." });
+                }
+
+                // Remove the member
+                bool result = await _teamService.RemoveMemberAsync(id, memberId);
+
+                if (!result)
+                {
+                    return NotFound(new { message = "Member could not be removed." });
+                }
+
+                return Ok(new { message = "Member removed successfully" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+
+
+        [HttpPut("{id}/leader")]
+        public async Task<IActionResult> ChangeLeader(int id, [FromBody] ChangeLeaderDTO changeLeaderDto)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (!int.TryParse(userIdClaim, out int currentLeaderId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
+
+                bool result = await _teamService.ChangeLeaderAsync(id, currentLeaderId, changeLeaderDto.NewLeaderId);
+                
+                if (!result) return NotFound(new { message = "Team not found." });
+
+                return Ok(new { message = "Leadership transferred successfully." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
     }
 }
 

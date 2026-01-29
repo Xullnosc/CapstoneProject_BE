@@ -269,6 +269,83 @@ namespace FCTMS.Tests.Controllers
             // Assert
             result.Should().BeOfType<NotFoundObjectResult>();
         }
+
+        [Fact]
+        public async Task ChangeLeader_ValidRequest_ReturnsOk()
+        {
+            // Arrange
+            int teamId = 1;
+            int currentLeaderId = 1; // From constructor claims
+            var dto = new ChangeLeaderDTO { NewLeaderId = 2 };
+
+            _mockTeamService.Setup(x => x.ChangeLeaderAsync(teamId, currentLeaderId, dto.NewLeaderId))
+                .ReturnsAsync(true);
+
+            // Act
+            var result = await _controller.ChangeLeader(teamId, dto);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.ToString().Should().Contain("Leadership transferred successfully");
+        }
+
+        [Fact]
+        public async Task ChangeLeader_NotCurrentLeader_ReturnsForbidden()
+        {
+            // Arrange
+            int teamId = 1;
+            int currentLeaderId = 1;
+            var dto = new ChangeLeaderDTO { NewLeaderId = 2 };
+
+            _mockTeamService.Setup(x => x.ChangeLeaderAsync(teamId, currentLeaderId, dto.NewLeaderId))
+                .ThrowsAsync(new UnauthorizedAccessException("Only the current team leader can transfer leadership."));
+
+            // Act
+            var result = await _controller.ChangeLeader(teamId, dto);
+
+            // Assert
+            var statusCodeResult = result.Should().BeOfType<ObjectResult>().Subject;
+            statusCodeResult.StatusCode.Should().Be(403);
+            statusCodeResult.Value.ToString().Should().Contain("Only the current team leader can transfer leadership");
+        }
+
+        [Fact]
+        public async Task ChangeLeader_NewLeaderNotMember_ReturnsBadRequest()
+        {
+            // Arrange
+            int teamId = 1;
+            int currentLeaderId = 1;
+            var dto = new ChangeLeaderDTO { NewLeaderId = 99 };
+
+            _mockTeamService.Setup(x => x.ChangeLeaderAsync(teamId, currentLeaderId, dto.NewLeaderId))
+                .ThrowsAsync(new ArgumentException("The new leader must be a member of the team."));
+
+            // Act
+            var result = await _controller.ChangeLeader(teamId, dto);
+
+            // Assert
+            var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            badRequestResult.Value.ToString().Should().Contain("The new leader must be a member of the team");
+        }
+
+        [Fact]
+        public async Task ChangeLeader_TeamNotFound_ReturnsNotFound()
+        {
+            // Arrange
+            int teamId = 99;
+            int currentLeaderId = 1;
+            var dto = new ChangeLeaderDTO { NewLeaderId = 2 };
+
+            _mockTeamService.Setup(x => x.ChangeLeaderAsync(teamId, currentLeaderId, dto.NewLeaderId))
+                .ReturnsAsync(false);
+
+            // Act
+            var result = await _controller.ChangeLeader(teamId, dto);
+
+            // Assert
+            var notFoundResult = result.Should().BeOfType<NotFoundObjectResult>().Subject;
+            notFoundResult.Value.ToString().Should().Contain("Team not found");
+        }
     }
 
 }
