@@ -10,5 +10,6 @@ namespace Services
         Task AcceptInvitationAsync(int invitationId, int studentId);
         Task DeclineInvitationAsync(int invitationId, int studentId);
         Task<TeamInvitationDTO> SendInvitationAsync(int teamId, int inviterId, string studentCodeOrEmail);
+        Task CancelInvitationAsync(int invitationId, int userId);
     }
 }

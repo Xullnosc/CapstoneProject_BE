@@ -1,4 +1,5 @@
 ﻿using BusinessObjects.Models;
+using BusinessObjects;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -49,6 +50,16 @@ namespace DataAccess
             
             // Reload to get navigation properties esp. Role
             await _context.Entry(user).Reference(u => u.Role).LoadAsync();
+        }
+
+        public async Task<List<User>> SearchUsersAsync(string term)
+        {
+            return await _context.Users
+                .Include(u => u.Role)
+                .Where(u => (u.FullName.Contains(term) || u.Email.Contains(term) || u.StudentCode.Contains(term)) 
+                            && u.Role.RoleName == CampusConstants.Roles.Student) // Only search students
+                .Take(10) // Limit results
+                .ToListAsync();
         }
     }
 }

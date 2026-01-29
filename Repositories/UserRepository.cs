@@ -36,5 +36,10 @@ namespace Repositories
         {
             await _userDAO.UpdateAsync(user);
         }
+
+        public async Task<List<User>> SearchUsersAsync(string term)
+        {
+            return await _userDAO.SearchUsersAsync(term);
+        }
     }
 }

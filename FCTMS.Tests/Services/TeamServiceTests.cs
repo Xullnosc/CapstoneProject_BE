@@ -71,7 +71,7 @@ namespace FCTMS.Tests.Services
         {
             // Arrange
             _mockTeamRepository.Setup(r => r.GetByIdAsync(1))
-                .ReturnsAsync((Team)null);
+                .ReturnsAsync((Team?)null);
             // Act
             var result = await _teamService.DisbandTeamAsync(1, 1);
             // Assert

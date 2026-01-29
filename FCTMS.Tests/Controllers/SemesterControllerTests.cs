@@ -132,7 +132,7 @@ namespace FCTMS.Tests.Controllers
 
             // Assert
             var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-            okResult.Value.ToString().Should().Contain("ended successfully");
+            okResult.Value!.ToString().Should().Contain("ended successfully");
         }
 
 
@@ -197,7 +197,7 @@ namespace FCTMS.Tests.Controllers
             // Assert
             var serverError = result.Should().BeOfType<ObjectResult>().Subject;
             serverError.StatusCode.Should().Be(500);
-            serverError.Value.ToString().Should().Contain("An error occurred");
+            serverError.Value!.ToString().Should().Contain("An error occurred");
         }
     }
 }

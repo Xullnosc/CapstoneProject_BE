@@ -48,5 +48,10 @@ namespace Repositories
         {
             await _dao.CancelAllPendingInvitationsForStudentAsync(studentId);
         }
+
+        public async Task<Teaminvitation?> GetByTeamAndStudentAsync(int teamId, int studentId)
+        {
+            return await _dao.GetByTeamAndStudentAsync(teamId, studentId);
+        }
     }
 }

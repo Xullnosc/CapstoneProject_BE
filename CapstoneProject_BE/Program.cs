@@ -81,11 +81,13 @@ if (!string.IsNullOrEmpty(allowedOrigins))
 
 //Services (Services Layer)
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddScoped<ISemesterService, SemesterService>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IArchivingService, ArchivingService>();
 builder.Services.AddScoped<ICloudinaryHelper, Services.Helpers.CloudinaryHelper>();
 builder.Services.AddScoped<ITeamInvitationService, TeamInvitationService>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
