@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Services;
 using System;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -147,7 +148,6 @@ namespace CapstoneProject_BE.Controllers
                 return StatusCode(500,new { message = ex.Message });
             }
         }
-
 
         [HttpDelete("{id}/members/{memberId}")]
         public async Task<IActionResult> RemoveMember(int id, int memberId)
