@@ -46,6 +46,22 @@ namespace DataAccess
                 .ToListAsync();
         }
 
+        public async Task<(List<Team> Items, int TotalCount)> GetBySemesterPagedAsync(int semesterId, int page, int limit)
+        {
+            var query = _context.Teams
+                .Include(t => t.Teammembers)
+                .ThenInclude(tm => tm.Student)
+                .Where(t => t.SemesterId == semesterId && t.Status != "Disbanded");
+
+            int total = await query.CountAsync();
+            var items = await query
+                .Skip((page - 1) * limit)
+                .Take(limit)
+                .ToListAsync();
+
+            return (items, total);
+        }
+
         public async Task<bool> UpdateStatusAsync(int teamId, string status)
         {
             var team = await _context.Teams.FindAsync(teamId);

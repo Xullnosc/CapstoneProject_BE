@@ -1,3 +1,4 @@
+using BusinessObjects.Models;
 using Repositories;
 using System.Threading.Tasks;
 
@@ -15,6 +16,20 @@ namespace Services
         public async Task ArchiveSemesterAsync(int semesterId)
         {
             await _archivingRepository.ArchiveSemesterAsync(semesterId);
+        }
+        public async Task<List<ArchivedTeam>> GetArchivedTeamsBySemesterAsync(int semesterId)
+        {
+            return await _archivingRepository.GetArchivedTeamsBySemesterAsync(semesterId);
+        }
+
+        public async Task<List<ArchivedTeam>> GetArchivedTeamsBySemesterIdsAsync(List<int> semesterIds)
+        {
+            return await _archivingRepository.GetArchivedTeamsBySemesterIdsAsync(semesterIds);
+        }
+
+        public async Task<List<ArchivedTeam>> GetAllArchivedTeamsAsync()
+        {
+            return await _archivingRepository.GetAllArchivedTeamsAsync();
         }
     }
 }

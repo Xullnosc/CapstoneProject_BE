@@ -16,12 +16,19 @@ namespace DataAccess
 
         public async Task<List<Semester>> GetAllAsync()
         {
-            return await _context.Semesters.ToListAsync();
+            return await _context.Semesters
+                .Include(s => s.Teams)
+                .ToListAsync();
         }
 
         public async Task<Semester?> GetByIdAsync(int id)
         {
-            return await _context.Semesters.FindAsync(id);
+            return await _context.Semesters
+                .Include(s => s.Teams)
+                    .ThenInclude(t => t.Teammembers)
+                .Include(s => s.Whitelists)
+                    .ThenInclude(w => w.Role)
+                .FirstOrDefaultAsync(s => s.SemesterId == id);
         }
 
         public async Task<Semester> AddAsync(Semester semester)
@@ -37,21 +44,18 @@ namespace DataAccess
             await _context.SaveChangesAsync();
         }
 
-        public async Task DeleteAsync(int id)
-        {
-            var semester = await _context.Semesters.FindAsync(id);
-            if (semester != null)
-            {
-                _context.Semesters.Remove(semester);
-                await _context.SaveChangesAsync();
-            }
-        }
+
 
         public async Task<Semester?> GetCurrentSemesterAsync()
         {
             var now = System.DateTime.UtcNow;
             return await _context.Semesters
                 .FirstOrDefaultAsync(s => s.StartDate <= now && s.EndDate >= now);
+        }
+
+        public async Task<Semester?> GetByCodeAsync(string code)
+        {
+            return await _context.Semesters.FirstOrDefaultAsync(s => s.SemesterCode == code);
         }
     }
 }

@@ -10,7 +10,7 @@ namespace Repositories
         Task<Semester?> GetSemesterByIdAsync(int id);
         Task<Semester> CreateSemesterAsync(Semester semester);
         Task UpdateSemesterAsync(Semester semester);
-        Task DeleteSemesterAsync(int id);
         Task<Semester?> GetCurrentSemesterAsync();
+        Task<Semester?> GetSemesterByCodeAsync(string code);
     }
 }

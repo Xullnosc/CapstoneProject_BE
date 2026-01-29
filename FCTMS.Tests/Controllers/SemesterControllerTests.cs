@@ -104,20 +104,7 @@ namespace FCTMS.Tests.Controllers
             result.Should().BeOfType<NoContentResult>();
         }
 
-        [Fact]
-        public async Task DeleteSemester_ValidRequest_ReturnsNoContent()
-        {
-            // Arrange
-            int id = 1;
-            _mockSemesterService.Setup(x => x.DeleteSemesterAsync(id))
-                .Returns(Task.CompletedTask);
 
-            // Act
-            var result = await _controller.DeleteSemester(id);
-
-            // Assert
-            result.Should().BeOfType<NoContentResult>();
-        }
 
         [Fact]
         public async Task EndSemester_ValidId_ReturnsOk()
@@ -198,6 +185,39 @@ namespace FCTMS.Tests.Controllers
             var serverError = result.Should().BeOfType<ObjectResult>().Subject;
             serverError.StatusCode.Should().Be(500);
             serverError.Value.ToString().Should().Contain("An error occurred");
+        }
+
+        [Fact]
+        public async Task CreateSemester_DuplicateCode_ReturnsBadRequest()
+        {
+            // Arrange
+            var request = new SemesterCreateDTO { SemesterCode = "SP26" };
+            _mockSemesterService.Setup(x => x.CreateSemesterAsync(request))
+                .ThrowsAsync(new InvalidOperationException("Semester code 'SP26' already exists."));
+
+            // Act
+            var result = await _controller.CreateSemester(request);
+
+            // Assert
+            var badRequestResult = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            badRequestResult.Value.ToString().Should().Contain("Semester code 'SP26' already exists.");
+        }
+
+        [Fact]
+        public async Task UpdateSemester_DuplicateCode_ReturnsBadRequest()
+        {
+            // Arrange
+            int id = 1;
+            var request = new SemesterCreateDTO { SemesterId = id, SemesterCode = "SP26" };
+            _mockSemesterService.Setup(x => x.UpdateSemesterAsync(request))
+                .ThrowsAsync(new InvalidOperationException("Semester code 'SP26' already exists."));
+
+            // Act
+            var result = await _controller.UpdateSemester(id, request);
+
+            // Assert
+            var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            badRequestResult.Value.ToString().Should().Contain("Semester code 'SP26' already exists.");
         }
     }
 }
