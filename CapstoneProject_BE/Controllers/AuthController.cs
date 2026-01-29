@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Services.DTOs;
 using Services;
+using Services.DTOs;
+using StackExchange.Redis;
 
 namespace capstone_be.Controllers
 {
@@ -11,11 +12,25 @@ namespace capstone_be.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
+        private readonly IConnectionMultiplexer _redis;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(
+            IAuthService authService,
+            ILogger<AuthController> logger,
+            IConnectionMultiplexer redis
+        )
         {
             _authService = authService;
+            _redis = redis;
             _logger = logger;
+        }
+
+        [HttpGet("redis")]
+        public async Task<string> TestRedis()
+        {
+            var db = _redis.GetDatabase();
+            await db.StringSetAsync("hello", "Redis works!");
+            return await db.StringGetAsync("hello");
         }
 
         [HttpPost("login")]
@@ -27,7 +42,7 @@ namespace capstone_be.Controllers
                 {
                     return BadRequest(new { message = "Request body is null" });
                 }
-                
+
                 if (string.IsNullOrWhiteSpace(request.IdToken))
                 {
                     // Debugging: Log what we received
