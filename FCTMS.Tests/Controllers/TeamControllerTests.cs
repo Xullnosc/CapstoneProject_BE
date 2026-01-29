@@ -6,7 +6,7 @@ using Services;
 using Repositories;
 using BusinessObjects.Models;
 using Microsoft.AspNetCore.Http;
-using Services.Helpers;
+
 
 namespace FCTMS.Tests.Controllers
 {
@@ -175,7 +175,7 @@ namespace FCTMS.Tests.Controllers
 
             // Assert
             var notFoundResult = result.Should().BeOfType<NotFoundObjectResult>().Subject;
-            notFoundResult.Value.ToString().Should().Contain("Team not found");
+            notFoundResult.Value!.ToString().Should().Contain("Team not found");
         }
 
         [Fact]
@@ -225,7 +225,7 @@ namespace FCTMS.Tests.Controllers
 
             // Assert
             var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
-            badRequestResult.Value.ToString().Should().Contain("You are the team leader");
+            badRequestResult.Value!.ToString().Should().Contain("You are the team leader");
         }
 
         [Fact]
@@ -247,7 +247,7 @@ namespace FCTMS.Tests.Controllers
 
             // Assert
             var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-            okResult.Value.ToString().Should().Contain("Left team successfully");
+            okResult.Value!.ToString().Should().Contain("Left team successfully");
         }
 
         [Fact]

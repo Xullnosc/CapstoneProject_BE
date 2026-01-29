@@ -90,7 +90,7 @@ namespace FCTMS.Tests.Controllers
 
             // Assert
             var unauthorizedResult = result.Should().BeOfType<UnauthorizedObjectResult>().Subject;
-            unauthorizedResult.Value.ToString().Should().Contain("Danang");
+            unauthorizedResult.Value!.ToString().Should().Contain("Danang");
         }
 
         [Fact]

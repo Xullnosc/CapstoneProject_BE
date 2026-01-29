@@ -13,5 +13,6 @@ namespace Repositories
         Task<bool> UpdateStatusAsync(int invitationId, string status);
         Task<List<Teaminvitation>> GetPendingInvitationsByStudentAsync(int studentId);
         Task CancelAllPendingInvitationsForStudentAsync(int studentId);
+        Task<Teaminvitation?> GetByTeamAndStudentAsync(int teamId, int studentId);
     }
 }
