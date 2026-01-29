@@ -137,14 +137,13 @@ namespace Services
                     .Replace("{TeamName}", teamName)
                     .Replace("{InviterName}", inviterName);
 
-                // Fire and forget email or await it? Await for now to catch errors if needed, but usually fire-and-forget is better for latency.
-                // However, user wants to know if it works, so let's await it.
+             
                await _emailService.SendEmailAsync(student.Email, subject, htmlContent);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[TeamInvitationService] Failed to send email: {ex.Message}");
-                // Suppress email errors so it doesn't fail the invitation flow
+              
             }
             
             // Reload to get navigation props for DTO
@@ -157,7 +156,7 @@ namespace Services
             var invitation = await _invitationRepository.GetByIdAsync(invitationId);
             if (invitation == null) throw new KeyNotFoundException("Invitation not found");
 
-            // Only the inviter (Leader) can cancel
+        
             if (invitation.InvitedBy != userId)
             {
                  throw new UnauthorizedAccessException("You are not authorized to cancel this invitation");
@@ -168,13 +167,6 @@ namespace Services
                 throw new InvalidOperationException("Cannot cancel an invitation that is not pending");
             }
 
-            // We can either delete it or set status to Cancelled. 
-            // Setting to Cancelled is safer for history, but if the user wants to "remove" it effectively, 
-            // the requirement said "cancel invitation member" -> "Delete" might be what they perceive visually 
-            // if we filter out cancelled ones. The DAO has DeleteAsync, and Repository has it in interface but maybe not implemented in repository class yet?
-            // Let's check Repository. 
-            // Logic: usually "Cancel" in UI implies it disappears or becomes inactive. 
-            // Let's sets it to Cancelled status.
             
             await _invitationRepository.UpdateStatusAsync(invitationId, CampusConstants.InvitationStatus.Cancelled);
         }
