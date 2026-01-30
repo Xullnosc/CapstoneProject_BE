@@ -35,13 +35,8 @@ namespace FCTMS.Tests.Services
             _mockConfiguration = new Mock<IConfiguration>(); // Added
 
             // Setup Email Configuration Mocks
-<<<<<<< HEAD
-            _mockConfiguration.Setup(c => c["EmailTemplates:TeamInvitation:Subject"]).Returns("Test Subject");
-            _mockConfiguration.Setup(c => c["EmailTemplates:TeamInvitation:HtmlBody"]).Returns("Test Body");
-=======
             // Email template is now hardcoded, no need to mock configuration for it.
             _mockConfiguration.Setup(c => c["AllowedOrigins"]).Returns("http://localhost:5173");
->>>>>>> 78181965ba97f8f708e3ab280a6fa309d2d472d4
 
             _service = new TeamInvitationService(
                 _mockInvitationRepository.Object,
@@ -99,18 +94,18 @@ namespace FCTMS.Tests.Services
             int teamId = 1;
             int inviterId = 2;
             string studentEmail = "student@example.com";
-            
+
             var team = new Team { TeamId = teamId, LeaderId = inviterId, TeamName = "My Team", Teammembers = new List<Teammember>() };
             var inviter = new User { UserId = inviterId, FullName = "Inviter" };
             var student = new User { UserId = 3, Email = studentEmail, FullName = "Student", StudentCode = "S123" };
-            
+
             _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
             _mockUserRepository.Setup(r => r.SearchUsersAsync(studentEmail)).ReturnsAsync(new List<User> { student });
             _mockUserRepository.Setup(r => r.GetByIdAsync(inviterId)).ReturnsAsync(inviter);
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1 });
             _mockTeamMemberRepository.Setup(r => r.IsStudentInTeamAsync(student.UserId, 1)).ReturnsAsync(false);
             _mockInvitationRepository.Setup(r => r.GetByTeamAndStudentAsync(teamId, student.UserId)).ReturnsAsync((Teaminvitation?)null);
-            
+
             var createdInvitation = new Teaminvitation { InvitationId = 100, TeamId = teamId, StudentId = student.UserId, Status = CampusConstants.InvitationStatus.Pending };
             _mockInvitationRepository.Setup(r => r.CreateAsync(It.IsAny<Teaminvitation>())).ReturnsAsync(createdInvitation);
              _mockInvitationRepository.Setup(r => r.GetByIdAsync(100)).ReturnsAsync(createdInvitation); // For reloading DTO
@@ -157,7 +152,7 @@ namespace FCTMS.Tests.Services
             int invitationId = 1;
             int userId = 10; // Inviter (Leader)
             var invitation = new Teaminvitation { InvitationId = invitationId, InvitedBy = userId, Status = CampusConstants.InvitationStatus.Pending };
-            
+
             _mockInvitationRepository.Setup(r => r.GetByIdAsync(invitationId)).ReturnsAsync(invitation);
 
             // Act
@@ -177,9 +172,9 @@ namespace FCTMS.Tests.Services
          [Fact]
         public async Task CancelInvitationAsync_NotInviter_ThrowsUnauthorizedAccessException()
         {
-             var invitation = new Teaminvitation { InvitationId = 1, InvitedBy = 55 }; 
+             var invitation = new Teaminvitation { InvitationId = 1, InvitedBy = 55 };
              _mockInvitationRepository.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(invitation);
-             
+
              await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _service.CancelInvitationAsync(1, 1));
         }
     }
