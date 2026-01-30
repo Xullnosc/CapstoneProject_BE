@@ -26,7 +26,10 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                if (!int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
                 var createdTeam = await _teamService.CreateTeamAsync(userId, createTeamDto);
                 return CreatedAtAction(nameof(GetTeamById), new { id = createdTeam.TeamId }, createdTeam);
             }
@@ -41,7 +44,10 @@ namespace CapstoneProject_BE.Controllers
         {
             try 
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                if (!int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
                 var team = await _teamService.GetTeamByIdAsync(id, userId);
                 if (team == null) return NotFound(new { message = "Team not found" });
                 return Ok(team);
@@ -73,7 +79,10 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                if (!int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
                 var team = await _teamService.GetTeamByStudentIdAsync(userId);
                 if (team == null) return NotFound(new { message = "You are not in any team" });
                 return Ok(team);
@@ -89,7 +98,10 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                if (!int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
                 bool result = await _teamService.DisbandTeamAsync(id, userId);
                 
                 if (!result) return NotFound(new { message = "Team not found or could not be disbanded" });
@@ -107,7 +119,10 @@ namespace CapstoneProject_BE.Controllers
         {
              try
             {
-                int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                if (!int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
                 var updatedTeam = await _teamService.UpdateTeamAsync(id, userId, updateTeamDto);
                 return Ok(updatedTeam);
             }

@@ -18,6 +18,7 @@ namespace DataAccess
         {
             return await _context.Semesters
                 .Include(s => s.Teams)
+                .AsNoTracking()
                 .ToListAsync();
         }
 
@@ -28,6 +29,7 @@ namespace DataAccess
                     .ThenInclude(t => t.Teammembers)
                 .Include(s => s.Whitelists)
                     .ThenInclude(w => w.Role)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.SemesterId == id);
         }
 
@@ -50,12 +52,13 @@ namespace DataAccess
         {
             var now = System.DateTime.UtcNow;
             return await _context.Semesters
+                .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.StartDate <= now && s.EndDate >= now);
         }
 
         public async Task<Semester?> GetByCodeAsync(string code)
         {
-            return await _context.Semesters.FirstOrDefaultAsync(s => s.SemesterCode == code);
+            return await _context.Semesters.AsNoTracking().FirstOrDefaultAsync(s => s.SemesterCode == code);
         }
     }
 }

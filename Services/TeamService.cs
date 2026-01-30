@@ -79,23 +79,27 @@ namespace Services
 
         private async Task<string> GenerateTeamCodeAsync(int semesterId, string semesterName)
         {
+            const string ValidPrefix = "SE_";
             var teamCodes = await _teamRepository.GetTeamCodesBySemesterAsync(semesterId);
+            
             if (teamCodes == null || !teamCodes.Any())
             {
-                return $"{DateTime.UtcNow.Year}-{semesterName}-001";
+                return $"{ValidPrefix}01";
             }
 
-            int maxId = 0;
-            foreach (var code in teamCodes)
-            {
-                string[] parts = code.Split('-');
-                if (parts.Length > 0 && int.TryParse(parts.Last(), out int id))
-                {
-                    if (id > maxId) maxId = id;
-                }
-            }
+            // Optimized LINQ:
+            // 1. Filter codes starting with "SE_"
+            // 2. Extract number part
+            // 3. Parse to int (use valid numbers only)
+            // 4. Find Max
+            int maxId = teamCodes
+                .Where(code => code.StartsWith(ValidPrefix))
+                .Select(code => code.Substring(ValidPrefix.Length))
+                .Select(numPart => int.TryParse(numPart, out int id) ? id : 0)
+                .DefaultIfEmpty(0)
+                .Max();
 
-            return $"{DateTime.UtcNow.Year}-{semesterName}-{maxId + 1:D3}";
+            return $"{ValidPrefix}{maxId + 1:D2}";
         }
 
         public async Task<TeamDTO?> GetTeamByIdAsync(int teamId, int userId)
