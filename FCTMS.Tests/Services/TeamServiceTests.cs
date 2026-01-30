@@ -192,5 +192,62 @@ namespace FCTMS.Tests.Services
             // Assert
             await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("Only the team leader can update team information.");
         }
+<<<<<<< HEAD
+=======
+        [Fact]
+        public async Task CreateTeamAsync_ShouldGenerateCorrectCode_WhenNoTeamsExist()
+        {
+            // Arrange
+            int userId = 1;
+            var createDto = new CreateTeamDTO 
+            {
+                TeamName = "New Team",
+                Description = "Description"
+            };
+            var semesterName = "SP26";
+            
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync())
+                .ReturnsAsync(new Semester { SemesterId = 1, SemesterCode = semesterName, SemesterName = "Spring 2026", IsActive = true });
+            
+            _mockUserRepository.Setup(r => r.GetByIdAsync(userId))
+                .ReturnsAsync(new User { UserId = userId, RoleId = 3, IsAuthorized = true }); 
+            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team)null);
+            _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1)).ReturnsAsync(new List<string>()); // No existing teams
+
+            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>()))
+                .ReturnsAsync((Team t) => t); // Return input team
+            
+            // Act
+            var result = await _teamService.CreateTeamAsync(userId, createDto);
+
+            // Assert
+            result.TeamCode.Should().Be("SE_01");
+            result.TeamName.Should().Be("New Team");
+        }
+
+        [Fact]
+        public async Task CreateTeamAsync_ShouldIncrementCode_WhenTeamsExist()
+        {
+            // Arrange
+            int userId = 2;
+            var createDto = new CreateTeamDTO { TeamName = "Team 2" };
+             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync())
+                .ReturnsAsync(new Semester { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026", IsActive = true });
+            _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { UserId = userId, RoleId = 3, IsAuthorized = true });
+             _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team)null);
+            
+            // Existing teams: SE_01, SE_02, SE_15
+            _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1))
+                .ReturnsAsync(new List<string> { "SE_01", "SE_02", "SE_15" });
+
+            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => t);
+
+            // Act
+            var result = await _teamService.CreateTeamAsync(userId, createDto);
+
+            // Assert
+            result.TeamCode.Should().Be("SE_16");
+        }
+>>>>>>> 78181965ba97f8f708e3ab280a6fa309d2d472d4
     }
 }
