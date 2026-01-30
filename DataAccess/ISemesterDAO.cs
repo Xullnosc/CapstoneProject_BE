@@ -10,7 +10,7 @@ namespace DataAccess
         Task<Semester?> GetByIdAsync(int id);
         Task<Semester> AddAsync(Semester semester);
         Task UpdateAsync(Semester semester);
-        Task DeleteAsync(int id);
         Task<Semester?> GetCurrentSemesterAsync();
+        Task<Semester?> GetByCodeAsync(string code);
     }
 }

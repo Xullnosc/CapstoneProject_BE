@@ -9,5 +9,7 @@ namespace DataAccess
         Task AddRangeAsync(IEnumerable<ArchivedTeam> archivedTeams);
         Task AddAsync(ArchivedTeam archivedTeam);
         Task<List<ArchivedTeam>> GetBySemesterIdAsync(int semesterId);
+        Task<List<ArchivedTeam>> GetBySemesterIdsAsync(List<int> semesterIds);
+        Task<List<ArchivedTeam>> GetAllAsync();
     }
 }

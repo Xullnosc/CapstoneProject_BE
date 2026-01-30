@@ -6,6 +6,7 @@ namespace BusinessObjects.DTOs
     public class SemesterDTO
     {
         public int SemesterId { get; set; }
+        public string SemesterCode { get; set; } = null!;
         public string SemesterName { get; set; } = null!;
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
@@ -16,6 +17,8 @@ namespace BusinessObjects.DTOs
         // For "GetAllSemesters", usually just the list of Semesters is enough, or count of teams. 
         // But if the previous response included teams, we should check if they are needed.
         // Assuming we want to break the recursion but keep some info:
+        // Optimized for Dashboard (List View) to avoid sending full Team list
+        public int TeamCount { get; set; }
         public List<TeamSimpleDTO> Teams { get; set; } = new List<TeamSimpleDTO>();
         public List<WhitelistDTO> Whitelists { get; set; } = new List<WhitelistDTO>();
     }

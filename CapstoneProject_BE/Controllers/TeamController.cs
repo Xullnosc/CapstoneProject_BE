@@ -58,8 +58,14 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet("semester/{semesterId}")]
-        public async Task<IActionResult> GetTeamsBySemester(int semesterId)
+        public async Task<IActionResult> GetTeamsBySemester(int semesterId, [FromQuery] int? page = null, [FromQuery] int? limit = null)
         {
+            if (page.HasValue && limit.HasValue)
+            {
+                var pagedResult = await _teamService.GetTeamsBySemesterPagedAsync(semesterId, page.Value, limit.Value);
+                return Ok(pagedResult);
+            }
+
             var teams = await _teamService.GetTeamsBySemesterAsync(semesterId);
             return Ok(teams);
         }

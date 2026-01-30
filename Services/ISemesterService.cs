@@ -10,7 +10,6 @@ namespace Services
         Task<SemesterDTO?> GetSemesterByIdAsync(int id);
         Task<SemesterDTO> CreateSemesterAsync(SemesterCreateDTO semesterCreateDTO);
         Task UpdateSemesterAsync(SemesterCreateDTO semesterCreateDTO);
-        Task DeleteSemesterAsync(int id);
         Task EndSemesterAsync(int id);
     }
 }

@@ -10,6 +10,7 @@ namespace Repositories
         Task<Team?> GetByIdAsync(int teamId);
         Task<Team?> GetByCodeAsync(string teamCode);
         Task<List<Team>> GetBySemesterAsync(int semesterId);
+        Task<(List<Team> Items, int TotalCount)> GetBySemesterPagedAsync(int semesterId, int page, int limit);
         Task<bool> UpdateStatusAsync(int teamId, string status);
         Task<int> CountTeamsInSemesterAsync(int semesterId);
         Task<List<string>> GetTeamCodesBySemesterAsync(int semesterId);

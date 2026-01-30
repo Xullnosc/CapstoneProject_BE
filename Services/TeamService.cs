@@ -119,6 +119,13 @@ namespace Services
             return teams.Select(MapToDTO).ToList();
         }
 
+        public async Task<PagedResult<TeamDTO>> GetTeamsBySemesterPagedAsync(int semesterId, int page, int limit)
+        {
+            var (items, totalCount) = await _teamRepository.GetBySemesterPagedAsync(semesterId, page, limit);
+            var dtos = items.Select(MapToDTO).ToList();
+            return new PagedResult<TeamDTO>(dtos, totalCount, page, limit);
+        }
+
         public async Task<bool> DisbandTeamAsync(int teamId, int leaderId)
         {
             var team = await _teamRepository.GetByIdAsync(teamId);

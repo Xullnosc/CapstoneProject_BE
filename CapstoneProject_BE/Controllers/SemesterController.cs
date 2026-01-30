@@ -42,8 +42,15 @@ namespace CapstoneProject_BE.Controllers
         [Authorize(Roles = CampusConstants.Roles.HOD)]
         public async Task<ActionResult<SemesterDTO>> CreateSemester(SemesterCreateDTO semesterCreateDTO)
         {
-            var created = await _semesterService.CreateSemesterAsync(semesterCreateDTO);
-            return CreatedAtAction(nameof(GetSemester), new { id = created.SemesterId }, created);
+            try
+            {
+                var created = await _semesterService.CreateSemesterAsync(semesterCreateDTO);
+                return CreatedAtAction(nameof(GetSemester), new { id = created.SemesterId }, created);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPut("{id}")]
@@ -54,17 +61,20 @@ namespace CapstoneProject_BE.Controllers
             {
                 return BadRequest();
             }
-            await _semesterService.UpdateSemesterAsync(semesterCreateDTO);
-            return NoContent();
+
+            try
+            {
+                await _semesterService.UpdateSemesterAsync(semesterCreateDTO);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
-        [HttpDelete("{id}")]
-        [Authorize(Roles = CampusConstants.Roles.HOD)]
-        public async Task<IActionResult> DeleteSemester(int id)
-        {
-            await _semesterService.DeleteSemesterAsync(id);
-            return NoContent();
-        }
+        // [HttpDelete("{id}")] - Removed as per audit
+        // Public method removed to prevent access
 
         [HttpPost("{id}/end")]
         [Authorize(Roles = CampusConstants.Roles.HOD)]

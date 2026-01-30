@@ -7,6 +7,8 @@ public partial class Semester
 {
     public int SemesterId { get; set; }
 
+    public string SemesterCode { get; set; } = null!;
+
     public string SemesterName { get; set; } = null!;
 
     public DateTime StartDate { get; set; }

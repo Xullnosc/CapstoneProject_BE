@@ -26,8 +26,16 @@ namespace Services.Mappings
             CreateMap<Team, TeamSimpleDTO>()
                 .ForMember(dest => dest.MemberCount, opt => opt.MapFrom(src => src.Teammembers.Count));
 
+            // ArchivedTeam -> TeamSimpleDTO
+            CreateMap<ArchivedTeam, TeamSimpleDTO>()
+                .ForMember(dest => dest.TeamId, opt => opt.MapFrom(src => src.OriginalTeamId))
+                .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status ?? "Archived"))
+                .ForMember(dest => dest.MemberCount, opt => opt.MapFrom(src => 0)); // JSON parsing is complex here
+
+
             // Semester -> SemesterDTO
             CreateMap<Semester, SemesterDTO>()
+                .ForMember(dest => dest.TeamCount, opt => opt.MapFrom(src => src.Teams.Count))
                 .ForMember(dest => dest.Teams, opt => opt.MapFrom(src => src.Teams))
                 .ForMember(dest => dest.Whitelists, opt => opt.MapFrom(src => src.Whitelists));
 
