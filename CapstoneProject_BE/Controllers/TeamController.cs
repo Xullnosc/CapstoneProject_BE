@@ -205,6 +205,39 @@ namespace CapstoneProject_BE.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+
+
+        [HttpPut("{id}/leader")]
+        public async Task<IActionResult> ChangeLeader(int id, [FromBody] ChangeLeaderDTO changeLeaderDto)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (!int.TryParse(userIdClaim, out int currentLeaderId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
+
+                bool result = await _teamService.ChangeLeaderAsync(id, currentLeaderId, changeLeaderDto.NewLeaderId);
+                
+                if (!result) return NotFound(new { message = "Team not found." });
+
+                return Ok(new { message = "Leadership transferred successfully." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
     }
 }
 

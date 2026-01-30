@@ -197,6 +197,37 @@ namespace Services
             return MapToDTO(team);
         }
 
+        public async Task<bool> ChangeLeaderAsync(int teamId, int currentLeaderId, int newLeaderId)
+        {
+            var team = await _teamRepository.GetByIdAsync(teamId);
+            if (team == null) return false;
+
+            if (team.LeaderId != currentLeaderId)
+            {
+                throw new UnauthorizedAccessException("Only the current team leader can transfer leadership.");
+            }
+
+            var newLeaderMember = team.Teammembers.FirstOrDefault(m => m.StudentId == newLeaderId);
+            if (newLeaderMember == null)
+            {
+                throw new ArgumentException("The new leader must be a member of the team.");
+            }
+
+            // Update Roles
+            var currentLeaderMember = team.Teammembers.FirstOrDefault(m => m.StudentId == currentLeaderId);
+            if (currentLeaderMember != null)
+            {
+                currentLeaderMember.Role = "Member";
+            }
+
+            newLeaderMember.Role = "Leader";
+            team.LeaderId = newLeaderId;
+            team.UpdatedAt = DateTime.UtcNow;
+
+            await _teamRepository.UpdateAsync(team);
+            return true;
+        }
+
         public async Task<bool> RemoveMemberAsync(int teamId, int studentId)
         {
             return await _teamMemberRepository.RemoveMemberAsync(teamId, studentId);
