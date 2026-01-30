@@ -12,16 +12,10 @@ namespace capstone_be.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
-        private readonly IConnectionMultiplexer _redis;
 
-        public AuthController(
-            IAuthService authService,
-            ILogger<AuthController> logger,
-            IConnectionMultiplexer redis
-        )
+        public AuthController(IAuthService authService, ILogger<AuthController> logger)
         {
             _authService = authService;
-            _redis = redis;
             _logger = logger;
         }
 
