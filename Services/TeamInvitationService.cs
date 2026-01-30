@@ -126,16 +126,30 @@ namespace Services
                 var teamName = team.TeamName;
                 var studentName = student.FullName;
 
-                string subjectTemplate = _configuration["EmailTemplates:TeamInvitation:Subject"];
-                string htmlBodyTemplate = _configuration["EmailTemplates:TeamInvitation:HtmlBody"];
+                // Dynamic Frontend URL
+                string frontendUrl = "http://localhost:5173"; // Default
+                var allowedOrigins = _configuration["AllowedOrigins"];
+                if (!string.IsNullOrEmpty(allowedOrigins))
+                {
+                    var origins = allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                    if (origins.Length > 0)
+                    {
+                        frontendUrl = origins[0].Trim();
+                    }
+                }
 
-                string subject = subjectTemplate
-                    .Replace("{TeamName}", teamName);
+                string link = $"{frontendUrl}/teams/my-team";
+
+                string subject = $"[FCTMS] You have been invited to join Team {teamName}";
                 
+                string htmlBodyTemplate = EmailTemplateConstants.TeamInvitationTemplate; // Using a constant/static string
+
                 string htmlContent = htmlBodyTemplate
                     .Replace("{StudentName}", studentName)
                     .Replace("{TeamName}", teamName)
-                    .Replace("{InviterName}", inviterName);
+                    .Replace("{InviterName}", inviterName)
+                    .Replace("{InvitationLink}", link)
+                    .Replace("{CurrentYear}", DateTime.Now.Year.ToString());
 
              
                await _emailService.SendEmailAsync(student.Email, subject, htmlContent);
