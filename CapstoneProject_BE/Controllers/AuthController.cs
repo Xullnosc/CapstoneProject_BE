@@ -25,14 +25,6 @@ namespace capstone_be.Controllers
             _logger = logger;
         }
 
-        [HttpGet("redis")]
-        public async Task<string> TestRedis()
-        {
-            var db = _redis.GetDatabase();
-            await db.StringSetAsync("hello", "Redis works!");
-            return await db.StringGetAsync("hello");
-        }
-
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequestDTO request)
         {
