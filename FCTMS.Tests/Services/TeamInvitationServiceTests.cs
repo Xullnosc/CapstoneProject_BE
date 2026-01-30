@@ -35,8 +35,8 @@ namespace FCTMS.Tests.Services
             _mockConfiguration = new Mock<IConfiguration>(); // Added
 
             // Setup Email Configuration Mocks
-            _mockConfiguration.Setup(c => c["EmailTemplates:TeamInvitation:Subject"]).Returns("Test Subject");
-            _mockConfiguration.Setup(c => c["EmailTemplates:TeamInvitation:HtmlBody"]).Returns("Test Body");
+            // Email template is now hardcoded, no need to mock configuration for it.
+            _mockConfiguration.Setup(c => c["AllowedOrigins"]).Returns("http://localhost:5173");
 
             _service = new TeamInvitationService(
                 _mockInvitationRepository.Object,
