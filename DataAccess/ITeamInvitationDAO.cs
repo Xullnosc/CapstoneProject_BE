@@ -14,6 +14,7 @@ namespace DataAccess
         Task<bool> DeleteAsync(int invitationId);
         Task<List<Teaminvitation>> GetPendingInvitationsByStudentAsync(int studentId);
         Task CancelAllPendingInvitationsForStudentAsync(int studentId);
+        Task<Teaminvitation?> GetByTeamAndStudentAsync(int teamId, int studentId);
 
     }
 }

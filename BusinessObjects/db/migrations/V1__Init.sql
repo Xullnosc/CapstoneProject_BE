@@ -1,10 +1,12 @@
 ﻿CREATE TABLE IF NOT EXISTS `semesters` (
   `SemesterID` int NOT NULL AUTO_INCREMENT,
+  `SemesterCode` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   `SemesterName` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   `StartDate` datetime NOT NULL,
   `EndDate` datetime NOT NULL,
   `IsActive` tinyint(1) NOT NULL,
-  PRIMARY KEY (`SemesterID`)
+  PRIMARY KEY (`SemesterID`),
+  UNIQUE KEY `UQ_Semesters_SemesterCode` (`SemesterCode`)
 );
 
 CREATE TABLE IF NOT EXISTS `roles` (

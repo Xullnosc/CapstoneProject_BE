@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace Services
 {
@@ -16,19 +17,25 @@ namespace Services
         private readonly ITeamRepository _teamRepository;
         private readonly ISemesterRepository _semesterRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IEmailService _emailService;
+        private readonly IConfiguration _configuration;
 
         public TeamInvitationService(
             ITeamInvitationRepository invitationRepository,
             ITeamMemberRepository teamMemberRepository,
             ITeamRepository teamRepository,
             ISemesterRepository semesterRepository,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            IEmailService emailService,
+            IConfiguration configuration)
         {
             _invitationRepository = invitationRepository;
             _teamMemberRepository = teamMemberRepository;
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
             _userRepository = userRepository;
+            _emailService = emailService;
+            _configuration = configuration;
         }
 
         public async Task<List<TeamInvitationDTO>> GetMyInvitationsAsync(int studentId)
@@ -68,7 +75,100 @@ namespace Services
 
         public async Task<TeamInvitationDTO> SendInvitationAsync(int teamId, int inviterId, string studentCodeOrEmail)
         {
-             throw new NotImplementedException("Send Invitation not implemented yet");
+            // 1. Validate Team
+            var team = await _teamRepository.GetByIdAsync(teamId);
+            if (team == null) throw new KeyNotFoundException("Team not found");
+            if (team.LeaderId != inviterId) throw new UnauthorizedAccessException("Only the leader can invite members");
+            
+            // Check if team is full logic is handled in Accept, but good to check here too if strict
+            if (team.Teammembers.Count >= 5) throw new InvalidOperationException("Team is full");
+
+            // 2. Find Student
+            // We search by email or student code
+            var users = await _userRepository.SearchUsersAsync(studentCodeOrEmail);
+            // SearchUsersAsync uses 'Contains', we want exact match for invite
+            var student = users.FirstOrDefault(u => u.Email.Equals(studentCodeOrEmail, StringComparison.OrdinalIgnoreCase) 
+                                                 || u.StudentCode.Equals(studentCodeOrEmail, StringComparison.OrdinalIgnoreCase));
+
+            if (student == null) throw new KeyNotFoundException($"Student with email/code '{studentCodeOrEmail}' not found");
+            
+            // 3. Validate Student Eligibility
+            if (student.UserId == inviterId) throw new InvalidOperationException("You cannot invite yourself");
+            
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester != null)
+            {
+                bool alreadyInTeam = await _teamMemberRepository.IsStudentInTeamAsync(student.UserId, currentSemester.SemesterId);
+                if (alreadyInTeam) throw new InvalidOperationException("Student is already in a team");
+            }
+
+            // 4. Check for existing pending invitation
+            var existingInvite = await _invitationRepository.GetByTeamAndStudentAsync(teamId, student.UserId);
+            if (existingInvite != null) throw new InvalidOperationException("Student has already been invited to this team");
+
+            // 5. Create Invitation
+            var invitation = new Teaminvitation
+            {
+                TeamId = teamId,
+                StudentId = student.UserId,
+                InvitedBy = inviterId,
+                Status = CampusConstants.InvitationStatus.Pending,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var createdInv = await _invitationRepository.CreateAsync(invitation);
+
+            // Send Email Notification
+            try
+            {
+                var inviter = await _userRepository.GetByIdAsync(inviterId);
+                var inviterName = inviter?.FullName ?? "A Team Leader";
+                var teamName = team.TeamName;
+                var studentName = student.FullName;
+
+                string subjectTemplate = _configuration["EmailTemplates:TeamInvitation:Subject"];
+                string htmlBodyTemplate = _configuration["EmailTemplates:TeamInvitation:HtmlBody"];
+
+                string subject = subjectTemplate
+                    .Replace("{TeamName}", teamName);
+                
+                string htmlContent = htmlBodyTemplate
+                    .Replace("{StudentName}", studentName)
+                    .Replace("{TeamName}", teamName)
+                    .Replace("{InviterName}", inviterName);
+
+             
+               await _emailService.SendEmailAsync(student.Email, subject, htmlContent);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[TeamInvitationService] Failed to send email: {ex.Message}");
+              
+            }
+            
+            // Reload to get navigation props for DTO
+            var fullInv = await _invitationRepository.GetByIdAsync(createdInv.InvitationId);
+            return MapToDTO(fullInv!);
+        }
+
+        public async Task CancelInvitationAsync(int invitationId, int userId)
+        {
+            var invitation = await _invitationRepository.GetByIdAsync(invitationId);
+            if (invitation == null) throw new KeyNotFoundException("Invitation not found");
+
+        
+            if (invitation.InvitedBy != userId)
+            {
+                 throw new UnauthorizedAccessException("You are not authorized to cancel this invitation");
+            }
+
+            if (invitation.Status != CampusConstants.InvitationStatus.Pending)
+            {
+                throw new InvalidOperationException("Cannot cancel an invitation that is not pending");
+            }
+
+            
+            await _invitationRepository.UpdateStatusAsync(invitationId, CampusConstants.InvitationStatus.Cancelled);
         }
 
         #region Helper Methods
@@ -146,17 +246,19 @@ namespace Services
                 TeamId = inv.TeamId,
                 Team = new TeamInfoDTO
                 {
-                    TeamId = inv.Team.TeamId,
-                    TeamName = inv.Team.TeamName,
-                    TeamAvatar = inv.Team.TeamAvatar,
-                    MemberCount = inv.Team.Teammembers.Count,
-                    LeaderName = inv.Team.Leader?.FullName ?? "Unknown" 
+                    TeamId = inv.Team?.TeamId ?? 0,
+                    TeamName = inv.Team?.TeamName ?? "Unknown Team",
+                    TeamAvatar = inv.Team?.TeamAvatar,
+                    MemberCount = inv.Team?.Teammembers?.Count ?? 0,
+                    LeaderName = inv.Team?.Leader?.FullName ?? "Unknown" 
                 },
                 StudentId = inv.StudentId,
                 InvitedBy = new InvitedByDTO
                 {
                     UserId = inv.InvitedBy,
-                    Name = inv.InvitedByNavigation.FullName
+                    Name = inv.InvitedByNavigation?.FullName ?? "Unknown",
+                    Email = inv.InvitedByNavigation?.Email ?? "",
+                    Avatar = inv.InvitedByNavigation?.Avatar ?? ""
                 },
                 Status = inv.Status,
                 CreatedAt = inv.CreatedAt ?? DateTime.UtcNow

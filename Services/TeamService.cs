@@ -15,13 +15,16 @@ namespace Services
         private readonly ISemesterRepository _semesterRepository;
         private readonly IUserRepository _userRepository;
         private readonly ICloudinaryHelper _cloudinaryHelper;
-
-        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, ICloudinaryHelper cloudinaryHelper)
+        private readonly IArchivingRepository _archivingRepository;
+        private readonly ITeamMemberRepository _teamMemberRepository;
+        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, ICloudinaryHelper cloudinaryHelper, IArchivingRepository archivingRepository, ITeamMemberRepository teamMemberRepository)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
             _userRepository = userRepository;
             _cloudinaryHelper = cloudinaryHelper;
+            _archivingRepository = archivingRepository;
+            _teamMemberRepository = teamMemberRepository;
         }
 
         public async Task<TeamDTO> CreateTeamAsync(int leaderId, CreateTeamDTO createTeamDto)
@@ -116,6 +119,13 @@ namespace Services
             return teams.Select(MapToDTO).ToList();
         }
 
+        public async Task<PagedResult<TeamDTO>> GetTeamsBySemesterPagedAsync(int semesterId, int page, int limit)
+        {
+            var (items, totalCount) = await _teamRepository.GetBySemesterPagedAsync(semesterId, page, limit);
+            var dtos = items.Select(MapToDTO).ToList();
+            return new PagedResult<TeamDTO>(dtos, totalCount, page, limit);
+        }
+
         public async Task<bool> DisbandTeamAsync(int teamId, int leaderId)
         {
             var team = await _teamRepository.GetByIdAsync(teamId);
@@ -129,7 +139,8 @@ namespace Services
             // TODO: Check if team has matched topic (when Topic module implemented)
             // if (team.TopicId != null && !semesterEnded) throw ...
 
-            return await _teamRepository.UpdateStatusAsync(teamId, "Disbanded");
+            await _archivingRepository.ArchiveTeamAsync(team);
+            return true;
         }
 
         public async Task<TeamDTO?> GetTeamByStudentIdAsync(int studentId)
@@ -153,19 +164,19 @@ namespace Services
                 SemesterId = team.SemesterId,
                 LeaderId = team.LeaderId,
                 Status = team.Status,
-                MemberCount = team.Teammembers.Count,
+                MemberCount = team.Teammembers?.Count ?? 0,
                 CreatedAt = team.CreatedAt ?? DateTime.UtcNow,
-                Members = team.Teammembers.Select(tm => new TeamMemberDTO
+                Members = team.Teammembers?.Select(tm => new TeamMemberDTO
                 {
                     TeamMemberId = tm.TeamMemberId,
                     StudentId = tm.StudentId,
-                    StudentCode = tm.Student.StudentCode, 
-                    FullName = tm.Student.FullName,
-                    Email = tm.Student.Email,
-                    Avatar = tm.Student.Avatar,
+                    StudentCode = tm.Student?.StudentCode ?? "N/A", 
+                    FullName = tm.Student?.FullName ?? "Unknown",
+                    Email = tm.Student?.Email ?? "N/A",
+                    Avatar = tm.Student?.Avatar,
                     Role = tm.Role,
                     JoinedAt = tm.JoinedAt ?? DateTime.UtcNow
-                }).ToList()
+                }).ToList() ?? new List<TeamMemberDTO>()
             };
         }
 
@@ -191,6 +202,42 @@ namespace Services
 
             await _teamRepository.UpdateAsync(team);
             return MapToDTO(team);
+        }
+
+        public async Task<bool> ChangeLeaderAsync(int teamId, int currentLeaderId, int newLeaderId)
+        {
+            var team = await _teamRepository.GetByIdAsync(teamId);
+            if (team == null) return false;
+
+            if (team.LeaderId != currentLeaderId)
+            {
+                throw new UnauthorizedAccessException("Only the current team leader can transfer leadership.");
+            }
+
+            var newLeaderMember = team.Teammembers.FirstOrDefault(m => m.StudentId == newLeaderId);
+            if (newLeaderMember == null)
+            {
+                throw new ArgumentException("The new leader must be a member of the team.");
+            }
+
+            // Update Roles
+            var currentLeaderMember = team.Teammembers.FirstOrDefault(m => m.StudentId == currentLeaderId);
+            if (currentLeaderMember != null)
+            {
+                currentLeaderMember.Role = "Member";
+            }
+
+            newLeaderMember.Role = "Leader";
+            team.LeaderId = newLeaderId;
+            team.UpdatedAt = DateTime.UtcNow;
+
+            await _teamRepository.UpdateAsync(team);
+            return true;
+        }
+
+        public async Task<bool> RemoveMemberAsync(int teamId, int studentId)
+        {
+            return await _teamMemberRepository.RemoveMemberAsync(teamId, studentId);
         }
     }
 }

@@ -116,5 +116,15 @@ namespace DataAccess
                 await _context.SaveChangesAsync();
             }
         }
+
+        public async Task<Teaminvitation?> GetByTeamAndStudentAsync(int teamId, int studentId)
+        {
+            return await _context.Teaminvitations
+                .Include(i => i.Team)
+                .Include(i => i.InvitedByNavigation)
+                .Include(i => i.Student)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.TeamId == teamId && i.StudentId == studentId && i.Status == CampusConstants.InvitationStatus.Pending);
+        }
     }
 }

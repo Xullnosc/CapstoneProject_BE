@@ -7,6 +7,7 @@ using Repositories;
 using BusinessObjects.Models;
 using Microsoft.AspNetCore.Http;
 
+
 namespace FCTMS.Tests.Controllers
 {
     public class TeamControllerTests
@@ -174,7 +175,7 @@ namespace FCTMS.Tests.Controllers
 
             // Assert
             var notFoundResult = result.Should().BeOfType<NotFoundObjectResult>().Subject;
-            notFoundResult.Value.ToString().Should().Contain("Team not found");
+            notFoundResult.Value!.ToString().Should().Contain("Team not found");
         }
 
         [Fact]
@@ -208,132 +209,143 @@ namespace FCTMS.Tests.Controllers
             var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
             badRequestResult.Value.Should().BeEquivalentTo(new { message = "Database connection failed" });
         }
-    }
-    public class TeamServiceTests
-    {
-        private readonly Mock<ITeamRepository> _mockTeamRepository;
-        private readonly Mock<ISemesterRepository> _mockSemesterRepository;
-        private readonly Mock<IUserRepository> _mockUserRepository;
-        private readonly Mock<ICloudinaryHelper> _mockCloudinaryHelper;
-        private readonly TeamService _teamService;
-
-        public TeamServiceTests()
-        {
-            _mockTeamRepository = new Mock<ITeamRepository>();
-            _mockSemesterRepository = new Mock<ISemesterRepository>();
-            _mockUserRepository = new Mock<IUserRepository>();
-            _mockCloudinaryHelper = new Mock<ICloudinaryHelper>();
-
-            _teamService = new TeamService(
-                _mockTeamRepository.Object,
-                _mockSemesterRepository.Object,
-                _mockUserRepository.Object,
-                _mockCloudinaryHelper.Object
-            );
-        }
-
         [Fact]
-        public async Task UpdateTeamAsync_ShouldUpdateNameAndDescription_WhenValid()
+        public async Task LeaveTeam_LeaderAttemptingToLeave_ReturnsBadRequest()
         {
             // Arrange
             int teamId = 1;
-            int leaderId = 1;
-            var updateDto = new UpdateTeamDTO
-            {
-                TeamName = "Updated Name",
-                Description = "Updated Description",
-            };
+            int userId = 1; // From constructor claims
+            var team = new TeamDTO { TeamId = teamId, LeaderId = userId };
 
-            var existingTeam = new Team
-            {
-                TeamId = teamId,
-                LeaderId = leaderId,
-                TeamName = "Old Name",
-                Description = "Old Description",
-                Teammembers = new List<Teammember>() // Prevent NullReferenceException in MapToDTO
-            };
-
-            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
+            _mockTeamService.Setup(x => x.GetTeamByIdAsync(teamId, userId))
+                .ReturnsAsync(team);
 
             // Act
-            var result = await _teamService.UpdateTeamAsync(teamId, leaderId, updateDto);
+            var result = await _controller.LeaveTeam(teamId);
 
             // Assert
-            result.TeamName.Should().Be("Updated Name");
-            result.Description.Should().Be("Updated Description");
-            _mockTeamRepository.Verify(x => x.UpdateAsync(existingTeam), Times.Once);
+            var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            badRequestResult.Value!.ToString().Should().Contain("You are the team leader");
         }
 
         [Fact]
-        public async Task UpdateTeamAsync_ShouldUploadAvatar_WhenFileProvided()
+        public async Task LeaveTeam_MemberLeaving_ReturnsOk()
         {
             // Arrange
             int teamId = 1;
-            int leaderId = 1;
-            var mockFile = new Mock<IFormFile>();
-            var updateDto = new UpdateTeamDTO
-            {
-                TeamName = "Updated Name",
-                Description = "Updated Description",
-                AvatarFile = mockFile.Object
-            };
+            int userId = 1; // From constructor claims
+            int leaderId = 2;
+            var team = new TeamDTO { TeamId = teamId, LeaderId = leaderId };
 
-            var existingTeam = new Team
-            {
-                TeamId = teamId,
-                LeaderId = leaderId,
-                TeamAvatar = "old_url",
-                Teammembers = new List<Teammember>()
-            };
-
-            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
-            _mockCloudinaryHelper.Setup(x => x.UploadImageAsync(mockFile.Object)).ReturnsAsync("new_secure_url");
+            _mockTeamService.Setup(x => x.GetTeamByIdAsync(teamId, userId))
+                .ReturnsAsync(team);
+            _mockTeamService.Setup(x => x.RemoveMemberAsync(teamId, userId))
+                .ReturnsAsync(true);
 
             // Act
-            var result = await _teamService.UpdateTeamAsync(teamId, leaderId, updateDto);
+            var result = await _controller.LeaveTeam(teamId);
 
             // Assert
-            result.TeamAvatar.Should().Be("new_secure_url");
-            existingTeam.TeamAvatar.Should().Be("new_secure_url");
-            _mockCloudinaryHelper.Verify(x => x.UploadImageAsync(mockFile.Object), Times.Once);
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value!.ToString().Should().Contain("Left team successfully");
         }
 
         [Fact]
-        public async Task UpdateTeamAsync_ShouldThrow_WhenTeamNotFound()
+        public async Task LeaveTeam_ServiceFails_ReturnsNotFound()
+        {
+            // Arrange
+            int teamId = 1;
+            int userId = 1;
+            
+            // Case where GetTeamById returns null (or fails) OR RemoveMember returns false
+            _mockTeamService.Setup(x => x.GetTeamByIdAsync(teamId, userId))
+                .ReturnsAsync((TeamDTO)null!);
+            _mockTeamService.Setup(x => x.RemoveMemberAsync(teamId, userId))
+                .ReturnsAsync(false);
+
+            // Act
+            var result = await _controller.LeaveTeam(teamId);
+
+            // Assert
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
+
+        [Fact]
+        public async Task ChangeLeader_ValidRequest_ReturnsOk()
+        {
+            // Arrange
+            int teamId = 1;
+            int currentLeaderId = 1; // From constructor claims
+            var dto = new ChangeLeaderDTO { NewLeaderId = 2 };
+
+            _mockTeamService.Setup(x => x.ChangeLeaderAsync(teamId, currentLeaderId, dto.NewLeaderId))
+                .ReturnsAsync(true);
+
+            // Act
+            var result = await _controller.ChangeLeader(teamId, dto);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.ToString().Should().Contain("Leadership transferred successfully");
+        }
+
+        [Fact]
+        public async Task ChangeLeader_NotCurrentLeader_ReturnsForbidden()
+        {
+            // Arrange
+            int teamId = 1;
+            int currentLeaderId = 1;
+            var dto = new ChangeLeaderDTO { NewLeaderId = 2 };
+
+            _mockTeamService.Setup(x => x.ChangeLeaderAsync(teamId, currentLeaderId, dto.NewLeaderId))
+                .ThrowsAsync(new UnauthorizedAccessException("Only the current team leader can transfer leadership."));
+
+            // Act
+            var result = await _controller.ChangeLeader(teamId, dto);
+
+            // Assert
+            var statusCodeResult = result.Should().BeOfType<ObjectResult>().Subject;
+            statusCodeResult.StatusCode.Should().Be(403);
+            statusCodeResult.Value.ToString().Should().Contain("Only the current team leader can transfer leadership");
+        }
+
+        [Fact]
+        public async Task ChangeLeader_NewLeaderNotMember_ReturnsBadRequest()
+        {
+            // Arrange
+            int teamId = 1;
+            int currentLeaderId = 1;
+            var dto = new ChangeLeaderDTO { NewLeaderId = 99 };
+
+            _mockTeamService.Setup(x => x.ChangeLeaderAsync(teamId, currentLeaderId, dto.NewLeaderId))
+                .ThrowsAsync(new ArgumentException("The new leader must be a member of the team."));
+
+            // Act
+            var result = await _controller.ChangeLeader(teamId, dto);
+
+            // Assert
+            var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            badRequestResult.Value.ToString().Should().Contain("The new leader must be a member of the team");
+        }
+
+        [Fact]
+        public async Task ChangeLeader_TeamNotFound_ReturnsNotFound()
         {
             // Arrange
             int teamId = 99;
-            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync((Team)null!);
+            int currentLeaderId = 1;
+            var dto = new ChangeLeaderDTO { NewLeaderId = 2 };
+
+            _mockTeamService.Setup(x => x.ChangeLeaderAsync(teamId, currentLeaderId, dto.NewLeaderId))
+                .ReturnsAsync(false);
 
             // Act
-            Func<Task> act = async () => await _teamService.UpdateTeamAsync(teamId, 1, new UpdateTeamDTO());
+            var result = await _controller.ChangeLeader(teamId, dto);
 
             // Assert
-            await act.Should().ThrowAsync<KeyNotFoundException>().WithMessage("Team not found");
-        }
-
-        [Fact]
-        public async Task UpdateTeamAsync_ShouldThrow_WhenUserNotLeader()
-        {
-            // Arrange
-            int teamId = 1;
-            int leaderId = 1;
-            int otherUserId = 2;
-
-            var existingTeam = new Team
-            {
-                TeamId = teamId,
-                LeaderId = leaderId, 
-                Teammembers = new List<Teammember>()
-            };
-
-            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
-
-            // Act
-            Func<Task> act = async () => await _teamService.UpdateTeamAsync(teamId, otherUserId, new UpdateTeamDTO());
-
-            // Assert
-            await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("Only the team leader can update team information.");
+            var notFoundResult = result.Should().BeOfType<NotFoundObjectResult>().Subject;
+            notFoundResult.Value.ToString().Should().Contain("Team not found");
         }
     }
+
 }

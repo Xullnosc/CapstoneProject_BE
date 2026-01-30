@@ -129,8 +129,11 @@ public partial class FctmsContext : DbContext
 
             entity.ToTable("semesters");
 
+            entity.HasIndex(e => e.SemesterCode, "UQ_Semesters_SemesterCode").IsUnique();
+
             entity.Property(e => e.SemesterId).HasColumnName("SemesterID");
             entity.Property(e => e.EndDate).HasColumnType("datetime");
+            entity.Property(e => e.SemesterCode).HasMaxLength(50);
             entity.Property(e => e.SemesterName).HasMaxLength(50);
             entity.Property(e => e.StartDate).HasColumnType("datetime");
         });

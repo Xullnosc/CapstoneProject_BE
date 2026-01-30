@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS Teams (
     INDEX idx_status (Status)
 );
 
-CREATE TABLE TeamMembers (
+CREATE TABLE IF NOT EXISTS TeamMembers (
     TeamMemberId INT AUTO_INCREMENT PRIMARY KEY,
     TeamId INT NOT NULL,
     StudentId INT NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE TeamMembers (
     INDEX idx_student (StudentId)
 );
 
-CREATE TABLE TeamInvitations (
+CREATE TABLE IF NOT EXISTS TeamInvitations (
     InvitationId INT AUTO_INCREMENT PRIMARY KEY,
     TeamId INT NOT NULL,
     StudentId INT NOT NULL,

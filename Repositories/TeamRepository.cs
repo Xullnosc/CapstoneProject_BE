@@ -34,6 +34,11 @@ namespace Repositories
             return await _teamDAO.GetBySemesterAsync(semesterId);
         }
 
+        public async Task<(List<Team> Items, int TotalCount)> GetBySemesterPagedAsync(int semesterId, int page, int limit)
+        {
+            return await _teamDAO.GetBySemesterPagedAsync(semesterId, page, limit);
+        }
+
         public async Task<bool> UpdateStatusAsync(int teamId, string status)
         {
             return await _teamDAO.UpdateStatusAsync(teamId, status);

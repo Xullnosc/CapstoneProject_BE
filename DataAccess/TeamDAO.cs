@@ -46,6 +46,22 @@ namespace DataAccess
                 .ToListAsync();
         }
 
+        public async Task<(List<Team> Items, int TotalCount)> GetBySemesterPagedAsync(int semesterId, int page, int limit)
+        {
+            var query = _context.Teams
+                .Include(t => t.Teammembers)
+                .ThenInclude(tm => tm.Student)
+                .Where(t => t.SemesterId == semesterId && t.Status != "Disbanded");
+
+            int total = await query.CountAsync();
+            var items = await query
+                .Skip((page - 1) * limit)
+                .Take(limit)
+                .ToListAsync();
+
+            return (items, total);
+        }
+
         public async Task<bool> UpdateStatusAsync(int teamId, string status)
         {
             var team = await _context.Teams.FindAsync(teamId);
@@ -79,6 +95,7 @@ namespace DataAccess
         }
         public async Task<bool> UpdateAsync(Team team)
         {
+            if (team == null) throw new ArgumentNullException(nameof(team));
             _context.Teams.Update(team);
             return await _context.SaveChangesAsync() > 0;
         }
@@ -103,6 +120,20 @@ namespace DataAccess
                     _context.Teaminvitations.RemoveRange(team.Teaminvitations);
             }
             _context.Teams.RemoveRange(teams);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(Team team)
+        {
+            if (team == null) throw new ArgumentNullException(nameof(team));
+
+            if (team.Teammembers.Any())
+                _context.Teammembers.RemoveRange(team.Teammembers);
+
+            if (team.Teaminvitations.Any())
+                _context.Teaminvitations.RemoveRange(team.Teaminvitations);
+
+            _context.Teams.Remove(team);
             await _context.SaveChangesAsync();
         }
     }

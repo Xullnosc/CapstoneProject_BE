@@ -22,8 +22,10 @@ namespace Repositories
 
         public async Task UpdateSemesterAsync(Semester semester) => await _semesterDAO.UpdateAsync(semester);
 
-        public async Task DeleteSemesterAsync(int id) => await _semesterDAO.DeleteAsync(id);
+
 
         public async Task<Semester?> GetCurrentSemesterAsync() => await _semesterDAO.GetCurrentSemesterAsync();
+
+        public async Task<Semester?> GetSemesterByCodeAsync(string code) => await _semesterDAO.GetByCodeAsync(code);
     }
 }
