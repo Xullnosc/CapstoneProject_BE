@@ -112,21 +112,17 @@ namespace FCTMS.Tests.Controllers
         // --- Abnormal Cases (Abnormal & Edge Cases) ---
 
         [Fact]
-        public async Task CreateTeam_InvalidModel_ReturnsBadRequest()
+        public async Task CreateTeam_MissingUserClaim_ReturnsUnauthorized()
         {
             // Act
-            // In a real integration test, ASP.NET Core validation middleware handles this.
-            // For unit testing controller, we can simulate service exception if validation logic is there,
-            // or simply simulate the generic Exception catch if that's what we want to test.
-            // But let's verify scenarios where 'User' claim is missing (parsing error).
-            
-            _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity()); // No claims
+            // Simulate missing NameIdentifier claim
+            _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity()); 
 
             // Act
             var result = await _controller.CreateTeam(new CreateTeamDTO());
 
             // Assert
-            result.Should().BeOfType<BadRequestObjectResult>();
+            result.Should().BeOfType<UnauthorizedObjectResult>();
         }
 
         [Fact]
