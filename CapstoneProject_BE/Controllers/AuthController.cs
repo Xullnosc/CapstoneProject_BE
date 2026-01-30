@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Services.DTOs;
 using Services;
+using Services.DTOs;
+using StackExchange.Redis;
 
 namespace capstone_be.Controllers
 {
@@ -27,7 +28,7 @@ namespace capstone_be.Controllers
                 {
                     return BadRequest(new { message = "Request body is null" });
                 }
-                
+
                 if (string.IsNullOrWhiteSpace(request.IdToken))
                 {
                     // Debugging: Log what we received

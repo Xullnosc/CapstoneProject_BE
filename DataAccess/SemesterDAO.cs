@@ -1,7 +1,7 @@
-using BusinessObjects.Models;
-using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using BusinessObjects.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess
 {
@@ -16,16 +16,13 @@ namespace DataAccess
 
         public async Task<List<Semester>> GetAllAsync()
         {
-            return await _context.Semesters
-                .Include(s => s.Teams)
-                .AsNoTracking()
-                .ToListAsync();
+            return await _context.Semesters.Include(s => s.Teams).AsNoTracking().ToListAsync();
         }
 
         public async Task<Semester?> GetByIdAsync(int id)
         {
-            return await _context.Semesters
-                .Include(s => s.Teams)
+            return await _context
+                .Semesters.Include(s => s.Teams)
                     .ThenInclude(t => t.Teammembers)
                 .Include(s => s.Whitelists)
                     .ThenInclude(w => w.Role)
@@ -46,19 +43,19 @@ namespace DataAccess
             await _context.SaveChangesAsync();
         }
 
-
-
         public async Task<Semester?> GetCurrentSemesterAsync()
         {
             var now = System.DateTime.UtcNow;
-            return await _context.Semesters
-                .AsNoTracking()
+            return await _context
+                .Semesters.AsNoTracking()
                 .FirstOrDefaultAsync(s => s.StartDate <= now && s.EndDate >= now);
         }
 
         public async Task<Semester?> GetByCodeAsync(string code)
         {
-            return await _context.Semesters.AsNoTracking().FirstOrDefaultAsync(s => s.SemesterCode == code);
+            return await _context
+                .Semesters.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.SemesterCode == code);
         }
     }
 }

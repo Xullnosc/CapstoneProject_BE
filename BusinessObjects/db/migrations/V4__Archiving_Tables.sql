@@ -1,11 +1,31 @@
 -- 1. Add SemesterId to Whitelists (Live Table)
 -- We assume SemesterId will link to Semesters table.
 -- Since this is a new column on an existing table, we allow NULL initially or set default if needed.
--- However, for strict integrity, we should enforce it. For now, we allow NULL to avoid breaking existing data immediately, 
+-- However, for strict integrity, we should enforce it. For now, we allow NULL to avoid breaking existing data immediately,
 -- or we assume existing data belongs to Semester 1 (if any). Let's make it NULLable for safety first, then User can backfill.
-ALTER TABLE Whitelist
-ADD COLUMN SemesterId INT NULL,
-ADD CONSTRAINT FK_Whitelist_Semester FOREIGN KEY (SemesterId) REFERENCES Semesters(SemesterId);
+
+SET @fk_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'Whitelist'
+      AND CONSTRAINT_NAME = 'FK_Whitelist_Semester'
+);
+
+SET @sql := IF(
+    @fk_exists = 0,
+    'ALTER TABLE Whitelist
+     ADD CONSTRAINT FK_Whitelist_Semester
+     FOREIGN KEY (SemesterId)
+     REFERENCES Semesters(SemesterId)',
+    'SELECT 1'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+
 
 -- 2. Create ArchivedWhitelists Table
 CREATE TABLE IF NOT EXISTS archived_whitelists (
@@ -18,7 +38,7 @@ CREATE TABLE IF NOT EXISTS archived_whitelists (
     Campus VARCHAR(50),
     SemesterId INT NOT NULL, -- The semester this whitelist belonged to
     ArchivedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
+
     INDEX IX_ArchivedWhitelist_Semester (SemesterId),
     INDEX IX_ArchivedWhitelist_Student (StudentCode)
 );
@@ -34,7 +54,7 @@ CREATE TABLE IF NOT EXISTS archived_teams (
     Status VARCHAR(50), -- "Qualified", "Disbanded", "Passed"
     ArchivedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     JsonData JSON NULL, -- Store full snapshot of members, topic, etc.
-    
+
     INDEX IX_ArchivedTeam_Semester (SemesterId),
     INDEX IX_ArchivedTeam_Original (OriginalTeamId)
 );

@@ -1,19 +1,25 @@
 using System.Text;
 using BusinessObjects.Models;
 using DataAccess;
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Repositories;
-using Services.Helpers;
 using Services;
+using Services.Helpers;
 using Services.Mappings;
-
-
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
+
+//Redis Configuration
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+{
+    var configuration =
+        builder.Configuration.GetValue<string>("Redis:Connection") ?? "localhost:6379";
+    return ConnectionMultiplexer.Connect(configuration);
+});
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -71,11 +77,14 @@ if (!string.IsNullOrEmpty(allowedOrigins))
 {
     builder.Services.AddCors(options =>
     {
-        options.AddPolicy("AllowReactApp",
-            builder => builder
-                .WithOrigins(allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries))
-                .AllowAnyMethod()
-                .AllowAnyHeader());
+        options.AddPolicy(
+            "AllowReactApp",
+            builder =>
+                builder
+                    .WithOrigins(allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+        );
     });
 }
 
