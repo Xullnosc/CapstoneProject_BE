@@ -52,7 +52,7 @@ namespace capstone_be.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error during login");
-                return StatusCode(500, new { message = "An unexpected error occurred" });
+                return StatusCode(500, new { message = ex.ToString() });
             }
         }
     }
