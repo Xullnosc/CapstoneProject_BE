@@ -27,5 +27,12 @@ namespace Repositories
         public async Task<Semester?> GetCurrentSemesterAsync() => await _semesterDAO.GetCurrentSemesterAsync();
 
         public async Task<Semester?> GetSemesterByCodeAsync(string code) => await _semesterDAO.GetByCodeAsync(code);
+
+        public async Task<int> GetStudentRoleIdAsync() => await _semesterDAO.GetStudentRoleIdAsync();
+
+        public async Task<List<Role>> GetAllRolesAsync() => await _semesterDAO.GetAllRolesAsync();
+
+        public async Task<bool> IsOverlapAsync(DateTime start, DateTime end, int? excludeId) 
+            => await _semesterDAO.IsOverlapAsync(start, end, excludeId);
     }
 }

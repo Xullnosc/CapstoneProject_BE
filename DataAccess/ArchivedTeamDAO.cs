@@ -40,8 +40,8 @@ namespace DataAccess
                     SemesterId = t.SemesterId,
                     LeaderId = t.LeaderId,
                     Status = t.Status,
-                    ArchivedAt = t.ArchivedAt
-                    // JsonData is excluded for performance
+                    ArchivedAt = t.ArchivedAt,
+                    JsonData = t.JsonData
                 })
                 .ToListAsync();
         }

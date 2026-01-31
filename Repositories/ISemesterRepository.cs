@@ -12,5 +12,8 @@ namespace Repositories
         Task UpdateSemesterAsync(Semester semester);
         Task<Semester?> GetCurrentSemesterAsync();
         Task<Semester?> GetSemesterByCodeAsync(string code);
+        Task<int> GetStudentRoleIdAsync();
+        Task<List<Role>> GetAllRolesAsync();
+        Task<bool> IsOverlapAsync(DateTime start, DateTime end, int? excludeId);
     }
 }

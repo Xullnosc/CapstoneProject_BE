@@ -76,6 +76,26 @@ namespace CapstoneProject_BE.Controllers
         // [HttpDelete("{id}")] - Removed as per audit
         // Public method removed to prevent access
 
+        [HttpPost("{id}/start")]
+        [Authorize(Roles = CampusConstants.Roles.HOD)]
+        public async Task<IActionResult> StartSemester(int id)
+        {
+            try
+            {
+                await _semesterService.StartSemesterAsync(id);
+                return Ok(new { message = $"Semester {id} started successfully. Previous active semester (if any) has been ended." });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                // In production, log this error
+                return StatusCode(500, new { message = "An error occurred while starting the semester.", detail = ex.Message });
+            }
+        }
+
         [HttpPost("{id}/end")]
         [Authorize(Roles = CampusConstants.Roles.HOD)]
         public async Task<IActionResult> EndSemester(int id)
