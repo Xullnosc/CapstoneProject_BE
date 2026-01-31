@@ -8,5 +8,6 @@ namespace DataAccess
     {
         Task AddRangeAsync(IEnumerable<ArchivedWhitelist> archivedWhitelists);
         Task<List<ArchivedWhitelist>> GetBySemesterIdAsync(int semesterId);
+        Task<List<ArchivedWhitelist>> GetBySemesterIdsAsync(List<int> semesterIds);
     }
 }

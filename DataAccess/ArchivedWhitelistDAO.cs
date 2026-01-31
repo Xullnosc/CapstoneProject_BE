@@ -26,5 +26,12 @@ namespace DataAccess
                 .Where(x => x.SemesterId == semesterId)
                 .ToListAsync();
         }
+
+        public async Task<List<ArchivedWhitelist>> GetBySemesterIdsAsync(List<int> semesterIds)
+        {
+            return await _context.ArchivedWhitelists
+                .Where(x => semesterIds.Contains(x.SemesterId))
+                .ToListAsync();
+        }
     }
 }

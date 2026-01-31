@@ -11,6 +11,7 @@ namespace BusinessObjects.DTOs
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public bool? IsActive { get; set; }
+        public bool IsArchived { get; set; } // Flag to distinguish between Upcoming and officially Ended semesters
         
         // Include minimal team info or simplified list to avoid deep nesting
         // If the UI needs full team details, we can use a separate simplified DTO or stick to this if TeamDTO is already DTO-safe.
@@ -19,6 +20,7 @@ namespace BusinessObjects.DTOs
         // Assuming we want to break the recursion but keep some info:
         // Optimized for Dashboard (List View) to avoid sending full Team list
         public int TeamCount { get; set; }
+        public int WhitelistCount { get; set; } // Added for statistics
         public List<TeamSimpleDTO> Teams { get; set; } = new List<TeamSimpleDTO>();
         public List<WhitelistDTO> Whitelists { get; set; } = new List<WhitelistDTO>();
     }
@@ -38,6 +40,7 @@ namespace BusinessObjects.DTOs
         public int WhitelistId { get; set; }
         public string Email { get; set; } = null!;
         public string? FullName { get; set; }
+        public int? RoleId { get; set; }
         public string? RoleName { get; set; }
     }
 }

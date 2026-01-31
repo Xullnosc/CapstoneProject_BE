@@ -15,6 +15,7 @@ namespace Repositories
         Task<List<ArchivedTeam>> GetArchivedTeamsBySemesterAsync(int semesterId);
         Task<List<ArchivedTeam>> GetArchivedTeamsBySemesterIdsAsync(List<int> semesterIds);
         Task<List<ArchivedTeam>> GetAllArchivedTeamsAsync();
+        Task<List<ArchivedWhitelist>> GetArchivedWhitelistsBySemesterIdsAsync(List<int> semesterIds);
     }
 
     public class ArchivingRepository : IArchivingRepository
@@ -125,6 +126,11 @@ namespace Repositories
         public async Task<List<ArchivedTeam>> GetAllArchivedTeamsAsync()
         {
             return await _archivedTeamDAO.GetAllAsync();
+        }
+
+        public async Task<List<ArchivedWhitelist>> GetArchivedWhitelistsBySemesterIdsAsync(List<int> semesterIds)
+        {
+            return await _archivedWhitelistDAO.GetBySemesterIdsAsync(semesterIds);
         }
     }
 }

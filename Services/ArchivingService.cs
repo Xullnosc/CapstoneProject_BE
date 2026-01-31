@@ -31,5 +31,10 @@ namespace Services
         {
             return await _archivingRepository.GetAllArchivedTeamsAsync();
         }
+
+        public async Task<List<ArchivedWhitelist>> GetArchivedWhitelistsBySemesterIdsAsync(List<int> semesterIds)
+        {
+            return await _archivingRepository.GetArchivedWhitelistsBySemesterIdsAsync(semesterIds);
+        }
     }
 }
