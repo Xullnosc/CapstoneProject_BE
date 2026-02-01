@@ -29,7 +29,7 @@ namespace DataAccess
                     .ThenInclude(t => t.Teammembers)
                 .Include(s => s.Whitelists)
                     .ThenInclude(w => w.Role)
-                .AsNoTracking()
+                .AsNoTrackingWithIdentityResolution()
                 .FirstOrDefaultAsync(s => s.SemesterId == id);
         }
 
@@ -75,7 +75,7 @@ namespace DataAccess
 
         public async Task<int> GetStudentRoleIdAsync()
         {
-            var role = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Student");
+            var role = await _context.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.RoleName == "Student");
             return role?.RoleId ?? 3; // Fallback to 3 if "Student" role not found (based on migration V2)
         }
 
