@@ -1,12 +1,12 @@
-﻿using BusinessObjects.Models;
-using Microsoft.IdentityModel.Tokens;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
+using BusinessObjects.Models;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Services.Helpers
 {
@@ -15,10 +15,10 @@ namespace Services.Helpers
         public static string GenerateToken(User user, JwtSettings jwtSettings)
         {
             var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
-            new Claim(ClaimTypes.Email, user.Email)
-        };
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+                new Claim(ClaimTypes.Email, user.Email),
+            };
 
             // Add role claim if user has a role
             if (user.Role != null && !string.IsNullOrEmpty(user.Role.RoleName))

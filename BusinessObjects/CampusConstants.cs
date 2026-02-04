@@ -16,7 +16,11 @@ namespace BusinessObjects
 
         public static readonly List<string> All = new()
         {
-        HoaLac, HoChiMinh, DaNang, CanTho, QuyNhon
+            HoaLac,
+            HoChiMinh,
+            DaNang,
+            CanTho,
+            QuyNhon,
         };
 
         public static class Roles
@@ -47,6 +51,16 @@ namespace BusinessObjects
         {
             public const string Leader = "Leader";
             public const string Member = "Member";
+        }
+
+        public static class WhitelistImportColumns
+        {
+            public const string Email = "Email";
+            public const string StudentCode = "StudentCode";
+            public const string FullName = "FullName";
+            public const string RoleId = "RoleId";
+            public const string Campus = "Campus";
+            public const string SemesterId = "SemesterId";
         }
     }
 }

@@ -1,6 +1,6 @@
+using System.Threading.Tasks;
 using BusinessObjects.Models;
 using Repositories;
-using System.Threading.Tasks;
 
 namespace Services
 {
@@ -17,12 +17,15 @@ namespace Services
         {
             await _archivingRepository.ArchiveSemesterAsync(semesterId);
         }
+
         public async Task<List<ArchivedTeam>> GetArchivedTeamsBySemesterAsync(int semesterId)
         {
             return await _archivingRepository.GetArchivedTeamsBySemesterAsync(semesterId);
         }
 
-        public async Task<List<ArchivedTeam>> GetArchivedTeamsBySemesterIdsAsync(List<int> semesterIds)
+        public async Task<List<ArchivedTeam>> GetArchivedTeamsBySemesterIdsAsync(
+            List<int> semesterIds
+        )
         {
             return await _archivingRepository.GetArchivedTeamsBySemesterIdsAsync(semesterIds);
         }
@@ -30,11 +33,6 @@ namespace Services
         public async Task<List<ArchivedTeam>> GetAllArchivedTeamsAsync()
         {
             return await _archivingRepository.GetAllArchivedTeamsAsync();
-        }
-
-        public async Task<List<ArchivedWhitelist>> GetArchivedWhitelistsBySemesterIdsAsync(List<int> semesterIds)
-        {
-            return await _archivingRepository.GetArchivedWhitelistsBySemesterIdsAsync(semesterIds);
         }
     }
 }
