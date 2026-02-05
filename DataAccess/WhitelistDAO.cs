@@ -26,6 +26,13 @@ namespace DataAccess
                 .ToListAsync();
         }
 
+        public async Task<List<Whitelist>> GetByRoleAsync(int roleId)
+        {
+            return await _context.Whitelists
+                .Where(w => w.RoleId == roleId)
+                .ToListAsync();
+        }
+
         public async Task DeleteRangeAsync(IEnumerable<Whitelist> whitelists)
         {
             _context.Whitelists.RemoveRange(whitelists);
