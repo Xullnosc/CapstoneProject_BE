@@ -16,5 +16,10 @@ namespace Repositories
         {
             return await _whitelistDAO.GetByEmailAsync(email);
         }
+
+        public async Task AddRangeAsync(IEnumerable<Whitelist> whitelists)
+        {
+            await _whitelistDAO.AddRangeAsync(whitelists);
+        }
     }
 }

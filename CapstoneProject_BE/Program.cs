@@ -12,7 +12,6 @@ using Services.Helpers;
 using Services.Mappings;
 using StackExchange.Redis;
 
-ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 var builder = WebApplication.CreateBuilder(args);
 
 //Redis Configuration
@@ -99,6 +98,7 @@ builder.Services.AddScoped<IArchivingService, ArchivingService>();
 builder.Services.AddScoped<ICloudinaryHelper, Services.Helpers.CloudinaryHelper>();
 builder.Services.AddScoped<ITeamInvitationService, TeamInvitationService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IImportService, ImportService>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();

@@ -7,5 +7,7 @@ namespace DataAccess
         Task<Whitelist?> GetByEmailAsync(string email);
         Task<List<Whitelist>> GetBySemesterIdAsync(int semesterId);
         Task DeleteRangeAsync(IEnumerable<Whitelist> whitelists);
+
+        Task AddRangeAsync(IEnumerable<Whitelist> whitelists);
     }
 }
