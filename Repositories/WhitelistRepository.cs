@@ -16,5 +16,10 @@ namespace Repositories
         {
             return await _whitelistDAO.GetByEmailAsync(email);
         }
+
+        public async Task<IEnumerable<Whitelist>> GetByRoleAsync(int roleId)
+        {
+            return await _whitelistDAO.GetByRoleAsync(roleId);
+        }
     }
 }
