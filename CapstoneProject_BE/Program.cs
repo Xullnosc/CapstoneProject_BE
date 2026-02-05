@@ -133,8 +133,6 @@ var jwtAudience = builder.Configuration["Jwt:Audience"];
 builder
     .Services.AddAuthentication(options =>
     {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     })
     .AddJwtBearer(options =>
     {
@@ -149,6 +147,11 @@ builder
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!)),
         };
     });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Reviewer", policy => policy.RequireClaim("IsReviewer", "true"));
+});
 
 var app = builder.Build();
 

@@ -21,5 +21,15 @@ namespace Repositories
         {
             return await _whitelistDAO.GetByRoleAsync(roleId);
         }
+
+        public async Task<Whitelist?> GetByIdAsync(int id)
+        {
+            return await _whitelistDAO.GetByIdAsync(id);
+        }
+
+        public async Task UpdateAsync(Whitelist whitelist)
+        {
+            await _whitelistDAO.UpdateAsync(whitelist);
+        }
     }
 }

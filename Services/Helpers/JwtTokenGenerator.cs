@@ -12,7 +12,7 @@ namespace Services.Helpers
 {
     public class JwtTokenGenerator
     {
-        public static string GenerateToken(User user, JwtSettings jwtSettings)
+        public static string GenerateToken(User user, bool isReviewer, JwtSettings jwtSettings)
         {
             var claims = new List<Claim>
         {
@@ -24,6 +24,11 @@ namespace Services.Helpers
             if (user.Role != null && !string.IsNullOrEmpty(user.Role.RoleName))
             {
                 claims.Add(new Claim("role", user.Role.RoleName));
+            }
+            
+            if (isReviewer)
+            {
+                claims.Add(new Claim("IsReviewer", "true"));
             }
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key));

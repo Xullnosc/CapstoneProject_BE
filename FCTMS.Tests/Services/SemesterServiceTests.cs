@@ -16,6 +16,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ISemesterRepository> _mockSemesterRepository;
         private readonly Mock<IArchivingService> _mockArchivingService;
         private readonly Mock<IMapper> _mockMapper;
+        private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly SemesterService _semesterService;
 
         public SemesterServiceTests()
@@ -23,11 +24,13 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository = new Mock<ISemesterRepository>();
             _mockArchivingService = new Mock<IArchivingService>();
             _mockMapper = new Mock<IMapper>();
+            _mockUserRepository = new Mock<IUserRepository>();
 
             _semesterService = new SemesterService(
                 _mockSemesterRepository.Object,
                 _mockArchivingService.Object,
-                _mockMapper.Object
+                _mockMapper.Object,
+                _mockUserRepository.Object
             );
         }
 
