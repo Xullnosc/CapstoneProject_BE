@@ -41,5 +41,10 @@ namespace Repositories
         {
             return await _userDAO.SearchUsersAsync(term);
         }
+
+        public async Task<List<User>> GetUsersByEmailsAsync(List<string> emails)
+        {
+            return await _userDAO.GetUsersByEmailsAsync(emails);
+        }
     }
 }

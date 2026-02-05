@@ -15,6 +15,10 @@ public partial class Whitelist
 
     public int? RoleId { get; set; }
 
+    public bool IsReviewer { get; set; }
+
+    public string? Avatar { get; set; }
+
     public string? Campus { get; set; }
 
     public DateTime? AddedDate { get; set; }

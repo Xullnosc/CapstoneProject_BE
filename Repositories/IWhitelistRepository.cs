@@ -6,5 +6,7 @@ namespace Repositories
     {
         Task<Whitelist?> GetByEmailAsync(string email);
         Task<IEnumerable<Whitelist>> GetByRoleAsync(int roleId);
+        Task<Whitelist?> GetByIdAsync(int id);
+        Task UpdateAsync(Whitelist whitelist);
     }
 }

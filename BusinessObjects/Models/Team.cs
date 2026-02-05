@@ -19,6 +19,8 @@ public partial class Team
 
     public int LeaderId { get; set; }
 
+    public int? MentorId { get; set; }
+
     public string? Status { get; set; }
 
     public DateTime? CreatedAt { get; set; }
@@ -28,6 +30,8 @@ public partial class Team
     public virtual User Leader { get; set; } = null!;
 
     public virtual Semester Semester { get; set; } = null!;
+
+    public virtual User? Mentor { get; set; }
 
     public virtual ICollection<Teaminvitation> Teaminvitations { get; set; } = new List<Teaminvitation>();
 

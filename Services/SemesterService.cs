@@ -13,12 +13,18 @@ namespace Services
         private readonly ISemesterRepository _semesterRepository;
         private readonly IArchivingService _archivingService;
         private readonly IMapper _mapper;
+        private readonly IUserRepository _userRepository;
 
-        public SemesterService(ISemesterRepository semesterRepository, IArchivingService archivingService, IMapper mapper)
+        public SemesterService(
+            ISemesterRepository semesterRepository, 
+            IArchivingService archivingService, 
+            IMapper mapper,
+            IUserRepository userRepository)
         {
             _semesterRepository = semesterRepository;
             _archivingService = archivingService;
             _mapper = mapper;
+            _userRepository = userRepository;
         }
 
         /// <summary>
@@ -136,6 +142,39 @@ namespace Services
                 dto.Whitelists.AddRange(archivedWlDTOs);
             }
 
+            // POPULATE AVATARS FOR ALL WHITELISTS
+            if (dto.Whitelists.Any())
+            {
+                // Normalize emails (Trim)
+                var emails = dto.Whitelists
+                    .Where(w => !string.IsNullOrWhiteSpace(w.Email))
+                    .Select(w => w.Email.Trim())
+                    .Distinct()
+                    .ToList();
+
+                var users = await _userRepository.GetUsersByEmailsAsync(emails);
+                
+                // Use case-insensitive dictionary to match emails safely
+                var avatarDict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var user in users)
+                {
+                    if (!string.IsNullOrEmpty(user.Email) && !avatarDict.ContainsKey(user.Email.Trim()))
+                    {
+                        avatarDict[user.Email.Trim()] = user.Avatar;
+                    }
+                }
+
+                foreach (var wl in dto.Whitelists)
+                {
+                    if (string.IsNullOrWhiteSpace(wl.Email)) continue;
+
+                    if (avatarDict.TryGetValue(wl.Email.Trim(), out var avatar))
+                    {
+                        wl.Avatar = avatar;
+                    }
+                }
+            }
+
             // 3. Calculate Counts (Total = Live + Archived)
             int liveTeamCount = semester.Teams?.Count ?? 0;
             int liveStudentCount = semester.Whitelists?.Count(w => w.RoleId == studentRoleId) ?? 0;
@@ -247,6 +286,9 @@ namespace Services
                 if (semesterToActivate != null && !semesterToActivate.IsActive)
                 {
                     semesterToActivate.IsActive = true;
+                    // Detach navigation properties to prevent EF tracking conflicts
+                    semesterToActivate.Teams = null;
+                    semesterToActivate.Whitelists = null;
                     await _semesterRepository.UpdateSemesterAsync(semesterToActivate);
                 }
 
@@ -285,6 +327,9 @@ namespace Services
 
                 // 1. Mark as Inactive
                 semester.IsActive = false;
+                // Detach navigation properties to prevent EF tracking conflicts
+                semester.Teams = null;
+                semester.Whitelists = null;
                 await _semesterRepository.UpdateSemesterAsync(semester);
 
                 // 2. Archive Data
