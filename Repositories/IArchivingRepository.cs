@@ -1,15 +1,16 @@
 using BusinessObjects.Models;
-using System.Threading.Tasks;
 
-namespace Services
+namespace Repositories
 {
-    public interface IArchivingService
+    public interface IArchivingRepository
     {
-        Task ArchiveTeamAsync(Team team);
-        Task ArchiveSemesterAsync(int semesterId);
+        Task ArchiveTeamAsync(ArchivedTeam team);
+
         Task<List<ArchivedTeam>> GetArchivedTeamsBySemesterAsync(int semesterId);
         Task<List<ArchivedTeam>> GetArchivedTeamsBySemesterIdsAsync(List<int> semesterIds);
         Task<List<ArchivedTeam>> GetAllArchivedTeamsAsync();
         Task<List<ArchivedWhitelist>> GetArchivedWhitelistsBySemesterIdsAsync(List<int> semesterIds);
+        Task ArchiveWhitelistsAsync(IEnumerable<ArchivedWhitelist> archivedWhitelists);
+        Task ArchiveTeamsAsync(IEnumerable<ArchivedTeam> archivedTeams);
     }
 }

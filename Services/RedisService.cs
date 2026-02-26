@@ -1,6 +1,8 @@
 using StackExchange.Redis;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Linq;
+using System.Collections.Generic;
 
 public class RedisService : IRedisService
 {
@@ -97,6 +99,105 @@ public class RedisService : IRedisService
         return json is null
             ? default
             : JsonSerializer.Deserialize<T>(json);
+    }
+
+    public async Task<bool> SetAddAsync(string key, string value, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _database.SetAddAsync(key, value);
+            _logger.LogInformation("Redis SADD {Key} (Value: {Value}) Added: {Added}", key, value, result);
+            return result;
+        }
+        catch (Exception ex) when (IsRedisException(ex))
+        {
+            _logger.LogError(ex, "Redis SADD failed for key {Key}", key);
+            throw;
+        }
+    }
+
+    public async Task<long> SetAddAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var rv = values.Select(v => (RedisValue)v).ToArray();
+            var result = await _database.SetAddAsync(key, rv);
+            _logger.LogInformation("Redis SADD {Key} (CountAttempted: {Count}) Added: {Added}", key, rv.Length, result);
+            return result;
+        }
+        catch (Exception ex) when (IsRedisException(ex))
+        {
+            _logger.LogError(ex, "Redis SADD failed for key {Key}", key);
+            throw;
+        }
+    }
+
+    public async Task<string[]?> SetMembersAsync(string key, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var members = await _database.SetMembersAsync(key);
+            if (members is null || members.Length == 0)
+            {
+                _logger.LogDebug("Redis SMEMBERS MISS {Key}", key);
+                return Array.Empty<string>();
+            }
+
+            var result = members.Select(m => (string)m).ToArray();
+            _logger.LogDebug("Redis SMEMBERS HIT {Key} Count: {Count}", key, result.Length);
+            return result;
+        }
+        catch (Exception ex) when (IsRedisException(ex))
+        {
+            _logger.LogError(ex, "Redis SMEMBERS failed for key {Key}", key);
+            throw;
+        }
+    }
+
+    public async Task<bool> SetRemoveAsync(string key, string value, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _database.SetRemoveAsync(key, value);
+            _logger.LogInformation("Redis SREM {Key} (Value: {Value}) Removed: {Removed}", key, value, result);
+            return result;
+        }
+        catch (Exception ex) when (IsRedisException(ex))
+        {
+            _logger.LogError(ex, "Redis SREM failed for key {Key}", key);
+            throw;
+        }
+    }
+
+    public async Task<long> SetRemoveAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var rv = values.Select(v => (RedisValue)v).ToArray();
+            var result = await _database.SetRemoveAsync(key, rv);
+            _logger.LogInformation("Redis SREM {Key} (CountAttempted: {Count}) Removed: {Removed}", key, rv.Length, result);
+            return result;
+        }
+        catch (Exception ex) when (IsRedisException(ex))
+        {
+            _logger.LogError(ex, "Redis SREM failed for key {Key}", key);
+            throw;
+        }
+    }
+
+    public async Task<bool> ExpireAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _database.KeyExpireAsync(key, expiry);
+            _logger.LogInformation("Redis EXPIRE {Key} (Expiry: {Expiry})", key, expiry);
+            return result;
+        }
+        catch (Exception ex) when (IsRedisException(ex))
+        {
+            _logger.LogError(ex, "Redis EXPIRE failed for key {Key}", key);
+            throw;
+        }
     }
 
     private static bool IsRedisException(Exception ex)

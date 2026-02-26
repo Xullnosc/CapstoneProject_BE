@@ -21,5 +21,14 @@ namespace Repositories
         {
             return await _whitelistDAO.GetByRoleAsync(roleId);
         }
+
+        public async Task<List<Whitelist>> GetBySemesterIdAsync(int semesterId)
+        {
+            return await _whitelistDAO.GetBySemesterIdAsync(semesterId);
+        }
+        public async Task DeleteRangeAsync(IEnumerable<Whitelist> whitelists)
+        {
+            await _whitelistDAO.DeleteRangeAsync(whitelists);
+        }
     }
 }

@@ -98,6 +98,7 @@ builder.Services.AddScoped<ICloudinaryHelper, Services.Helpers.CloudinaryHelper>
 builder.Services.AddScoped<ITeamInvitationService, TeamInvitationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IWhitelistService, WhitelistService>();
+builder.Services.AddScoped<IRedisService, RedisService>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
