@@ -31,6 +31,8 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<Whitelist> Whitelists { get; set; }
 
+    public virtual DbSet<Thesis> Theses { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -300,6 +302,37 @@ public partial class FctmsContext : DbContext
             entity.HasOne(d => d.Semester).WithMany(p => p.Whitelists)
                 .HasForeignKey(d => d.SemesterId)
                 .HasConstraintName("FK_Whitelist_Semester");
+        });
+
+        modelBuilder.Entity<Thesis>(entity =>
+        {
+            entity.HasKey(e => e.ThesisId).HasName("PRIMARY");
+
+            entity.ToTable("thesis");
+
+            entity.HasIndex(e => e.UserId, "fk_thesis_userid");
+
+            entity.Property(e => e.ThesisId)
+                .HasMaxLength(36)
+                .HasDefaultValueSql("(uuid())")
+                .IsFixedLength();
+            entity.Property(e => e.FileUrl).HasMaxLength(500);
+            entity.Property(e => e.ShortDescription).HasColumnType("text");
+            entity.Property(e => e.Status)
+                .HasDefaultValueSql("'Reviewing'")
+                .HasColumnType("enum('Published','Updated','Need Update','Reviewing','Rejected','Registered')");
+            entity.Property(e => e.Title).HasMaxLength(255);
+            entity.Property(e => e.UpDate)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UpdateDate)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.User).WithMany(p => p.Theses)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("fk_thesis_userid");
         });
 
         OnModelCreatingPartial(modelBuilder);
