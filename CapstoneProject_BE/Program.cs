@@ -28,6 +28,7 @@ builder
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
 builder.Services.AddDbContext<FctmsContext>(options =>
 {
@@ -98,6 +99,7 @@ builder.Services.AddScoped<ICloudinaryHelper, Services.Helpers.CloudinaryHelper>
 builder.Services.AddScoped<ITeamInvitationService, TeamInvitationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IWhitelistService, WhitelistService>();
+builder.Services.AddScoped<IThesisService, ThesisService>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
@@ -108,6 +110,7 @@ builder.Services.AddScoped<IArchivedWhitelistDAO, ArchivedWhitelistDAO>();
 builder.Services.AddScoped<IArchivedTeamDAO, ArchivedTeamDAO>();
 builder.Services.AddScoped<ITeamInvitationDAO, TeamInvitationDAO>();
 builder.Services.AddScoped<ITeamMemberDAO, TeamMemberDAO>();
+builder.Services.AddScoped<IThesisDAO, ThesisDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -117,6 +120,7 @@ builder.Services.AddScoped<ITeamRepository, TeamRepository>();
 builder.Services.AddScoped<IArchivingRepository, ArchivingRepository>();
 builder.Services.AddScoped<ITeamInvitationRepository, TeamInvitationRepository>();
 builder.Services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
+builder.Services.AddScoped<IThesisRepository, ThesisRepository>();
 
 //Middleware
 // AutoMapper

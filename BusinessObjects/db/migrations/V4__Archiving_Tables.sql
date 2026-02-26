@@ -3,8 +3,6 @@
 -- Since this is a new column on an existing table, we allow NULL initially or set default if needed.
 -- However, for strict integrity, we should enforce it. For now, we allow NULL to avoid breaking existing data immediately,
 -- or we assume existing data belongs to Semester 1 (if any). Let's make it NULLable for safety first, then User can backfill.
-
--- Check if SemesterId column exists in Whitelist table and add it if not
 SET @col_exists := (
     SELECT COUNT(*)
     FROM information_schema.COLUMNS
@@ -22,8 +20,6 @@ SET @sql_add_col := IF(
 PREPARE stmt_add_col FROM @sql_add_col;
 EXECUTE stmt_add_col;
 DEALLOCATE PREPARE stmt_add_col;
-
--- Now add the foreign key constraint
 SET @fk_exists := (
     SELECT COUNT(*)
     FROM information_schema.TABLE_CONSTRAINTS
