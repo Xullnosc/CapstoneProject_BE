@@ -38,5 +38,16 @@ namespace DataAccess
             _context.Whitelists.RemoveRange(whitelists);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<Whitelist?> GetByIdAsync(int id)
+        {
+            return await _context.Whitelists.FindAsync(id);
+        }
+
+        public async Task UpdateAsync(Whitelist whitelist)
+        {
+            _context.Whitelists.Update(whitelist);
+            await _context.SaveChangesAsync();
+        }
     }
 }

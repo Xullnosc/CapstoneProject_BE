@@ -23,5 +23,19 @@ namespace CapstoneProject_BE.Controllers
             var result = await _whitelistService.GetWhitelistByRoleAsync(roleId);
             return Ok(result);
         }
+
+        [HttpPut("update-reviewer-status/{id}")]
+        public async Task<IActionResult> UpdateReviewerStatus(int id, [FromBody] bool isReviewer)
+        {
+            try
+            {
+                await _whitelistService.UpdateReviewerStatusAsync(id, isReviewer);
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
     }
 }

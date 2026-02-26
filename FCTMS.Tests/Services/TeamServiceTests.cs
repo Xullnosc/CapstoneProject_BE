@@ -19,7 +19,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ISemesterRepository> _mockSemesterRepository;
         private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<ICloudinaryHelper> _mockCloudinaryHelper;
-        private readonly Mock<IArchivingRepository> _mockArchivingRepository;
+        private readonly Mock<IArchivingService> _mockArchivingService;
         private readonly Mock<ITeamMemberRepository> _mockTeamMemberRepository;
         private readonly TeamService _teamService;
 
@@ -29,7 +29,7 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository = new Mock<ISemesterRepository>();
             _mockUserRepository = new Mock<IUserRepository>();
             _mockCloudinaryHelper = new Mock<ICloudinaryHelper>();
-            _mockArchivingRepository = new Mock<IArchivingRepository>();
+            _mockArchivingService = new Mock<IArchivingService>();
             _mockTeamMemberRepository = new Mock<ITeamMemberRepository>();
 
             _teamService = new TeamService(
@@ -37,7 +37,7 @@ namespace FCTMS.Tests.Services
                 _mockSemesterRepository.Object,
                 _mockUserRepository.Object,
                 _mockCloudinaryHelper.Object,
-                _mockArchivingRepository.Object,
+                _mockArchivingService.Object,
                 _mockTeamMemberRepository.Object
             );
         }
@@ -57,13 +57,13 @@ namespace FCTMS.Tests.Services
             };
             _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId))
                 .ReturnsAsync(team);
-            _mockArchivingRepository.Setup(r => r.ArchiveTeamAsync(It.IsAny<Team>()))
+            _mockArchivingService.Setup(r => r.ArchiveTeamAsync(It.IsAny<Team>()))
                 .Returns(Task.CompletedTask);
             // Act
             var result = await _teamService.DisbandTeamAsync(teamId, leaderId);
             // Assert
             Assert.True(result);
-            _mockArchivingRepository.Verify(r => r.ArchiveTeamAsync(team), Times.Once);
+            _mockArchivingService.Verify(r => r.ArchiveTeamAsync(team), Times.Once);
             _mockTeamRepository.Verify(r => r.UpdateStatusAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
         }
         [Fact]
@@ -76,7 +76,7 @@ namespace FCTMS.Tests.Services
             var result = await _teamService.DisbandTeamAsync(1, 1);
             // Assert
             Assert.False(result);
-            _mockArchivingRepository.Verify(r => r.ArchiveTeamAsync(It.IsAny<Team>()), Times.Never);
+            _mockArchivingService.Verify(r => r.ArchiveTeamAsync(It.IsAny<Team>()), Times.Never);
         }
         [Fact]
         public async Task DisbandTeamAsync_ThrowsException_WhenNotLeader()
@@ -87,7 +87,7 @@ namespace FCTMS.Tests.Services
                 .ReturnsAsync(team);
             // Act & Assert
             await Assert.ThrowsAsync<Exception>(() => _teamService.DisbandTeamAsync(1, 1));
-            _mockArchivingRepository.Verify(r => r.ArchiveTeamAsync(It.IsAny<Team>()), Times.Never);
+            _mockArchivingService.Verify(r => r.ArchiveTeamAsync(It.IsAny<Team>()), Times.Never);
         }
         [Fact]
         public async Task UpdateTeamAsync_ShouldUpdateNameAndDescription_WhenValid()

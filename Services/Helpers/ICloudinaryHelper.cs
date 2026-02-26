@@ -6,5 +6,6 @@ namespace Services.Helpers
     public interface ICloudinaryHelper
     {
         Task<string> UploadImageAsync(IFormFile file);
+        Task<string> UploadFileAsync(IFormFile file);
     }
 }
