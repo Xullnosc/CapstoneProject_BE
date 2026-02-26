@@ -8,5 +8,8 @@ namespace Repositories
         Task<IEnumerable<Whitelist>> GetByRoleAsync(int roleId);
         Task<List<Whitelist>> GetBySemesterIdAsync(int semesterId);
         Task DeleteRangeAsync(IEnumerable<Whitelist> whitelists);
+        Task<Whitelist?> GetByIdAsync(int id);
+        Task UpdateAsync(Whitelist whitelist);
+
     }
 }

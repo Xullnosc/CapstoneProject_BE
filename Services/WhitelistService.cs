@@ -18,5 +18,17 @@ namespace Services
         {
             return await _whitelistRepository.GetByRoleAsync(roleId);
         }
+
+        public async Task UpdateReviewerStatusAsync(int whitelistId, bool isReviewer)
+        {
+            var whitelist = await _whitelistRepository.GetByIdAsync(whitelistId);
+            if (whitelist == null)
+            {
+                throw new KeyNotFoundException($"Whitelist entry with ID {whitelistId} not found.");
+            }
+
+            whitelist.IsReviewer = isReviewer;
+            await _whitelistRepository.UpdateAsync(whitelist);
+        }
     }
 }

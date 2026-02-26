@@ -28,6 +28,7 @@ namespace DataAccess
                 .Semesters.Include(s => s.Teams)
                     .ThenInclude(t => t.Teammembers)
                 .Include(s => s.Whitelists)
+                    .ThenInclude(w => w.Role)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.SemesterId == id);
         }

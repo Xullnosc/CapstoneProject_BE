@@ -7,5 +7,7 @@ namespace Services
     public interface IWhitelistService
     {
         Task<IEnumerable<Whitelist>> GetWhitelistByRoleAsync(int roleId);
+        Task UpdateReviewerStatusAsync(int whitelistId, bool isReviewer);
+    
     }
 }

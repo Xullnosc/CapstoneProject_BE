@@ -61,5 +61,14 @@ namespace DataAccess
                 .Take(10) // Limit results
                 .ToListAsync();
         }
+        public async Task<List<User>> GetUsersByEmailsAsync(List<string> emails)
+        {
+            if (emails == null || !emails.Any()) return new List<User>();
+
+            return await _context.Users
+                .Where(u => emails.Contains(u.Email))
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }

@@ -30,5 +30,14 @@ namespace Repositories
         {
             await _whitelistDAO.DeleteRangeAsync(whitelists);
         }
+        public async Task<Whitelist?> GetByIdAsync(int id)
+        {
+            return await _whitelistDAO.GetByIdAsync(id);
+        }
+
+        public async Task UpdateAsync(Whitelist whitelist)
+        {
+            await _whitelistDAO.UpdateAsync(whitelist);
+        }
     }
 }

@@ -1,6 +1,7 @@
-# Parameter: optional settings path
+# Parameter: optional settings path and command
 param(
-	[string]$settingsPath
+	[string]$settingsPath,
+    [string]$command = "migrate"
 )
 # Dot-source environment-variables only if it exists
 $envFile = Join-Path $PSScriptRoot "environment-variables.ps1"
@@ -22,9 +23,9 @@ else {
 
 # Allow optional -settingsPath parameter; if provided pass it through
 if ($settingsPath) {
-	Run-Flyway -settingsPath $settingsPath
+	Run-Flyway -settingsPath $settingsPath -command $command
 }
 else {
-	Run-Flyway
+	Run-Flyway -command $command
 }
 
