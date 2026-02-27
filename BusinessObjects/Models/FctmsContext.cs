@@ -33,6 +33,8 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<Thesis> Theses { get; set; }
 
+    public virtual DbSet<ThesisHistory> ThesisHistories { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -314,8 +316,12 @@ public partial class FctmsContext : DbContext
 
             entity.Property(e => e.ThesisId)
                 .HasMaxLength(36)
-                .HasDefaultValueSql("(uuid())")
-                .IsFixedLength();
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => Guid.Parse(v),
+                    v => v.ToString()
+                )
+                .HasDefaultValueSql("(uuid())");
             entity.Property(e => e.FileUrl).HasMaxLength(500);
             entity.Property(e => e.ShortDescription).HasColumnType("text");
             entity.Property(e => e.Status)
@@ -333,6 +339,41 @@ public partial class FctmsContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.Theses)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("fk_thesis_userid");
+        });
+
+        modelBuilder.Entity<ThesisHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("thesis_histories");
+
+            entity.HasIndex(e => e.ThesisId, "FK_ThesisHistory_Thesis");
+            entity.HasIndex(e => e.UploadedBy, "FK_ThesisHistory_User");
+
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.ThesisId)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => Guid.Parse(v),
+                    v => v.ToString()
+                );
+            entity.Property(e => e.FileUrl).HasMaxLength(500);
+            entity.Property(e => e.VersionNumber).HasDefaultValueSql("1");
+            entity.Property(e => e.Note).HasColumnType("text");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.Thesis).WithMany(p => p.ThesisHistories)
+                .HasForeignKey(d => d.ThesisId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ThesisHistory_Thesis");
+
+            entity.HasOne(d => d.UploadedByUser).WithMany()
+                .HasForeignKey(d => d.UploadedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ThesisHistory_User");
         });
 
         OnModelCreatingPartial(modelBuilder);

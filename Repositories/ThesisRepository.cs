@@ -23,5 +23,16 @@ namespace Repositories
         public Task<IEnumerable<Thesis>> GetThesesByUserIdAsync(int userId) => _thesisDAO.GetThesesByUserIdAsync(userId);
 
         public Task UpdateThesisAsync(Thesis thesis) => _thesisDAO.UpdateThesisAsync(thesis);
+
+        // ─── Phase 02: New Methods ───────────────────────────────────────────────
+
+        public Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId)
+            => _thesisDAO.GetAllThesesFilteredAsync(status, userId);
+
+        public Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id)
+            => _thesisDAO.GetThesisByIdWithHistoriesAsync(id);
+
+        public Task AddThesisHistoryAsync(ThesisHistory history)
+            => _thesisDAO.AddThesisHistoryAsync(history);
     }
 }

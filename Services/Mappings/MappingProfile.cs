@@ -63,6 +63,16 @@ namespace Services.Mappings
             // Reverse map for Create/Update
             CreateMap<SemesterDTO, Semester>();
             CreateMap<SemesterCreateDTO, Semester>();
+
+            // Thesis → ThesisDTO
+            CreateMap<Thesis, ThesisDTO>()
+                .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.User != null ? src.User.FullName : null))
+                .ForMember(dest => dest.OwnerEmail, opt => opt.MapFrom(src => src.User != null ? src.User.Email : null))
+                .ForMember(dest => dest.Histories, opt => opt.MapFrom(src => src.ThesisHistories));
+
+            // ThesisHistory → ThesisHistoryDTO
+            CreateMap<ThesisHistory, ThesisHistoryDTO>()
+                .ForMember(dest => dest.UploaderName, opt => opt.MapFrom(src => src.UploadedByUser != null ? src.UploadedByUser.FullName : null));
         }
     }
 }
