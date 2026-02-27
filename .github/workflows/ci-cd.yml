@@ -64,5 +64,5 @@ jobs:
         run: |
           az containerapp update \
             --name fctmscapstone \
-            --resource-group capstoneResourceGroup \
+            --resource-group capstoneResourceGroupNew \
             --image docker.io/${{ secrets.DOCKER_USERNAME }}/capstone_be:2.0
