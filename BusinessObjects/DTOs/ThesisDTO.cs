@@ -1,0 +1,20 @@
+using System;
+using System.Collections.Generic;
+
+namespace BusinessObjects.DTOs
+{
+    public class ThesisDTO
+    {
+        public string ThesisId { get; set; } = null!;
+        public string Title { get; set; } = null!;
+        public string? ShortDescription { get; set; }
+        public string? FileUrl { get; set; }
+        public string? Status { get; set; }
+        public DateTime? UpDate { get; set; }
+        public DateTime? UpdateDate { get; set; }
+        public int UserId { get; set; }
+        public string? OwnerName { get; set; }
+        public string? OwnerEmail { get; set; }
+        public List<ThesisHistoryDTO>? Histories { get; set; }
+    }
+}

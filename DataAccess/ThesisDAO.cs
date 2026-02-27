@@ -49,5 +49,48 @@ namespace DataAccess
             _context.Entry(thesis).State = EntityState.Modified;
             await _context.SaveChangesAsync();
         }
+
+        // ─── Phase 02: New Methods ───────────────────────────────────────────────
+
+        public async Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId)
+        {
+            var query = _context.Theses
+                .Include(t => t.User)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(t => t.Status == status);
+
+            if (userId.HasValue)
+                query = query.Where(t => t.UserId == userId.Value);
+
+            return await query.OrderByDescending(t => t.UpdateDate).ToListAsync();
+        }
+
+        public async Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+
+            var thesis = await _context.Theses
+                .Include(t => t.User)
+                .Include(t => t.ThesisHistories) // Explicitly included
+                .FirstOrDefaultAsync(t => t.ThesisId == id);
+
+            if (thesis != null && thesis.ThesisHistories != null)
+            {
+                // EF Core cannot sort inside Include -> sort in memory after loading
+                thesis.ThesisHistories = thesis.ThesisHistories
+                    .OrderByDescending(h => h.VersionNumber)
+                    .ToList();
+            }
+
+            return thesis;
+        }
+
+        public async Task AddThesisHistoryAsync(ThesisHistory history)
+        {
+            _context.ThesisHistories.Add(history);
+            await _context.SaveChangesAsync();
+        }
     }
 }
