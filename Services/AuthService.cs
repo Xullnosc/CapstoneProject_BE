@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using BusinessObjects;
 using BusinessObjects.Models;
 using Google.Apis.Auth;
@@ -177,6 +177,7 @@ namespace Services
 
                 // 6. Map to DTO and return
                 var userInfo = _mapper.Map<UserInfoDTO>(user);
+                userInfo.IsReviewer = isReviewer;
 
                 return new LoginResponseDTO
                 {

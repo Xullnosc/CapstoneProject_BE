@@ -180,12 +180,17 @@ namespace Services
         }
 
         /// <summary>
-        /// Get filtered list of theses. Both filters are optional.
+        /// Get filtered list of theses. All filters are optional.
         /// </summary>
-        public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId)
+        public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null)
         {
             var theses = await _thesisRepository.GetAllThesesFilteredAsync(status, userId);
-            return _mapper.Map<IEnumerable<ThesisDTO>>(theses);
+            var dtos = _mapper.Map<IEnumerable<ThesisDTO>>(theses);
+            if (!string.IsNullOrWhiteSpace(searchTitle))
+            {
+                dtos = dtos.Where(d => d.Title != null && d.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase));
+            }
+            return dtos;
         }
     }
 }

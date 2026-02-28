@@ -98,16 +98,15 @@ namespace CapstoneProject_BE.Controllers
         }
 
         /// <summary>
-        /// GET /api/thesis?status=Reviewing&amp;userId=5
-        /// Returns filtered list of all theses. Both query params are optional.
+        /// GET /api/thesis?status=Reviewing&amp;userId=5&amp;searchTitle=...
+        /// Returns filtered list of all theses. All query params are optional.
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetAllTheses([FromQuery] string? status, [FromQuery] int? userId)
+        public async Task<IActionResult> GetAllTheses([FromQuery] string? status, [FromQuery] int? userId, [FromQuery] string? searchTitle)
         {
             try
             {
-                // If filters are provided, use filtered query; otherwise return all
-                var theses = await _thesisService.GetFilteredThesesAsync(status, userId);
+                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle);
                 return Ok(theses);
             }
             catch (Exception ex)
