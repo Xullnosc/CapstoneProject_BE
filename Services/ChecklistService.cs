@@ -45,8 +45,10 @@ namespace Services
             if (entity == null)
                 throw new KeyNotFoundException($"Checklist with id {id} not found.");
 
+            entity.Title = dto.Title;
             entity.Content = dto.Content;
             entity.DisplayOrder = dto.DisplayOrder;
+            entity.IsCompleted = dto.IsCompleted;
             await _repository.UpdateAsync(entity);
         }
 

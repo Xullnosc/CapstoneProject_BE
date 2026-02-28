@@ -17,8 +17,7 @@ namespace DataAccess
         public async Task<List<Checklist>> GetAllAsync()
         {
             return await _context.Checklists
-                .OrderBy(c => c.DisplayOrder)
-                .ThenBy(c => c.ChecklistId)
+                .OrderByDescending(c => c.CreatedAt)
                 .AsNoTracking()
                 .ToListAsync();
         }
