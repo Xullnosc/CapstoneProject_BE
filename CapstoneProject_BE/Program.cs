@@ -101,6 +101,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IWhitelistService, WhitelistService>();
 builder.Services.AddScoped<IRedisService, RedisService>();
 builder.Services.AddScoped<IThesisService, ThesisService>();
+builder.Services.AddScoped<IChecklistService, ChecklistService>();
 
 
 //DAO (DataAccess Layer)
@@ -113,6 +114,7 @@ builder.Services.AddScoped<IArchivedTeamDAO, ArchivedTeamDAO>();
 builder.Services.AddScoped<ITeamInvitationDAO, TeamInvitationDAO>();
 builder.Services.AddScoped<ITeamMemberDAO, TeamMemberDAO>();
 builder.Services.AddScoped<IThesisDAO, ThesisDAO>();
+builder.Services.AddScoped<IChecklistDAO, ChecklistDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -123,6 +125,7 @@ builder.Services.AddScoped<IArchivingRepository, ArchivingRepository>();
 builder.Services.AddScoped<ITeamInvitationRepository, TeamInvitationRepository>();
 builder.Services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
 builder.Services.AddScoped<IThesisRepository, ThesisRepository>();
+builder.Services.AddScoped<IChecklistRepository, ChecklistRepository>();
 
 //Middleware
 // AutoMapper
