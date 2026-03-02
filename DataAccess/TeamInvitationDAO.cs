@@ -1,5 +1,6 @@
-using BusinessObjects.Models;
 using BusinessObjects;
+using BusinessObjects.DTOs;
+using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -49,6 +50,29 @@ namespace DataAccess
                 .ToListAsync();
         }
 
+        public async Task<PagedResult<Teaminvitation>> GetByStudentIdAsync(int studentId, int pageIndex, int pageSize)
+        {
+            var query = _context.Teaminvitations
+                .Include(i => i.Team)
+                    .ThenInclude(t => t.Teammembers)
+                .Include(i => i.Team)
+                    .ThenInclude(t => t.Leader)
+                .Include(i => i.InvitedByNavigation)
+                .Include(i => i.Student)
+                .AsNoTracking()
+                .Where(i => i.StudentId == studentId);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(i => i.CreatedAt)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Teaminvitation>(items, totalCount, pageIndex, pageSize);
+        }
+
         public async Task<List<Teaminvitation>> GetByTeamIdAsync(int teamId)
         {
             return await _context.Teaminvitations
@@ -58,6 +82,26 @@ namespace DataAccess
                 .AsNoTracking()
                 .Where(i => i.TeamId == teamId)
                 .ToListAsync();
+        }
+
+        public async Task<PagedResult<Teaminvitation>> GetByTeamIdAsync(int teamId, int pageIndex, int pageSize)
+        {
+            var query = _context.Teaminvitations
+                .Include(i => i.Team)
+                .Include(i => i.InvitedByNavigation)
+                .Include(i => i.Student)
+                .AsNoTracking()
+                .Where(i => i.TeamId == teamId);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(i => i.CreatedAt)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Teaminvitation>(items, totalCount, pageIndex, pageSize);
         }
 
         public async Task<bool> UpdateStatusAsync(int invitationId, string status)
@@ -98,6 +142,29 @@ namespace DataAccess
                  .Where(i => i.StudentId == studentId && i.Status == CampusConstants.InvitationStatus.Pending)
                  .OrderByDescending(i => i.CreatedAt)
                  .ToListAsync();
+        }
+
+        public async Task<PagedResult<Teaminvitation>> GetPendingInvitationsByStudentAsync(int studentId, int pageIndex, int pageSize)
+        {
+            var query = _context.Teaminvitations
+                .Include(i => i.Team)
+                    .ThenInclude(t => t.Teammembers)
+                .Include(i => i.Team)
+                    .ThenInclude(t => t.Leader)
+                .Include(i => i.InvitedByNavigation)
+                .Include(i => i.Student)
+                .AsNoTracking()
+                .Where(i => i.StudentId == studentId && i.Status == CampusConstants.InvitationStatus.Pending);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(i => i.CreatedAt)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Teaminvitation>(items, totalCount, pageIndex, pageSize);
         }
 
         public async Task CancelAllPendingInvitationsForStudentAsync(int studentId)

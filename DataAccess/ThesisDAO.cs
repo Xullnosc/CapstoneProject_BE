@@ -1,3 +1,4 @@
+using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
@@ -29,6 +30,22 @@ namespace DataAccess
                 .ToListAsync();
         }
 
+        public async Task<PagedResult<Thesis>> GetAllThesesAsync(int pageIndex, int pageSize)
+        {
+            var query = _context.Theses
+                .Include(t => t.User);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(t => t.ThesisId)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Thesis>(items, totalCount, pageIndex, pageSize);
+        }
+
         public async Task<Thesis?> GetThesisByIdAsync(string id)
         {
             return await _context.Theses
@@ -42,6 +59,23 @@ namespace DataAccess
                 .Include(t => t.User)
                 .Where(t => t.UserId == userId)
                 .ToListAsync();
+        }
+
+        public async Task<PagedResult<Thesis>> GetThesesByUserIdAsync(int userId, int pageIndex, int pageSize)
+        {
+            var query = _context.Theses
+                .Include(t => t.User)
+                .Where(t => t.UserId == userId);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(t => t.ThesisId)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Thesis>(items, totalCount, pageIndex, pageSize);
         }
 
         public async Task UpdateThesisAsync(Thesis thesis)
