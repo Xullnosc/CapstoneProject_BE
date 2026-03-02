@@ -17,6 +17,7 @@ namespace Services
         private readonly ITeamRepository _teamRepository;
         private readonly ISemesterRepository _semesterRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IWhitelistRepository _whitelistRepository;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
 
@@ -26,6 +27,7 @@ namespace Services
             ITeamRepository teamRepository,
             ISemesterRepository semesterRepository,
             IUserRepository userRepository,
+            IWhitelistRepository whitelistRepository,
             IEmailService emailService,
             IConfiguration configuration
         )
@@ -35,6 +37,7 @@ namespace Services
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
             _userRepository = userRepository;
+            _whitelistRepository = whitelistRepository;
             _emailService = emailService;
             _configuration = configuration;
         }
@@ -109,9 +112,30 @@ namespace Services
             );
 
             if (student == null)
-                throw new KeyNotFoundException(
-                    $"Student with email/code '{studentCodeOrEmail}' not found"
-                );
+            {
+                // Try to find them in Whitelist
+                var whitelistEntry = await _whitelistRepository.GetByEmailAsync(studentCodeOrEmail);
+
+                if (whitelistEntry == null)
+                {
+                    throw new KeyNotFoundException($"Student with email '{studentCodeOrEmail}' not found in the system or whitelist.");
+                }
+
+                // Auto-create a stub User record so the invitation can be assigned a UserId
+                student = new User
+                {
+                    Email = whitelistEntry.Email,
+                    FullName = whitelistEntry.FullName ?? "New User",
+                    Avatar = whitelistEntry.Avatar ?? "",
+                    RoleId = whitelistEntry.RoleId,
+                    StudentCode = whitelistEntry.StudentCode,
+                    Campus = whitelistEntry.Campus,
+                    IsAuthorized = true, // Ensure they can login later
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                student = await _userRepository.AddAsync(student);
+            }
 
             // 3. Validate Student Eligibility
             if (student.UserId == inviterId)

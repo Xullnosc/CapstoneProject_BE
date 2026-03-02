@@ -17,7 +17,16 @@ namespace Services
         private readonly ICloudinaryHelper _cloudinaryHelper;
         private readonly IArchivingService _archivingService;
         private readonly ITeamMemberRepository _teamMemberRepository;
-        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, ICloudinaryHelper cloudinaryHelper, IArchivingService archivingService, ITeamMemberRepository teamMemberRepository)
+        private readonly IThesisRepository _thesisRepository;
+
+        public TeamService(
+            ITeamRepository teamRepository, 
+            ISemesterRepository semesterRepository, 
+            IUserRepository userRepository, 
+            ICloudinaryHelper cloudinaryHelper, 
+            IArchivingService archivingService, 
+            ITeamMemberRepository teamMemberRepository,
+            IThesisRepository thesisRepository)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
@@ -25,6 +34,7 @@ namespace Services
             _cloudinaryHelper = cloudinaryHelper;
             _archivingService = archivingService;
             _teamMemberRepository = teamMemberRepository;
+            _thesisRepository = thesisRepository;
         }
 
         public async Task<TeamDTO> CreateTeamAsync(int leaderId, CreateTeamDTO createTeamDto)
@@ -236,6 +246,16 @@ namespace Services
             team.UpdatedAt = DateTime.UtcNow;
 
             await _teamRepository.UpdateAsync(team);
+
+            // Transfer Thesis Ownership
+            var activeTheses = await _thesisRepository.GetThesesByUserIdAsync(currentLeaderId);
+            var activeThesis = activeTheses.FirstOrDefault();
+            if (activeThesis != null)
+            {
+                activeThesis.UserId = newLeaderId;
+                await _thesisRepository.UpdateThesisAsync(activeThesis);
+            }
+
             return true;
         }
 
