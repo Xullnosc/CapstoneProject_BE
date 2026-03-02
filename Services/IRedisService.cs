@@ -19,4 +19,5 @@ public interface IRedisService
     Task<bool> SetRemoveAsync(string key, string value, CancellationToken cancellationToken = default);
     Task<long> SetRemoveAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default);
     Task<bool> ExpireAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default);
+    Task RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default);
 }

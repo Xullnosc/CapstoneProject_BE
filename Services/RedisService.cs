@@ -200,6 +200,29 @@ public class RedisService : IRedisService
         }
     }
 
+    public async Task RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var endpoints = _redis.GetEndPoints();
+            foreach (var endpoint in endpoints)
+            {
+                var server = _redis.GetServer(endpoint);
+                var keys = server.Keys(pattern: prefix + "*");
+                foreach (var key in keys)
+                {
+                    await _database.KeyDeleteAsync(key);
+                }
+            }
+            _logger.LogInformation("Redis DELETE BY PREFIX {Prefix}*", prefix);
+        }
+        catch (Exception ex) when (IsRedisException(ex))
+        {
+            _logger.LogError(ex, "Redis DELETE BY PREFIX failed for prefix {Prefix}", prefix);
+            throw;
+        }
+    }
+
     private static bool IsRedisException(Exception ex)
         => ex is RedisConnectionException
         || ex is RedisTimeoutException
