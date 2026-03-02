@@ -1,10 +1,9 @@
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using AutoMapper;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Linq;
 using Repositories;
+using Microsoft.Extensions.Configuration;
+
 
 namespace Services
 {
@@ -14,17 +13,24 @@ namespace Services
         private readonly IArchivingService _archivingService;
         private readonly IMapper _mapper;
         private readonly IUserRepository _userRepository;
+        private readonly IRedisService _redisService;
+        private readonly IConfiguration _configuration;
+        private readonly System.Threading.SemaphoreSlim _semaphore = new System.Threading.SemaphoreSlim(1, 1);
 
         public SemesterService(
             ISemesterRepository semesterRepository, 
             IArchivingService archivingService, 
             IMapper mapper,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            IRedisService redisService,
+            IConfiguration configuration)
         {
             _semesterRepository = semesterRepository;
             _archivingService = archivingService;
             _mapper = mapper;
             _userRepository = userRepository;
+            _redisService = redisService;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -34,158 +40,196 @@ namespace Services
         /// <returns>List of semester DTOs with counts filtered by Student role</returns>
         public async Task<List<SemesterDTO>> GetAllSemestersAsync()
         {
-            var semesters = await _semesterRepository.GetAllSemestersAsync();
-            var semesterDTOs = _mapper.Map<List<SemesterDTO>>(semesters);
+            const string cacheKey = "fctms:semester:all";
+            var cached = await _redisService.GetObjectAsync<List<SemesterDTO>>(cacheKey);
+            if (cached != null) return cached;
 
-            if (semesterDTOs == null || !semesterDTOs.Any())
-                return new List<SemesterDTO>();
-
-            var semesterIds = semesterDTOs.Select(s => s.SemesterId).ToList();
-
-            var allArchivedTeams = await _archivingService.GetArchivedTeamsBySemesterIdsAsync(semesterIds);
-            var allArchivedWhitelists = await _archivingService.GetArchivedWhitelistsBySemesterIdsAsync(semesterIds);
-            
-            var archivedTeamsBySemester = (allArchivedTeams ?? new List<ArchivedTeam>())
-                .GroupBy(x => x.SemesterId)
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            var archivedWhitelistsBySemester = (allArchivedWhitelists ?? new List<ArchivedWhitelist>())
-                .GroupBy(x => x.SemesterId)
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            // Gets Student Role ID for filtering
-            int studentRoleId = await _semesterRepository.GetStudentRoleIdAsync();
-
-            foreach (var dto in semesterDTOs)
+            await _semaphore.WaitAsync();
+            try
             {
-                // Add Active Count (assumed mapped) + Archived Count for Teams
-                int activeTeamCount = dto.Teams?.Count ?? 0;
-                int archivedTeamCount = 0;
-                if (archivedTeamsBySemester.TryGetValue(dto.SemesterId, out var archivedTeamsList))
+                // Double-check cache after acquiring semaphore
+                cached = await _redisService.GetObjectAsync<List<SemesterDTO>>(cacheKey);
+                if (cached != null) return cached;
+
+                var semesters = await _semesterRepository.GetAllSemestersAsync();
+                var semesterDTOs = _mapper.Map<List<SemesterDTO>>(semesters);
+
+                if (semesterDTOs == null || !semesterDTOs.Any())
+                    return new List<SemesterDTO>();
+
+                var semesterIds = semesterDTOs.Select(s => s.SemesterId).ToList();
+
+                var allArchivedTeams = await _archivingService.GetArchivedTeamsBySemesterIdsAsync(semesterIds);
+                var allArchivedWhitelists = await _archivingService.GetArchivedWhitelistsBySemesterIdsAsync(semesterIds);
+                
+                var archivedTeamsBySemester = (allArchivedTeams ?? new List<ArchivedTeam>())
+                    .GroupBy(x => x.SemesterId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
+                var archivedWhitelistsBySemester = (allArchivedWhitelists ?? new List<ArchivedWhitelist>())
+                    .GroupBy(x => x.SemesterId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
+                // Gets Student Role ID for filtering
+                int studentRoleId = await _semesterRepository.GetStudentRoleIdAsync();
+
+                foreach (var dto in semesterDTOs)
                 {
-                    archivedTeamCount = archivedTeamsList.Count;
+                    // Add Active Count (assumed mapped) + Archived Count for Teams
+                    int activeTeamCount = dto.Teams?.Count ?? 0;
+                    int archivedTeamCount = 0;
+                    if (archivedTeamsBySemester.TryGetValue(dto.SemesterId, out var archivedTeamsList))
+                    {
+                        archivedTeamCount = archivedTeamsList.Count;
+                    }
+
+                    dto.TeamCount = activeTeamCount + archivedTeamCount;
+
+                    // Student Count Logic:
+                    // Live/Upcoming -> Count Whitelist (Role = Student)
+                    // Ended -> Count ArchivedWhitelist (Role = Student)
+                    
+                    int liveStudentCount = dto.Whitelists?
+                        .Count(w => w.RoleId == studentRoleId) ?? 0;
+
+                    int archivedStudentCount = 0;
+                    if (archivedWhitelistsBySemester.TryGetValue(dto.SemesterId, out var archivedWlList))
+                    {
+                        archivedStudentCount = archivedWlList.Count(w => w.RoleId == studentRoleId);
+                    }
+
+                    dto.WhitelistCount = liveStudentCount + archivedStudentCount;
+                    
+                    // Set IsArchived flag if any archived data exists
+                    dto.IsArchived = archivedTeamCount > 0 || archivedStudentCount > 0;
+                    
+                    // CRITICAL OPTIMIZATION: Clear the Teams and Whitelists lists for the Dashboard view.
+                    dto.Teams = new List<TeamSimpleDTO>(); 
+                    dto.Whitelists = new List<WhitelistDTO>();
                 }
 
-                dto.TeamCount = activeTeamCount + archivedTeamCount;
+                var ttlMinutes = _configuration.GetValue<int>("RedisSettings:SemesterTTLMinutes", 30);
+                await _redisService.SetObjectAsync(cacheKey, semesterDTOs, TimeSpan.FromMinutes(ttlMinutes));
 
-                // Student Count Logic:
-                // Live/Upcoming -> Count Whitelist (Role = Student)
-                // Ended -> Count ArchivedWhitelist (Role = Student)
-                
-                int liveStudentCount = dto.Whitelists?
-                    .Count(w => w.RoleId == studentRoleId) ?? 0;
-
-                int archivedStudentCount = 0;
-                if (archivedWhitelistsBySemester.TryGetValue(dto.SemesterId, out var archivedWlList))
-                {
-                    archivedStudentCount = archivedWlList.Count(w => w.RoleId == studentRoleId);
-                }
-
-                dto.WhitelistCount = liveStudentCount + archivedStudentCount;
-                
-                // Set IsArchived flag if any archived data exists
-                dto.IsArchived = archivedTeamCount > 0 || archivedStudentCount > 0;
-                
-                // CRITICAL OPTIMIZATION: Clear the Teams and Whitelists lists for the Dashboard view.
-                dto.Teams = new List<TeamSimpleDTO>(); 
-                dto.Whitelists = new List<WhitelistDTO>();
+                return semesterDTOs;
             }
-
-            return semesterDTOs;
+            finally
+            {
+                _semaphore.Release();
+            }
         }
 
         public async Task<SemesterDTO?> GetSemesterByIdAsync(int id)
         {
-            var semester = await _semesterRepository.GetSemesterByIdAsync(id);
-            if (semester == null) return null;
+            string cacheKey = $"fctms:semester:id:{id}";
+            var cached = await _redisService.GetObjectAsync<SemesterDTO>(cacheKey);
+            if (cached != null) return cached;
 
-            var dto = _mapper.Map<SemesterDTO>(semester);
-            
-            // Ensure lists are initialized even if AutoMapper set them to null (unlikely with new Profile config but safer)
-            dto.Teams ??= new List<TeamSimpleDTO>();
-            dto.Whitelists ??= new List<WhitelistDTO>();
-
-            // Fetch archived data
-            var archivedTeams = await _archivingService.GetArchivedTeamsBySemesterAsync(id);
-            var archivedWhitelists = await _archivingService.GetArchivedWhitelistsBySemesterIdsAsync(new List<int> { id });
-
-            int studentRoleId = await _semesterRepository.GetStudentRoleIdAsync();
-
-            // 1. Merge Teams
-            int archivedTeamCount = 0;
-            if (archivedTeams != null && archivedTeams.Any())
+            await _semaphore.WaitAsync();
+            try
             {
-                archivedTeamCount = archivedTeams.Count;
-                var archivedTeamDTOs = _mapper.Map<List<TeamSimpleDTO>>(archivedTeams);
-                dto.Teams.AddRange(archivedTeamDTOs);
-            }
+                // Double-check cache
+                cached = await _redisService.GetObjectAsync<SemesterDTO>(cacheKey);
+                if (cached != null) return cached;
 
-            // 2. Merge Whitelists
-            int archivedStudentCount = 0;
-            if (archivedWhitelists != null && archivedWhitelists.Any())
-            {
-                archivedStudentCount = archivedWhitelists.Count(w => w.RoleId == studentRoleId);
-                var archivedWlDTOs = _mapper.Map<List<WhitelistDTO>>(archivedWhitelists);
+                var semester = await _semesterRepository.GetSemesterByIdAsync(id);
+                if (semester == null) return null;
+
+                var dto = _mapper.Map<SemesterDTO>(semester);
                 
-                // Manually populate RoleName for archived entries (since they lack navigation property)
-                var roles = await _semesterRepository.GetAllRolesAsync();
-                var roleDict = roles.ToDictionary(r => r.RoleId, r => r.RoleName);
-                
-                foreach (var wlDto in archivedWlDTOs)
+                // Ensure lists are initialized even if AutoMapper set them to null (unlikely with new Profile config but safer)
+                dto.Teams ??= new List<TeamSimpleDTO>();
+                dto.Whitelists ??= new List<WhitelistDTO>();
+
+                // Fetch archived data
+                var archivedTeams = await _archivingService.GetArchivedTeamsBySemesterAsync(id);
+                var archivedWhitelists = await _archivingService.GetArchivedWhitelistsBySemesterIdsAsync(new List<int> { id });
+
+                int studentRoleId = await _semesterRepository.GetStudentRoleIdAsync();
+
+                // 1. Merge Teams
+                int archivedTeamCount = 0;
+                if (archivedTeams != null && archivedTeams.Any())
                 {
-                    if (wlDto.RoleId.HasValue && roleDict.TryGetValue(wlDto.RoleId.Value, out var roleName))
-                    {
-                        wlDto.RoleName = roleName;
-                    }
-                }
-                
-                dto.Whitelists.AddRange(archivedWlDTOs);
-            }
-
-            // POPULATE AVATARS FOR ALL WHITELISTS
-            if (dto.Whitelists.Any())
-            {
-                // Normalize emails (Trim)
-                var emails = dto.Whitelists
-                    .Where(w => !string.IsNullOrWhiteSpace(w.Email))
-                    .Select(w => w.Email.Trim())
-                    .Distinct()
-                    .ToList();
-
-                var users = await _userRepository.GetUsersByEmailsAsync(emails);
-                
-                // Use case-insensitive dictionary to match emails safely
-                var avatarDict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-                foreach (var user in users)
-                {
-                    if (!string.IsNullOrEmpty(user.Email) && !avatarDict.ContainsKey(user.Email.Trim()))
-                    {
-                        avatarDict[user.Email.Trim()] = user.Avatar;
-                    }
+                    archivedTeamCount = archivedTeams.Count;
+                    var archivedTeamDTOs = _mapper.Map<List<TeamSimpleDTO>>(archivedTeams);
+                    dto.Teams.AddRange(archivedTeamDTOs);
                 }
 
-                foreach (var wl in dto.Whitelists)
+                // 2. Merge Whitelists
+                int archivedStudentCount = 0;
+                if (archivedWhitelists != null && archivedWhitelists.Any())
                 {
-                    if (string.IsNullOrWhiteSpace(wl.Email)) continue;
-
-                    if (avatarDict.TryGetValue(wl.Email.Trim(), out var avatar))
+                    archivedStudentCount = archivedWhitelists.Count(w => w.RoleId == studentRoleId);
+                    var archivedWlDTOs = _mapper.Map<List<WhitelistDTO>>(archivedWhitelists);
+                    
+                    // Manually populate RoleName for archived entries (since they lack navigation property)
+                    var roles = await _semesterRepository.GetAllRolesAsync();
+                    var roleDict = roles.ToDictionary(r => r.RoleId, r => r.RoleName);
+                    
+                    foreach (var wlDto in archivedWlDTOs)
                     {
-                        wl.Avatar = avatar;
+                        if (wlDto.RoleId.HasValue && roleDict.TryGetValue(wlDto.RoleId.Value, out var roleName))
+                        {
+                            wlDto.RoleName = roleName;
+                        }
+                    }
+                    
+                    dto.Whitelists.AddRange(archivedWlDTOs);
+                }
+
+                // POPULATE AVATARS FOR ALL WHITELISTS
+                if (dto.Whitelists.Any())
+                {
+                    // Normalize emails (Trim)
+                    var emails = dto.Whitelists
+                        .Where(w => !string.IsNullOrWhiteSpace(w.Email))
+                        .Select(w => w.Email.Trim())
+                        .Distinct()
+                        .ToList();
+
+                    var users = await _userRepository.GetUsersByEmailsAsync(emails);
+                    
+                    // Use case-insensitive dictionary to match emails safely
+                    var avatarDict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var user in users)
+                    {
+                        if (!string.IsNullOrEmpty(user.Email) && !avatarDict.ContainsKey(user.Email.Trim()))
+                        {
+                            avatarDict[user.Email.Trim()] = user.Avatar;
+                        }
+                    }
+
+                    foreach (var wl in dto.Whitelists)
+                    {
+                        if (string.IsNullOrWhiteSpace(wl.Email)) continue;
+
+                        if (avatarDict.TryGetValue(wl.Email.Trim(), out var avatar))
+                        {
+                            wl.Avatar = avatar;
+                        }
                     }
                 }
+
+                // 3. Calculate Counts (Total = Live + Archived)
+                int liveTeamCount = semester.Teams?.Count ?? 0;
+                int liveStudentCount = semester.Whitelists?.Count(w => w.RoleId == studentRoleId) ?? 0;
+
+                dto.TeamCount = liveTeamCount + archivedTeamCount;
+                dto.WhitelistCount = liveStudentCount + archivedStudentCount;
+                
+                // 4. Set IsArchived flag
+                dto.IsArchived = archivedTeamCount > 0 || archivedStudentCount > 0;
+
+                var ttlMinutes = _configuration.GetValue<int>("RedisSettings:SemesterTTLMinutes", 30);
+                await _redisService.SetObjectAsync(cacheKey, dto, TimeSpan.FromMinutes(ttlMinutes));
+
+                return dto;
             }
-
-            // 3. Calculate Counts (Total = Live + Archived)
-            int liveTeamCount = semester.Teams?.Count ?? 0;
-            int liveStudentCount = semester.Whitelists?.Count(w => w.RoleId == studentRoleId) ?? 0;
-
-            dto.TeamCount = liveTeamCount + archivedTeamCount;
-            dto.WhitelistCount = liveStudentCount + archivedStudentCount;
-            
-            // 4. Set IsArchived flag
-            dto.IsArchived = archivedTeamCount > 0 || archivedStudentCount > 0;
-
-            return dto;
+            finally
+            {
+                _semaphore.Release();
+            }
         }
 
         public async Task<SemesterDTO> CreateSemesterAsync(SemesterCreateDTO semesterCreateDTO)
@@ -202,6 +246,7 @@ namespace Services
             // Force IsActive to false on create. Must be started manually.
             semester.IsActive = false; 
             var createdSemester = await _semesterRepository.CreateSemesterAsync(semester);
+            await InvalidateSemesterCacheAsync();
             return _mapper.Map<SemesterDTO>(createdSemester);
         }
 
@@ -218,6 +263,7 @@ namespace Services
             var semester = _mapper.Map<Semester>(semesterCreateDTO);
 
             await _semesterRepository.UpdateSemesterAsync(semester);
+            await InvalidateSemesterCacheAsync(semester.SemesterId);
         }
 
         private async Task ValidateSemesterLogicAsync(SemesterCreateDTO dto)
@@ -287,12 +333,13 @@ namespace Services
                 {
                     semesterToActivate.IsActive = true;
                     // Detach navigation properties to prevent EF tracking conflicts
-                    semesterToActivate.Teams = null;
-                    semesterToActivate.Whitelists = null;
+                    semesterToActivate.Teams = null!;
+                    semesterToActivate.Whitelists = null!;
                     await _semesterRepository.UpdateSemesterAsync(semesterToActivate);
                 }
 
                 transaction.Complete();
+                await InvalidateSemesterCacheAsync(id);
             }
             catch (Exception)
             {
@@ -328,19 +375,36 @@ namespace Services
                 // 1. Mark as Inactive
                 semester.IsActive = false;
                 // Detach navigation properties to prevent EF tracking conflicts
-                semester.Teams = null;
-                semester.Whitelists = null;
+                semester.Teams = null!;
+                semester.Whitelists = null!;
                 await _semesterRepository.UpdateSemesterAsync(semester);
 
                 // 2. Archive Data
                 await _archivingService.ArchiveSemesterAsync(id);
 
                 transaction.Complete();
+                await InvalidateSemesterCacheAsync(id);
             }
             catch (Exception)
             {
                 // Transaction will auto-rollback if not completed
                 throw;
+            }
+        }
+
+        private async Task InvalidateSemesterCacheAsync(int? id = null)
+        {
+            await _redisService.DeleteValueAsync("fctms:semester:all");
+            if (id.HasValue)
+            {
+                await _redisService.DeleteValueAsync($"fctms:semester:id:{id.Value}");
+            }
+            else
+            {
+                // If no specific ID, we might need to invalidate all semester detail caches
+                // but usually after Create, only "all" needs invalidation.
+                // However, following the requirement for prefix based invalidation:
+                await _redisService.RemoveByPrefixAsync("fctms:semester:");
             }
         }
     }
