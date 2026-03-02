@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using BusinessObjects.Models;
 using Services.DTOs;
 using BusinessObjects.DTOs;
@@ -73,6 +73,10 @@ namespace Services.Mappings
             // ThesisHistory → ThesisHistoryDTO
             CreateMap<ThesisHistory, ThesisHistoryDTO>()
                 .ForMember(dest => dest.UploaderName, opt => opt.MapFrom(src => src.UploadedByUser != null ? src.UploadedByUser.FullName : null));
+
+            // Checklist
+            CreateMap<Checklist, ChecklistDTO>();
+            CreateMap<ChecklistCreateDTO, Checklist>();
         }
     }
 }

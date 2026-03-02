@@ -19,6 +19,6 @@ namespace Services
         Task<ThesisDTO> UpdateThesisAsync(string thesisId, UpdateThesisDTO req, string email);
         Task<IEnumerable<ThesisDTO>> GetMyThesesAsync(string email, string? status = null, string? searchTitle = null);
         Task<ThesisDTO?> GetThesisDetailAsync(string id);
-        Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId);
+        Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null);
     }
 }

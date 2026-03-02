@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,6 +34,8 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<Thesis> Theses { get; set; }
 
     public virtual DbSet<ThesisHistory> ThesisHistories { get; set; }
+
+    public virtual DbSet<Checklist> Checklists { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -374,6 +376,22 @@ public partial class FctmsContext : DbContext
                 .HasForeignKey(d => d.UploadedBy)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ThesisHistory_User");
+        });
+
+        modelBuilder.Entity<Checklist>(entity =>
+        {
+            entity.HasKey(e => e.ChecklistId).HasName("PRIMARY");
+
+            entity.ToTable("checklists");
+
+            entity.HasIndex(e => e.DisplayOrder, "IX_Checklist_DisplayOrder");
+
+            entity.Property(e => e.ChecklistId).HasColumnName("ChecklistId");
+            entity.Property(e => e.Content).HasMaxLength(500);
+            entity.Property(e => e.IsCompleted).HasDefaultValue(false);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
         });
 
         OnModelCreatingPartial(modelBuilder);

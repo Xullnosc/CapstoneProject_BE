@@ -240,5 +240,38 @@ namespace FCTMS.Tests.Services
 
             _mockThesisRepository.Verify(x => x.UpdateThesisAsync(thesis), Times.Once);
         }
+
+        [Fact]
+        public async Task UpdateThesisStatusAsync_ShouldUpdateStatus_WhenThesisExists()
+        {
+            // Arrange
+            string thesisId = "guid-123";
+            string newStatus = "Published";
+            var thesis = new Thesis { ThesisId = thesisId, Status = "Reviewing", UpdateDate = null };
+
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(thesisId)).ReturnsAsync(thesis);
+
+            // Act
+            await _thesisService.UpdateThesisStatusAsync(thesisId, newStatus);
+
+            // Assert
+            thesis.Status.Should().Be(newStatus);
+            thesis.UpdateDate.Should().NotBeNull();
+            _mockThesisRepository.Verify(x => x.UpdateThesisAsync(thesis), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateThesisStatusAsync_ShouldThrow_WhenThesisNotFound()
+        {
+            // Arrange
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(It.IsAny<string>())).ReturnsAsync((Thesis?)null);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.UpdateThesisStatusAsync("invalid-id", "Published");
+
+            // Assert
+            await act.Should().ThrowAsync<Exception>().WithMessage("Thesis not found");
+            _mockThesisRepository.Verify(x => x.UpdateThesisAsync(It.IsAny<Thesis>()), Times.Never);
+        }
     }
 }
