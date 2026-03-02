@@ -108,8 +108,11 @@ namespace Services
                     dto.Whitelists = new List<WhitelistDTO>();
                 }
 
-                var ttlMinutes = _configuration.GetValue<int>("RedisSettings:SemesterTTLMinutes", 30);
-                await _redisService.SetObjectAsync(cacheKey, semesterDTOs, TimeSpan.FromMinutes(ttlMinutes));
+                var ttlStr = _configuration["RedisSettings:SemesterTTLMinutes"];
+                int ttlMinutes;
+                if (!int.TryParse(ttlStr, out ttlMinutes)) ttlMinutes = 30;
+                ttlMinutes = System.Math.Max(1, ttlMinutes);
+                await _redisService.SetObjectAsync(cacheKey, semesterDTOs, System.TimeSpan.FromMinutes(ttlMinutes), System.Threading.CancellationToken.None);
 
                 return semesterDTOs;
             }
@@ -221,8 +224,11 @@ namespace Services
                 // 4. Set IsArchived flag
                 dto.IsArchived = archivedTeamCount > 0 || archivedStudentCount > 0;
 
-                var ttlMinutes = _configuration.GetValue<int>("RedisSettings:SemesterTTLMinutes", 30);
-                await _redisService.SetObjectAsync(cacheKey, dto, TimeSpan.FromMinutes(ttlMinutes));
+                var ttlStr = _configuration["RedisSettings:SemesterTTLMinutes"];
+                int ttlMinutes2;
+                if (!int.TryParse(ttlStr, out ttlMinutes2)) ttlMinutes2 = 30;
+                ttlMinutes2 = System.Math.Max(1, ttlMinutes2);
+                await _redisService.SetObjectAsync(cacheKey, dto, System.TimeSpan.FromMinutes(ttlMinutes2), System.Threading.CancellationToken.None);
 
                 return dto;
             }
