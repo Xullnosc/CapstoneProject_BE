@@ -1,3 +1,4 @@
+using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -9,12 +10,14 @@ namespace DataAccess
         Task<Teaminvitation> CreateAsync(Teaminvitation invitation);
         Task<Teaminvitation?> GetByIdAsync(int invitationId);
         Task<List<Teaminvitation>> GetByStudentIdAsync(int studentId);
+        Task<PagedResult<Teaminvitation>> GetByStudentIdAsync(int studentId, int pageIndex, int pageSize);
         Task<List<Teaminvitation>> GetByTeamIdAsync(int teamId);
+        Task<PagedResult<Teaminvitation>> GetByTeamIdAsync(int teamId, int pageIndex, int pageSize);
         Task<bool> UpdateStatusAsync(int invitationId, string status);
         Task<bool> DeleteAsync(int invitationId);
         Task<List<Teaminvitation>> GetPendingInvitationsByStudentAsync(int studentId);
+        Task<PagedResult<Teaminvitation>> GetPendingInvitationsByStudentAsync(int studentId, int pageIndex, int pageSize);
         Task CancelAllPendingInvitationsForStudentAsync(int studentId);
         Task<Teaminvitation?> GetByTeamAndStudentAsync(int teamId, int studentId);
-
     }
 }

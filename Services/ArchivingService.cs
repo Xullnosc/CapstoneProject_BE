@@ -90,22 +90,17 @@ namespace Services
         public async Task<List<ArchivedTeam>> GetArchivedTeamsBySemesterAsync(int semesterId)
         {
             string semesterKey = $"archivedTeams:semester:{semesterId}";
-
             var teamIds = await _redisService.SetMembersAsync(semesterKey);
-
             if (teamIds.Any())
             {
                 var teams = new List<ArchivedTeam>();
-
                 foreach (var id in teamIds)
                 {
                     var team = await _redisService
                         .GetObjectAsync<ArchivedTeam>($"archivedTeam:{id}");
-
                     if (team != null)
                         teams.Add(team);
                 }
-
                 if (teams.Any())
                     return teams;
             }
@@ -113,21 +108,18 @@ namespace Services
             // Cache miss → query DB
             var archivedTeams = await _archivingRepository
                 .GetArchivedTeamsBySemesterAsync(semesterId);
-
             foreach (var team in archivedTeams)
             {
                 await _redisService.SetObjectAsync(
                     $"archivedTeam:{team.ArchivedTeamId}",
                     team,
                     TimeSpan.FromMinutes(5));
-
                 await _redisService.SetAddAsync(semesterKey, team.ArchivedTeamId.ToString());
             }
 
             await _redisService.ExpireAsync(
                 semesterKey,
                 TimeSpan.FromMinutes(5));
-
             return archivedTeams;
         }
 
@@ -143,16 +135,13 @@ namespace Services
                 if (teamIds.Any())
                 {
                     var teams = new List<ArchivedTeam>();
-
                     foreach (var id in teamIds)
                     {
                         var team = await _redisService
                             .GetObjectAsync<ArchivedTeam>($"archivedTeam:{id}");
-
                         if (team != null)
                             teams.Add(team);
                     }
-
                     if (teams.Any())
                         result.AddRange(teams);
                 }
@@ -172,20 +161,16 @@ namespace Services
                 {
                     var semesterId = kvp.Key;
                     var teams = kvp.Value;
-
                     var semesterKey = $"archivedTeams:semester:{semesterId}";
-
                     foreach (var team in teams)
                     {
                         await _redisService.SetObjectAsync(
                             $"archivedTeam:{team.ArchivedTeamId}",
                             team,
                             TimeSpan.FromMinutes(5));
-
                         await _redisService.SetAddAsync(
                             semesterKey,
                             team.ArchivedTeamId.ToString());
-
                         result.Add(team);
                     }
 

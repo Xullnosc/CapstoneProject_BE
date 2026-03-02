@@ -12,3 +12,4 @@ namespace Repositories
         Task UpdateAsync(Whitelist whitelist);
     }
 }
+
