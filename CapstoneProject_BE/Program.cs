@@ -14,6 +14,9 @@ using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// EPPlus license context (set globally once during startup)
+ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
 //Redis Configuration
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 {

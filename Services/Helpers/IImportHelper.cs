@@ -6,6 +6,6 @@ namespace Services.Helpers
 {
     public interface IImportHelper
     {
-        List<WhitelistImportDTO> ImportWhitelistFromExcel(Stream excelStream);
+        ImportResult<WhitelistImportDTO> ImportWhitelistFromExcel(Stream excelStream);
     }
 }
