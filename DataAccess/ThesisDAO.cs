@@ -126,5 +126,14 @@ namespace DataAccess
             _context.ThesisHistories.Add(history);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds)
+        {
+            return await _context.Theses
+                .Include(t => t.User)
+                .Where(t => userIds.Contains(t.UserId))
+                .OrderByDescending(t => t.UpdateDate)
+                .ToListAsync();
+        }
     }
 }

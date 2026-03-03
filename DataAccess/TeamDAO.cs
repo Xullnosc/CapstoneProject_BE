@@ -190,5 +190,15 @@ namespace DataAccess
             _context.Teams.Remove(team);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<Team?> GetActiveTeamByStudentIdAsync(int studentId)
+        {
+            return await _context.Teams
+                .Include(t => t.Teammembers)
+                .ThenInclude(tm => tm.Student)
+                .Where(t => t.Status != "Disbanded" && t.Teammembers.Any(tm => tm.StudentId == studentId))
+                .OrderByDescending(t => t.CreatedAt)
+                .FirstOrDefaultAsync();
+        }
     }
 }

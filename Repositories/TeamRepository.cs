@@ -77,5 +77,10 @@ namespace Repositories
         {
             await _teamDAO.DeleteAsync(team);
         }
+
+        public Task<Team?> GetActiveTeamByStudentIdAsync(int studentId)
+        {
+            return _teamDAO.GetActiveTeamByStudentIdAsync(studentId);
+        }
     }
 }

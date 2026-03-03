@@ -34,5 +34,8 @@ namespace Repositories
 
         public Task AddThesisHistoryAsync(ThesisHistory history)
             => _thesisDAO.AddThesisHistoryAsync(history);
+
+        public Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds)
+            => _thesisDAO.GetThesesByUserIdsAsync(userIds);
     }
 }
