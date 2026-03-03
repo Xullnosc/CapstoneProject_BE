@@ -14,14 +14,11 @@ public class ChecklistDTO
     [JsonPropertyName("content")]
     public string Content { get; set; } = null!;
 
-    [JsonPropertyName("displayOrder")]
-    public int DisplayOrder { get; set; }
-
-    [JsonPropertyName("isCompleted")]
-    public bool IsCompleted { get; set; }
-
     [JsonPropertyName("createdAt")]
     public DateTime? CreatedAt { get; set; }
+
+    [JsonPropertyName("updatedAt")]
+    public DateTime? UpdatedAt { get; set; }
 }
 
 public class ChecklistCreateDTO
@@ -31,9 +28,6 @@ public class ChecklistCreateDTO
 
     [JsonPropertyName("content")]
     public string Content { get; set; } = null!;
-
-    [JsonPropertyName("displayOrder")]
-    public int DisplayOrder { get; set; }
 }
 
 public class ChecklistUpdateDTO
@@ -43,10 +37,4 @@ public class ChecklistUpdateDTO
 
     [JsonPropertyName("content")]
     public string Content { get; set; } = null!;
-
-    [JsonPropertyName("displayOrder")]
-    public int DisplayOrder { get; set; }
-
-    [JsonPropertyName("isCompleted")]
-    public bool IsCompleted { get; set; }
 }

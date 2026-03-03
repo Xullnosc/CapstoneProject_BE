@@ -384,13 +384,12 @@ public partial class FctmsContext : DbContext
 
             entity.ToTable("checklists");
 
-            entity.HasIndex(e => e.DisplayOrder, "IX_Checklist_DisplayOrder");
-
             entity.Property(e => e.ChecklistId).HasColumnName("ChecklistId");
             entity.Property(e => e.Content).HasMaxLength(500);
-            entity.Property(e => e.IsCompleted).HasDefaultValue(false);
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UpdatedAt)
                 .HasColumnType("datetime");
         });
 
