@@ -13,6 +13,8 @@ public partial class Teaminvitation
 
     public int InvitedBy { get; set; }
 
+    public string Type { get; set; } = "Member";
+
     public string? Status { get; set; }
 
     public DateTime? CreatedAt { get; set; }

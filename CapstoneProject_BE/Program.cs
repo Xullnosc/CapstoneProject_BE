@@ -97,6 +97,7 @@ builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IArchivingService, ArchivingService>();
 builder.Services.AddScoped<ICloudinaryHelper, Services.Helpers.CloudinaryHelper>();
 builder.Services.AddScoped<ITeamInvitationService, TeamInvitationService>();
+builder.Services.AddScoped<IMentorInvitationService, MentorInvitationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IWhitelistService, WhitelistService>();
 builder.Services.AddScoped<IRedisService, RedisService>();

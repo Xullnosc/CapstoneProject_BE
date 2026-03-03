@@ -23,5 +23,6 @@ namespace DataAccess
         Task<PagedResult<Team>> GetForArchivingAsync(int semesterId, int pageIndex, int pageSize);
         Task DeleteRangeAsync(IEnumerable<Team> teams);
         Task DeleteAsync(Team team);
+        Task<Team?> GetActiveTeamByStudentIdAsync(int studentId);
     }
 }

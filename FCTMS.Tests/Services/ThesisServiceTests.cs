@@ -19,6 +19,7 @@ namespace FCTMS.Tests.Services
     public class ThesisServiceTests
     {
         private readonly Mock<IThesisRepository> _mockThesisRepository;
+        private readonly Mock<ITeamRepository> _mockTeamRepository;
         private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<ICloudinaryHelper> _mockCloudinaryHelper;
         private readonly Mock<IMapper> _mockMapper;
@@ -27,6 +28,7 @@ namespace FCTMS.Tests.Services
         public ThesisServiceTests()
         {
             _mockThesisRepository = new Mock<IThesisRepository>();
+            _mockTeamRepository = new Mock<ITeamRepository>();
             _mockUserRepository = new Mock<IUserRepository>();
             _mockCloudinaryHelper = new Mock<ICloudinaryHelper>();
 
@@ -34,6 +36,7 @@ namespace FCTMS.Tests.Services
 
             _thesisService = new ThesisService(
                 _mockThesisRepository.Object,
+                _mockTeamRepository.Object,
                 _mockUserRepository.Object,
                 _mockCloudinaryHelper.Object,
                 _mockMapper.Object
@@ -54,6 +57,7 @@ namespace FCTMS.Tests.Services
             };
 
             _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync((Team?)null);
             _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(userId)).ReturnsAsync(theses);
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
             { 
@@ -272,6 +276,77 @@ namespace FCTMS.Tests.Services
             // Assert
             await act.Should().ThrowAsync<Exception>().WithMessage("Thesis not found");
             _mockThesisRepository.Verify(x => x.UpdateThesisAsync(It.IsAny<Thesis>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task GetMyThesesAsync_ShouldIncludeLeaderTheses_WhenUserIsTeamMember()
+        {
+            // Arrange
+            string studentEmail = "member@fpt.edu.vn";
+            int studentId = 2;
+            int leaderId = 1;
+            var user = new User { UserId = studentId, Email = studentEmail };
+            var team = new Team { TeamId = 10, LeaderId = leaderId };
+            
+            var theses = new List<Thesis>
+            {
+                new Thesis { ThesisId = "T1", Title = "Leader Thesis", UserId = leaderId },
+                new Thesis { ThesisId = "T2", Title = "Member Thesis", UserId = studentId }
+            };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(studentEmail)).ReturnsAsync(user);
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(studentId)).ReturnsAsync(team);
+            
+            // Should call GetThesesByUserIdsAsync with [2, 1]
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.Is<IEnumerable<int>>(ids => ids.Contains(studentId) && ids.Contains(leaderId))))
+                .ReturnsAsync(theses);
+
+            _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(It.IsAny<IEnumerable<Thesis>>())).Returns(new List<ThesisDTO> 
+            { 
+                new ThesisDTO { Title = "Leader Thesis" }, 
+                new ThesisDTO { Title = "Member Thesis" } 
+            });
+
+            // Act
+            var result = await _thesisService.GetMyThesesAsync(studentEmail);
+
+            // Assert
+            result.Should().HaveCount(2);
+            result.Should().Contain(t => t.Title == "Leader Thesis");
+            result.Should().Contain(t => t.Title == "Member Thesis");
+            
+            _mockThesisRepository.Verify(x => x.GetThesesByUserIdsAsync(It.IsAny<IEnumerable<int>>()), Times.Once);
+            _mockThesisRepository.Verify(x => x.GetThesesByUserIdAsync(It.IsAny<int>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task UpdateThesisAsync_ShouldSyncTitleWithFileName_WhenFileProvidedAndNoTitle()
+        {
+            // Arrange
+            string thesisId = "1";
+            string email = "owner@fpt.edu.vn";
+            int ownerId = 1;
+            
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.FileName).Returns("New_Thesis_File.docx");
+            mockFile.Setup(f => f.Length).Returns(100);
+            
+            var req = new UpdateThesisDTO { File = mockFile.Object, Title = "" }; // Empty title
+            
+            var user = new User { UserId = ownerId, Email = email };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = ownerId, Title = "Old Title", ThesisHistories = new List<ThesisHistory>() };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId)).ReturnsAsync(thesis);
+            _mockCloudinaryHelper.Setup(x => x.UploadFileAsync(mockFile.Object)).ReturnsAsync("new_url");
+            _mockMapper.Setup(m => m.Map<ThesisDTO>(It.IsAny<Thesis>())).Returns(new ThesisDTO { Title = "New_Thesis_File" });
+
+            // Act
+            var result = await _thesisService.UpdateThesisAsync(thesisId, req, email);
+
+            // Assert
+            thesis.Title.Should().Be("New_Thesis_File");
+            _mockThesisRepository.Verify(x => x.UpdateThesisAsync(thesis), Times.Once);
         }
     }
 }

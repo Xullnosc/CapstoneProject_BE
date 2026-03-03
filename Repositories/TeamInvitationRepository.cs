@@ -1,3 +1,4 @@
+using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using DataAccess;
 using System.Collections.Generic;
@@ -52,6 +53,38 @@ namespace Repositories
         public async Task<Teaminvitation?> GetByTeamAndStudentAsync(int teamId, int studentId)
         {
             return await _dao.GetByTeamAndStudentAsync(teamId, studentId);
+        }
+
+        // --- Mentor Invitation Methods ---
+
+        public async Task<List<Teaminvitation>> GetPendingMentorInvitationsByMentorIdAsync(int mentorId)
+        {
+            return await _dao.GetPendingMentorInvitationsByMentorIdAsync(mentorId);
+        }
+
+        public async Task<PagedResult<Teaminvitation>> GetPendingMentorInvitationsByMentorIdAsync(int mentorId, int pageIndex, int pageSize)
+        {
+            return await _dao.GetPendingMentorInvitationsByMentorIdAsync(mentorId, pageIndex, pageSize);
+        }
+
+        public async Task<List<Teaminvitation>> GetMentorInvitationsByTeamAsync(int teamId)
+        {
+            return await _dao.GetMentorInvitationsByTeamAsync(teamId);
+        }
+
+        public async Task<PagedResult<Teaminvitation>> GetMentorInvitationsByTeamAsync(int teamId, int pageIndex, int pageSize)
+        {
+            return await _dao.GetMentorInvitationsByTeamAsync(teamId, pageIndex, pageSize);
+        }
+
+        public async Task<Teaminvitation?> GetByTeamAndMentorAsync(int teamId, int mentorId)
+        {
+            return await _dao.GetByTeamAndMentorAsync(teamId, mentorId);
+        }
+
+        public async Task<int> GetMentorActiveTeamCountAsync(int mentorId, int semesterId)
+        {
+            return await _dao.GetMentorActiveTeamCountAsync(mentorId, semesterId);
         }
     }
 }

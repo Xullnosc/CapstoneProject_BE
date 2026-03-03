@@ -29,6 +29,7 @@ namespace DataAccess
             return await _context.Teams
                 .Include(t => t.Teammembers)
                 .ThenInclude(tm => tm.Student)
+                .Include(t => t.Mentor)
                 .FirstOrDefaultAsync(t => t.TeamId == teamId);
         }
 
@@ -43,6 +44,7 @@ namespace DataAccess
             return await _context.Teams
                 .Include(t => t.Teammembers)
                 .ThenInclude(tm => tm.Student)
+                .Include(t => t.Mentor)
                 .Where(t => t.SemesterId == semesterId && t.Status != "Disbanded")
                 .ToListAsync();
         }
@@ -126,6 +128,7 @@ namespace DataAccess
             return await _context.Teams
                 .Include(t => t.Teammembers)
                 .ThenInclude(tm => tm.Student)
+                .Include(t => t.Mentor)
                 .Where(t => t.SemesterId == semesterId && t.Status != "Disbanded")
                 .FirstOrDefaultAsync(t => t.Teammembers.Any(tm => tm.StudentId == studentId));
         }
@@ -189,6 +192,17 @@ namespace DataAccess
 
             _context.Teams.Remove(team);
             await _context.SaveChangesAsync();
+        }
+
+        public async Task<Team?> GetActiveTeamByStudentIdAsync(int studentId)
+        {
+            return await _context.Teams
+                .Include(t => t.Teammembers)
+                .ThenInclude(tm => tm.Student)
+                .Include(t => t.Mentor)
+                .Where(t => t.Status != "Disbanded" && t.Teammembers.Any(tm => tm.StudentId == studentId))
+                .OrderByDescending(t => t.CreatedAt)
+                .FirstOrDefaultAsync();
         }
     }
 }

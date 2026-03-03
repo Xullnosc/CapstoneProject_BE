@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
@@ -205,6 +205,9 @@ public partial class FctmsContext : DbContext
             entity.Property(e => e.Status)
                 .HasDefaultValueSql("'Pending'")
                 .HasColumnType("enum('Pending','Accepted','Declined','Cancelled')");
+            entity.Property(e => e.Type)
+                .HasDefaultValueSql("'Member'")
+                .HasColumnType("varchar(20)");
 
             entity.HasOne(d => d.InvitedByNavigation).WithMany(p => p.TeaminvitationInvitedByNavigations)
                 .HasForeignKey(d => d.InvitedBy)
