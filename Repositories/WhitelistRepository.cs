@@ -20,6 +20,8 @@ namespace Repositories
         public async Task AddRangeAsync(IEnumerable<Whitelist> whitelists)
         {
             await _whitelistDAO.AddRangeAsync(whitelists);
+        }
+
         public async Task<IEnumerable<Whitelist>> GetByRoleAsync(int roleId)
         {
             return await _whitelistDAO.GetByRoleAsync(roleId);

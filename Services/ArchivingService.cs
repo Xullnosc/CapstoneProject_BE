@@ -200,6 +200,57 @@ namespace Services
             return result;
         }
 
+        public async Task<List<ArchivedWhitelist>> GetArchivedWhitelistsBySemesterIdsAsync(List<int> semesterIds)
+        {
+            var result = new List<ArchivedWhitelist>();
+            var missingSemesterIds = new List<int>();
+
+            foreach (var semesterId in semesterIds)
+            {
+                var semesterKey = $"fctms:archivedWhitelist:semester:{semesterId}";
+                var whitelistIds = await _redisService.SetMembersAsync(semesterKey);
+
+                if (whitelistIds.Any())
+                {
+                    var items = new List<ArchivedWhitelist>();
+                    foreach (var id in whitelistIds)
+                    {
+                        var item = await _redisService.GetObjectAsync<ArchivedWhitelist>($"fctms:archivedWhitelist:id:{id}");
+                        if (item != null)
+                            items.Add(item);
+                    }
+                    if (items.Any())
+                        result.AddRange(items);
+                }
+                else
+                {
+                    missingSemesterIds.Add(semesterId);
+                }
+            }
+
+            if (missingSemesterIds.Any())
+            {
+                var dbResults = await _archivingRepository.GetArchivedWhitelistsBySemesterIdsAsync(missingSemesterIds);
+                var grouped = dbResults.GroupBy(x => x.SemesterId).ToDictionary(g => g.Key, g => g.ToList());
+                foreach (var kvp in grouped)
+                {
+                    var semesterId = kvp.Key;
+                    var items = kvp.Value;
+                    var semesterKey = $"fctms:archivedWhitelist:semester:{semesterId}";
+                    foreach (var item in items)
+                    {
+                        await _redisService.SetObjectAsync($"fctms:archivedWhitelist:id:{item.ArchivedWhitelistId}", item, TimeSpan.FromMinutes(60));
+                        await _redisService.SetAddAsync(semesterKey, item.ArchivedWhitelistId.ToString());
+                        result.Add(item);
+                    }
+
+                    await _redisService.ExpireAsync(semesterKey, TimeSpan.FromMinutes(60));
+                }
+            }
+
+            return result;
+        }
+
         public async Task<List<ArchivedTeam>> GetAllArchivedTeamsAsync()
         {
             return await _archivingRepository.GetAllArchivedTeamsAsync();

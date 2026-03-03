@@ -86,6 +86,7 @@ namespace DataAccess
                 await tx.RollbackAsync();
                 throw;
             }
+        }
         public async Task<Whitelist?> GetByIdAsync(int id)
         {
             return await _context.Whitelists.FindAsync(id);
