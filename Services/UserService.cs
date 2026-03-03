@@ -36,37 +36,44 @@ namespace Services
                 return new List<UserInfoDTO>();
             }
 
-            var users = await _userRepository.SearchUsersAsync(term);
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
             var semesterId = currentSemester?.SemesterId ?? 0;
 
+            if (semesterId == 0) return new List<UserInfoDTO>();
+
+            var whitelists = await _whitelistRepository.SearchAsync(term, semesterId);
+            var emails = whitelists.Select(w => w.Email).ToList();
+            var existingUsers = await _userRepository.GetUsersByEmailsAsync(emails);
+
             var result = new List<UserInfoDTO>();
 
-            foreach (var u in users)
+            foreach (var w in whitelists)
             {
+                var existingUser = existingUsers.FirstOrDefault(u => u.Email.Equals(w.Email, System.StringComparison.OrdinalIgnoreCase));
+
                 // Exclude current user
-                if (u.UserId == currentUserId) continue;
+                if (existingUser != null && existingUser.UserId == currentUserId) continue;
 
                 // Ensure user has Student role
-                if (u.Role?.RoleName != CampusConstants.Roles.Student) continue;
+                if (w.Role?.RoleName != CampusConstants.Roles.Student && w.RoleId != 3) continue;
 
                 var dto = new UserInfoDTO
                 {
-                    UserId = u.UserId,
-                    Email = u.Email,
-                    FullName = u.FullName,
-                    StudentCode = u.StudentCode,
-                    Avatar = u.Avatar
+                    UserId = existingUser?.UserId ?? -w.WhitelistId, // Use negative id for unique UI key if not logged in
+                    Email = w.Email,
+                    FullName = w.FullName ?? existingUser?.FullName,
+                    StudentCode = w.StudentCode ?? existingUser?.StudentCode,
+                    Avatar = w.Avatar ?? existingUser?.Avatar
                 };
 
-                if (semesterId > 0)
+                if (existingUser != null && semesterId > 0)
                 {
-                    dto.HasTeam = await _teamMemberRepository.IsStudentInTeamAsync(u.UserId, semesterId);
+                    dto.HasTeam = await _teamMemberRepository.IsStudentInTeamAsync(existingUser.UserId, semesterId);
                 }
 
-                if (teamId.HasValue && !dto.HasTeam)
+                if (teamId.HasValue && !dto.HasTeam && existingUser != null)
                 {
-                    var existingInvitation = await _teamInvitationRepository.GetByTeamAndStudentAsync(teamId.Value, u.UserId);
+                    var existingInvitation = await _teamInvitationRepository.GetByTeamAndStudentAsync(teamId.Value, existingUser.UserId);
                     if (existingInvitation != null && existingInvitation.Status == CampusConstants.InvitationStatus.Pending)
                     {
                         dto.PendingInvitationId = existingInvitation.InvitationId;

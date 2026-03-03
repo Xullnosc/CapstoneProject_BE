@@ -1,4 +1,5 @@
 using AutoMapper;
+using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Repositories;
@@ -39,6 +40,13 @@ namespace Services
             var user = await _userRepository.GetByEmailAsync(email);
             if (user == null)
                 throw new Exception("User not found");
+
+            // Prevent multiple theses per leader, except for Lecturers
+            var existingTheses = await _thesisRepository.GetThesesByUserIdAsync(user.UserId);
+            if (existingTheses.Any() && user.Role?.RoleName != CampusConstants.Roles.Lecturer)
+            {
+                throw new InvalidOperationException("You have already proposed a thesis. You cannot propose more than one.");
+            }
 
             string? fileUrl = null;
             if (req.File != null)
@@ -183,11 +191,11 @@ namespace Services
             // Apply filtering in memory
             if (!string.IsNullOrWhiteSpace(status))
             {
-                theses = theses.Where(t => t.Status.Equals(status, StringComparison.OrdinalIgnoreCase));
+                theses = theses.Where(t => string.Equals(t.Status, status, StringComparison.OrdinalIgnoreCase));
             }
             if (!string.IsNullOrWhiteSpace(searchTitle))
             {
-                theses = theses.Where(t => t.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase));
+                theses = theses.Where(t => t.Title != null && t.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase));
             }
 
             return _mapper.Map<IEnumerable<ThesisDTO>>(theses);
