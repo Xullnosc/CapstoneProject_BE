@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -46,6 +47,24 @@ namespace DataAccess
                 .ToListAsync();
         }
 
+        public async Task<PagedResult<Team>> GetBySemesterAsync(int semesterId, int pageIndex, int pageSize)
+        {
+            var query = _context.Teams
+                .Include(t => t.Teammembers)
+                .ThenInclude(tm => tm.Student)
+                .Where(t => t.SemesterId == semesterId && t.Status != "Disbanded");
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(t => t.TeamId)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Team>(items, totalCount, pageIndex, pageSize);
+        }
+
         public async Task<(List<Team> Items, int TotalCount)> GetBySemesterPagedAsync(int semesterId, int page, int limit)
         {
             var query = _context.Teams
@@ -85,6 +104,23 @@ namespace DataAccess
                 .ToListAsync();
         }
 
+        public async Task<PagedResult<string>> GetTeamCodesBySemesterAsync(int semesterId, int pageIndex, int pageSize)
+        {
+            var query = _context.Teams
+                .Where(t => t.SemesterId == semesterId)
+                .Select(t => t.TeamCode);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(code => code)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<string>(items, totalCount, pageIndex, pageSize);
+        }
+
         public async Task<Team?> GetTeamByStudentIdAsync(int studentId, int semesterId)
         {
             return await _context.Teams
@@ -107,6 +143,24 @@ namespace DataAccess
                 .Include(t => t.Teammembers)
                 .Include(t => t.Teaminvitations)
                 .ToListAsync();
+        }
+
+        public async Task<PagedResult<Team>> GetForArchivingAsync(int semesterId, int pageIndex, int pageSize)
+        {
+            var query = _context.Teams
+                .Where(t => t.SemesterId == semesterId)
+                .Include(t => t.Teammembers)
+                .Include(t => t.Teaminvitations);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(t => t.TeamId)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Team>(items, totalCount, pageIndex, pageSize);
         }
 
         public async Task DeleteRangeAsync(IEnumerable<Team> teams)

@@ -52,5 +52,26 @@ namespace Services.Helpers
 
             return uploadResult.SecureUrl.ToString();
         }
+
+        public async Task<string> UploadFileAsync(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                throw new ArgumentException("File is empty");
+
+            using var stream = file.OpenReadStream();
+            var uploadParams = new RawUploadParams
+            {
+                File = new FileDescription(file.FileName, stream)
+            };
+
+            var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+
+            if (uploadResult.Error != null)
+            {
+                throw new Exception(uploadResult.Error.Message);
+            }
+
+            return uploadResult.SecureUrl.ToString();
+        }
     }
 }

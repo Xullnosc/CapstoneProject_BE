@@ -17,6 +17,10 @@ public partial class ArchivedWhitelist
 
     public int? RoleId { get; set; }
 
+    public bool IsReviewer { get; set; }
+
+    public string? Avatar { get; set; }
+
     public string? Campus { get; set; }
 
     public int SemesterId { get; set; }

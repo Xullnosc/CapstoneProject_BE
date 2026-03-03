@@ -1,5 +1,6 @@
-using BusinessObjects.Models;
 using BusinessObjects;
+using BusinessObjects.DTOs;
+using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,6 +42,23 @@ namespace DataAccess
                 .Include(m => m.Student)
                 .Where(m => m.TeamId == teamId)
                 .ToListAsync();
+        }
+
+        public async Task<PagedResult<Teammember>> GetMembersByTeamIdAsync(int teamId, int pageIndex, int pageSize)
+        {
+            var query = _context.Teammembers
+                .Include(m => m.Student)
+                .Where(m => m.TeamId == teamId);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(m => m.StudentId)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Teammember>(items, totalCount, pageIndex, pageSize);
         }
 
         public async Task<Teammember?> GetMemberAsync(int teamId, int studentId)

@@ -1,4 +1,4 @@
-﻿namespace Services.DTOs
+namespace Services.DTOs
 {
     public class UserInfoDTO
     {
@@ -12,5 +12,6 @@
         public DateTime? LastLogin { get; set; }
         public bool HasTeam { get; set; }
         public int? PendingInvitationId { get; set; }
+        public bool IsReviewer { get; set; }
     }
 }

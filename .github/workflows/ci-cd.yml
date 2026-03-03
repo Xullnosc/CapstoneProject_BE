@@ -10,6 +10,12 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     environment: Test
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 6
 
     steps:
       - name: Checkout repository
@@ -18,7 +24,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "8.0.417"
 
       - name: Restore all projects
         run: dotnet restore
@@ -30,7 +36,17 @@ jobs:
             --no-restore
 
       - name: Test
+        env:
+          REDIS_CONNECTION: "localhost:6379,abortConnect=False"
         run: |
+          echo "Waiting for Redis to be available..."
+          sudo apt-get update -y && sudo apt-get install -y redis-tools
+          for i in {1..30}; do
+            if redis-cli -h localhost ping | grep -q PONG; then
+              echo "Redis is up"; break
+            fi
+            echo "Redis not ready yet, waiting..."; sleep 1
+          done
           dotnet test FCTMS.Tests/FCTMS.Tests.csproj \
             --configuration Release \
             --verbosity normal
@@ -64,5 +80,5 @@ jobs:
         run: |
           az containerapp update \
             --name fctmscapstone \
-            --resource-group capstoneResourceGroup \
+            --resource-group capstoneResourceGroupNew \
             --image docker.io/${{ secrets.DOCKER_USERNAME }}/capstone_be:2.0

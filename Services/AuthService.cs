@@ -199,10 +199,13 @@ namespace Services
                     ExpireMinutes = expireMinutes,
                 };
 
-                var token = JwtTokenGenerator.GenerateToken(user, jwtSettings);
+                var isReviewer = whitelistEntry?.IsReviewer ?? false;
+
+                var token = JwtTokenGenerator.GenerateToken(user, isReviewer, jwtSettings);
 
                 // 6. Map to DTO and return
                 var userInfo = _mapper.Map<UserInfoDTO>(user);
+                userInfo.IsReviewer = isReviewer;
 
                 return new LoginResponseDTO { Token = token, UserInfo = userInfo };
             }

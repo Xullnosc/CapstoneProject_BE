@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,12 +25,31 @@ namespace DataAccess
                 .AsNoTracking().ToListAsync();
         }
 
+        public async Task<PagedResult<Semester>> GetAllAsync(int pageIndex, int pageSize)
+        {
+            var query = _context.Semesters
+                .Include(s => s.Teams)
+                .Include(s => s.Whitelists)
+                .AsNoTracking();
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(s => s.SemesterId)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Semester>(items, totalCount, pageIndex, pageSize);
+        }
+
         public async Task<Semester?> GetByIdAsync(int id)
         {
             return await _context
                 .Semesters.Include(s => s.Teams)
                     .ThenInclude(t => t.Teammembers)
                 .Include(s => s.Whitelists)
+                    .ThenInclude(w => w.Role)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.SemesterId == id);
         }
@@ -59,7 +81,7 @@ namespace DataAccess
 
             // Priority 2: Fallback to Date Range (Backward Compatibility)
             // If no semester is flagged IsActive, we fall back to checking dates.
-            var now = System.DateTime.UtcNow;
+            var now = DateTime.UtcNow;
             return await _context
                 .Semesters.AsNoTracking()
                 .FirstOrDefaultAsync(s => s.StartDate <= now && s.EndDate >= now);
@@ -83,6 +105,21 @@ namespace DataAccess
             return await _context.Roles.AsNoTracking().ToListAsync();
         }
 
+        public async Task<PagedResult<Role>> GetAllRolesAsync(int pageIndex, int pageSize)
+        {
+            var query = _context.Roles.AsNoTracking();
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(r => r.RoleId)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Role>(items, totalCount, pageIndex, pageSize);
+        }
+
         public async Task<bool> IsOverlapAsync(DateTime start, DateTime end, int? excludeId)
         {
             return await _context.Semesters.AnyAsync(s => 
@@ -91,3 +128,4 @@ namespace DataAccess
         }
     }
 }
+

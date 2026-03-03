@@ -15,15 +15,15 @@ namespace Services
         private readonly ISemesterRepository _semesterRepository;
         private readonly IUserRepository _userRepository;
         private readonly ICloudinaryHelper _cloudinaryHelper;
-        private readonly IArchivingRepository _archivingRepository;
+        private readonly IArchivingService _archivingService;
         private readonly ITeamMemberRepository _teamMemberRepository;
-        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, ICloudinaryHelper cloudinaryHelper, IArchivingRepository archivingRepository, ITeamMemberRepository teamMemberRepository)
+        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, ICloudinaryHelper cloudinaryHelper, IArchivingService archivingService, ITeamMemberRepository teamMemberRepository)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
             _userRepository = userRepository;
             _cloudinaryHelper = cloudinaryHelper;
-            _archivingRepository = archivingRepository;
+            _archivingService = archivingService;
             _teamMemberRepository = teamMemberRepository;
         }
 
@@ -143,7 +143,7 @@ namespace Services
             // TODO: Check if team has matched topic (when Topic module implemented)
             // if (team.TopicId != null && !semesterEnded) throw ...
 
-            await _archivingRepository.ArchiveTeamAsync(team);
+            await _archivingService.ArchiveTeamAsync(team);
             return true;
         }
 

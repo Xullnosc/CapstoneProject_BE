@@ -7,6 +7,8 @@ using Repositories;
 using Services;
 using System;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Threading;
 using Xunit;
 
 namespace FCTMS.Tests.Services
@@ -16,6 +18,9 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ISemesterRepository> _mockSemesterRepository;
         private readonly Mock<IArchivingService> _mockArchivingService;
         private readonly Mock<IMapper> _mockMapper;
+        private readonly Mock<IUserRepository> _mockUserRepository;
+        private readonly Mock<IRedisService> _mockRedisService;
+        private readonly Mock<Microsoft.Extensions.Configuration.IConfiguration> _mockConfiguration;
         private readonly SemesterService _semesterService;
 
         public SemesterServiceTests()
@@ -23,11 +28,32 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository = new Mock<ISemesterRepository>();
             _mockArchivingService = new Mock<IArchivingService>();
             _mockMapper = new Mock<IMapper>();
+            _mockUserRepository = new Mock<IUserRepository>();
+            _mockRedisService = new Mock<IRedisService>();
+            _mockConfiguration = new Mock<Microsoft.Extensions.Configuration.IConfiguration>();
+
+            // Default redis mock behaviors
+            _mockRedisService.Setup(r => r.GetObjectAsync<List<SemesterDTO>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((List<SemesterDTO>?)null);
+            _mockRedisService.Setup(r => r.GetObjectAsync<SemesterDTO>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((SemesterDTO?)null);
+            _mockRedisService.Setup(r => r.SetObjectAsync<List<SemesterDTO>>(It.IsAny<string>(), It.IsAny<List<SemesterDTO>>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _mockRedisService.Setup(r => r.SetObjectAsync<SemesterDTO>(It.IsAny<string>(), It.IsAny<SemesterDTO>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            _mockRedisService.Setup(r => r.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+
+            // Default configuration TTL
+            _mockConfiguration.SetupGet(c => c["RedisSettings:SemesterTTLMinutes"]).Returns("30");
 
             _semesterService = new SemesterService(
                 _mockSemesterRepository.Object,
                 _mockArchivingService.Object,
-                _mockMapper.Object
+                _mockMapper.Object,
+                _mockUserRepository.Object,
+                _mockRedisService.Object,
+                _mockConfiguration.Object
             );
         }
 

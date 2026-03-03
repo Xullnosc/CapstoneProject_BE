@@ -1,12 +1,12 @@
-﻿using System;
+using AutoMapper;
+using BusinessObjects.Models;
+using Services.DTOs;
+using BusinessObjects.DTOs;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using AutoMapper;
-using BusinessObjects.DTOs;
-using BusinessObjects.Models;
-using Services.DTOs;
 
 namespace Services.Mappings
 {
@@ -24,10 +24,8 @@ namespace Services.Mappings
             // Whitelist -> WhitelistDTO
             CreateMap<Whitelist, WhitelistDTO>()
                 .ForMember(dest => dest.RoleId, opt => opt.MapFrom(src => src.RoleId))
-                .ForMember(
-                    dest => dest.RoleName,
-                    opt => opt.MapFrom(src => src.Role != null ? src.Role.RoleName : null)
-                );
+                .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.Role != null ? src.Role.RoleName : null))
+                .ForMember(dest => dest.IsReviewer, opt => opt.MapFrom(src => src.IsReviewer));
 
             // Team -> TeamSimpleDTO (Minimal info for lists)
             CreateMap<Team, TeamSimpleDTO>()
@@ -86,6 +84,20 @@ namespace Services.Mappings
             // Reverse map for Create/Update
             CreateMap<SemesterDTO, Semester>();
             CreateMap<SemesterCreateDTO, Semester>();
+
+            // Thesis → ThesisDTO
+            CreateMap<Thesis, ThesisDTO>()
+                .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.User != null ? src.User.FullName : null))
+                .ForMember(dest => dest.OwnerEmail, opt => opt.MapFrom(src => src.User != null ? src.User.Email : null))
+                .ForMember(dest => dest.Histories, opt => opt.MapFrom(src => src.ThesisHistories));
+
+            // ThesisHistory → ThesisHistoryDTO
+            CreateMap<ThesisHistory, ThesisHistoryDTO>()
+                .ForMember(dest => dest.UploaderName, opt => opt.MapFrom(src => src.UploadedByUser != null ? src.UploadedByUser.FullName : null));
+
+            // Checklist
+            CreateMap<Checklist, ChecklistDTO>();
+            CreateMap<ChecklistCreateDTO, Checklist>();
         }
     }
 }

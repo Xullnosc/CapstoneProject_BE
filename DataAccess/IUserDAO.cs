@@ -1,4 +1,5 @@
-﻿using BusinessObjects.Models;
+﻿using BusinessObjects.DTOs;
+using BusinessObjects.Models;
 
 namespace DataAccess
 {
@@ -9,5 +10,8 @@ namespace DataAccess
         Task<User> AddAsync(User user);
         Task UpdateAsync(User user);
         Task<List<User>> SearchUsersAsync(string term);
+        Task<PagedResult<User>> SearchUsersAsync(string term, int pageIndex, int pageSize);
+        Task<List<User>> GetUsersByEmailsAsync(List<string> emails);
+        Task<PagedResult<User>> GetUsersByEmailsAsync(List<string> emails, int pageIndex, int pageSize);
     }
 }

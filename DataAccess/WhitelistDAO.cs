@@ -1,4 +1,6 @@
-﻿using BusinessObjects.Models;
+﻿using System.Linq;
+using BusinessObjects.DTOs;
+using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess
@@ -24,6 +26,45 @@ namespace DataAccess
             return await _context.Whitelists.Where(w => w.SemesterId == semesterId).ToListAsync();
         }
 
+        public async Task<PagedResult<Whitelist>> GetBySemesterIdAsync(int semesterId, int pageIndex, int pageSize)
+        {
+            var query = _context.Whitelists
+                .Where(w => w.SemesterId == semesterId);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(w => w.WhitelistId)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Whitelist>(items, totalCount, pageIndex, pageSize);
+        }
+
+        public async Task<List<Whitelist>> GetByRoleAsync(int roleId)
+        {
+            return await _context.Whitelists
+                .Where(w => w.RoleId == roleId)
+                .ToListAsync();
+        }
+
+        public async Task<PagedResult<Whitelist>> GetByRoleAsync(int roleId, int pageIndex, int pageSize)
+        {
+            var query = _context.Whitelists
+                .Where(w => w.RoleId == roleId);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(w => w.WhitelistId)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Whitelist>(items, totalCount, pageIndex, pageSize);
+        }
+
         public async Task DeleteRangeAsync(IEnumerable<Whitelist> whitelists)
         {
             _context.Whitelists.RemoveRange(whitelists);
@@ -45,6 +86,15 @@ namespace DataAccess
                 await tx.RollbackAsync();
                 throw;
             }
+        public async Task<Whitelist?> GetByIdAsync(int id)
+        {
+            return await _context.Whitelists.FindAsync(id);
+        }
+
+        public async Task UpdateAsync(Whitelist whitelist)
+        {
+            _context.Whitelists.Update(whitelist);
+            await _context.SaveChangesAsync();
         }
     }
 }

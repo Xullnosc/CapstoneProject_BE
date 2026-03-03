@@ -63,5 +63,19 @@ namespace Repositories
         {
             return await _teamDAO.UpdateAsync(team);
         }
+        public async Task<List<Team>> GetForArchivingAsync(int semesterId)
+        {
+            return await _teamDAO.GetForArchivingAsync(semesterId);
+        }
+
+        public async Task DeleteRangeAsync(IEnumerable<Team> teams)
+        {
+            await _teamDAO.DeleteRangeAsync(teams);
+        }
+
+        public async Task DeleteTeamAsync(Team team)
+        {
+            await _teamDAO.DeleteAsync(team);
+        }
     }
 }
