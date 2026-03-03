@@ -26,6 +26,7 @@ namespace DataAccess
         public async Task<IEnumerable<Thesis>> GetAllThesesAsync()
         {
             return await _context.Theses
+                .AsNoTracking()
                 .Include(t => t.User)
                 .ToListAsync();
         }
@@ -33,6 +34,7 @@ namespace DataAccess
         public async Task<PagedResult<Thesis>> GetAllThesesAsync(int pageIndex, int pageSize)
         {
             var query = _context.Theses
+                .AsNoTracking()
                 .Include(t => t.User);
 
             var totalCount = await query.CountAsync();
@@ -49,6 +51,7 @@ namespace DataAccess
         public async Task<Thesis?> GetThesisByIdAsync(string id)
         {
             return await _context.Theses
+                .AsNoTracking()
                 .Include(t => t.User)
                 .FirstOrDefaultAsync(t => t.ThesisId == id);
         }
@@ -56,6 +59,7 @@ namespace DataAccess
         public async Task<IEnumerable<Thesis>> GetThesesByUserIdAsync(int userId)
         {
             return await _context.Theses
+                .AsNoTracking()
                 .Include(t => t.User)
                 .Where(t => t.UserId == userId)
                 .ToListAsync();
@@ -64,6 +68,7 @@ namespace DataAccess
         public async Task<PagedResult<Thesis>> GetThesesByUserIdAsync(int userId, int pageIndex, int pageSize)
         {
             var query = _context.Theses
+                .AsNoTracking()
                 .Include(t => t.User)
                 .Where(t => t.UserId == userId);
 
@@ -89,6 +94,7 @@ namespace DataAccess
         public async Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId)
         {
             var query = _context.Theses
+                .AsNoTracking()
                 .Include(t => t.User)
                 .AsQueryable();
 
@@ -106,6 +112,7 @@ namespace DataAccess
             if (string.IsNullOrEmpty(id)) return null;
 
             var thesis = await _context.Theses
+                .AsNoTracking()
                 .Include(t => t.User)
                 .Include(t => t.ThesisHistories) // Explicitly included
                 .FirstOrDefaultAsync(t => t.ThesisId == id);
@@ -130,6 +137,7 @@ namespace DataAccess
         public async Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds)
         {
             return await _context.Theses
+                .AsNoTracking()
                 .Include(t => t.User)
                 .Where(t => userIds.Contains(t.UserId))
                 .OrderByDescending(t => t.UpdateDate)

@@ -161,6 +161,36 @@ namespace Services
         }
 
         /// <summary>
+        /// Cancel a thesis proposal.
+        /// Only the owner can cancel it.
+        /// </summary>
+        public async Task<ThesisDTO> CancelThesisAsync(string thesisId, string email)
+        {
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null)
+                throw new UnauthorizedAccessException("User not found.");
+
+            var thesis = await _thesisRepository.GetThesisByIdWithHistoriesAsync(thesisId);
+            if (thesis == null)
+                throw new KeyNotFoundException("Thesis not found.");
+
+            // Only the owner can cancel
+            if (thesis.UserId != user.UserId)
+                throw new UnauthorizedAccessException("You are not authorized to cancel this thesis.");
+
+            // Only cancel if not already matched or published (can refine logic here if needed, usually just allow if it's 'Reviewing' or 'Registered')
+            if (thesis.Status != "Reviewing" && thesis.Status != "Registered")
+                throw new InvalidOperationException($"Cannot cancel a thesis that is '{thesis.Status}'.");
+
+            thesis.Status = "Cancelled";
+            thesis.UpdateDate = DateTime.UtcNow;
+
+            await _thesisRepository.UpdateThesisAsync(thesis);
+
+            return _mapper.Map<ThesisDTO>(thesis);
+        }
+
+        /// <summary>
         /// Get all theses owned by the logged-in student.
         /// </summary>
         public async Task<IEnumerable<ThesisDTO>> GetMyThesesAsync(string email, string? status = null, string? searchTitle = null)
