@@ -1,4 +1,5 @@
-﻿using BusinessObjects.Models;
+﻿using BusinessObjects.DTOs;
+using BusinessObjects.Models;
 
 namespace DataAccess
 {
@@ -6,7 +7,9 @@ namespace DataAccess
     {
         Task<Whitelist?> GetByEmailAsync(string email);
         Task<List<Whitelist>> GetBySemesterIdAsync(int semesterId);
+        Task<PagedResult<Whitelist>> GetBySemesterIdAsync(int semesterId, int pageIndex, int pageSize);
         Task<List<Whitelist>> GetByRoleAsync(int roleId);
+        Task<PagedResult<Whitelist>> GetByRoleAsync(int roleId, int pageIndex, int pageSize);
         Task DeleteRangeAsync(IEnumerable<Whitelist> whitelists);
         Task<Whitelist?> GetByIdAsync(int id);
         Task UpdateAsync(Whitelist whitelist);

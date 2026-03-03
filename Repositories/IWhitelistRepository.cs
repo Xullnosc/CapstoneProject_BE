@@ -13,3 +13,4 @@ namespace Repositories
         Task<List<Whitelist>> SearchAsync(string term, int semesterId);
     }
 }
+

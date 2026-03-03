@@ -117,11 +117,13 @@ namespace Services
             var team = await _teamRepository.GetByIdAsync(teamId);
             if (team == null) return null;
 
-            // Check if user is a member of the team
+            // Allow access if user is a member OR the Mentor
             bool isMember = team.Teammembers.Any(tm => tm.StudentId == userId);
-            if (!isMember)
+            bool isMentor = team.MentorId == userId;
+            
+            if (!isMember && !isMentor)
             {
-                throw new UnauthorizedAccessException("You are not a member of this team.");
+                throw new UnauthorizedAccessException("You are not authorized to view this team.");
             }
 
             return MapToDTO(team);
@@ -163,7 +165,25 @@ namespace Services
              if (currentSemester == null) return null;
 
              var team = await _teamRepository.GetTeamByStudentIdAsync(studentId, currentSemester.SemesterId);
+             if (team == null)
+             {
+                 // Check if user is a mentor for any team in this semester
+                 var mentoredTeams = await _teamRepository.GetBySemesterAsync(currentSemester.SemesterId);
+                 team = mentoredTeams.FirstOrDefault(t => t.MentorId == studentId);
+             }
              return team == null ? null : MapToDTO(team);
+        }
+
+        public async Task<List<TeamDTO>> GetMentorTeamsAsync(int mentorId)
+        {
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester == null) return new List<TeamDTO>();
+
+            var allTeams = await _teamRepository.GetBySemesterAsync(currentSemester.SemesterId);
+            return allTeams
+                .Where(t => t.MentorId == mentorId && t.Status != "Disbanded")
+                .Select(MapToDTO)
+                .ToList();
         }
 
         private TeamDTO MapToDTO(Team team)
@@ -190,7 +210,11 @@ namespace Services
                     Avatar = tm.Student?.Avatar,
                     Role = tm.Role,
                     JoinedAt = tm.JoinedAt ?? DateTime.UtcNow
-                }).ToList() ?? new List<TeamMemberDTO>()
+                }).ToList() ?? new List<TeamMemberDTO>(),
+                MentorId = team.MentorId,
+                MentorName = team.Mentor?.FullName ?? (team.MentorId != null ? "Assigned Mentor" : string.Empty),
+                MentorEmail = team.Mentor?.Email ?? string.Empty,
+                MentorAvatar = team.Mentor?.Avatar ?? string.Empty
             };
         }
 

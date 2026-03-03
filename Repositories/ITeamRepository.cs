@@ -19,5 +19,6 @@ namespace Repositories
         Task<List<Team>> GetForArchivingAsync(int semesterId);
         Task DeleteRangeAsync(IEnumerable<Team> teams);
         Task DeleteTeamAsync(Team team);
+        Task<Team?> GetActiveTeamByStudentIdAsync(int studentId);
     }
 }

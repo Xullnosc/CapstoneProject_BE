@@ -35,6 +35,8 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<ThesisHistory> ThesisHistories { get; set; }
 
+    public virtual DbSet<Checklist> Checklists { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -203,6 +205,9 @@ public partial class FctmsContext : DbContext
             entity.Property(e => e.Status)
                 .HasDefaultValueSql("'Pending'")
                 .HasColumnType("enum('Pending','Accepted','Declined','Cancelled')");
+            entity.Property(e => e.Type)
+                .HasDefaultValueSql("'Member'")
+                .HasColumnType("varchar(20)");
 
             entity.HasOne(d => d.InvitedByNavigation).WithMany(p => p.TeaminvitationInvitedByNavigations)
                 .HasForeignKey(d => d.InvitedBy)
@@ -374,6 +379,22 @@ public partial class FctmsContext : DbContext
                 .HasForeignKey(d => d.UploadedBy)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ThesisHistory_User");
+        });
+
+        modelBuilder.Entity<Checklist>(entity =>
+        {
+            entity.HasKey(e => e.ChecklistId).HasName("PRIMARY");
+
+            entity.ToTable("checklists");
+
+            entity.HasIndex(e => e.DisplayOrder, "IX_Checklist_DisplayOrder");
+
+            entity.Property(e => e.ChecklistId).HasColumnName("ChecklistId");
+            entity.Property(e => e.Content).HasMaxLength(500);
+            entity.Property(e => e.IsCompleted).HasDefaultValue(false);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
         });
 
         OnModelCreatingPartial(modelBuilder);

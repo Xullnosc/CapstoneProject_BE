@@ -13,13 +13,27 @@ namespace Services
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly ITeamRepository _teamRepository;
         private readonly IRedisService _redisService;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
+        private readonly TimeSpan _archivedTtl;
 
-        public ArchivingService(IArchivingRepository archivingRepository, IWhitelistRepository whitelistRepository, ITeamRepository teamRepository, IRedisService redisService)
+        public ArchivingService(
+            IArchivingRepository archivingRepository, 
+            IWhitelistRepository whitelistRepository, 
+            ITeamRepository teamRepository, 
+            IRedisService redisService,
+            Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             _whitelistRepository = whitelistRepository;
             _archivingRepository = archivingRepository;
             _teamRepository = teamRepository;
             _redisService = redisService;
+            _configuration = configuration;
+            
+            var ttlStr = _configuration["RedisSettings:ArchivedTTLMinutes"];
+            int ttlMinutes;
+            if (!int.TryParse(ttlStr, out ttlMinutes)) ttlMinutes = 1440; // Default 24h
+            ttlMinutes = System.Math.Max(1, ttlMinutes); // Ensure a positive TTL
+            _archivedTtl = System.TimeSpan.FromMinutes(ttlMinutes);
         }
 
         public async Task ArchiveSemesterAsync(int semesterId)
@@ -89,23 +103,18 @@ namespace Services
         }
         public async Task<List<ArchivedTeam>> GetArchivedTeamsBySemesterAsync(int semesterId)
         {
-            string semesterKey = $"archivedTeams:semester:{semesterId}";
-
+            string semesterKey = $"fctms:archivedTeam:semester:{semesterId}";
             var teamIds = await _redisService.SetMembersAsync(semesterKey);
-
             if (teamIds.Any())
             {
                 var teams = new List<ArchivedTeam>();
-
                 foreach (var id in teamIds)
                 {
                     var team = await _redisService
-                        .GetObjectAsync<ArchivedTeam>($"archivedTeam:{id}");
-
+                        .GetObjectAsync<ArchivedTeam>($"fctms:archivedTeam:id:{id}");
                     if (team != null)
                         teams.Add(team);
                 }
-
                 if (teams.Any())
                     return teams;
             }
@@ -113,21 +122,18 @@ namespace Services
             // Cache miss → query DB
             var archivedTeams = await _archivingRepository
                 .GetArchivedTeamsBySemesterAsync(semesterId);
-
             foreach (var team in archivedTeams)
             {
                 await _redisService.SetObjectAsync(
-                    $"archivedTeam:{team.ArchivedTeamId}",
+                    $"fctms:archivedTeam:id:{team.ArchivedTeamId}",
                     team,
-                    TimeSpan.FromMinutes(5));
-
+                    TimeSpan.FromMinutes(60)); // Use longer TTL for archived data
                 await _redisService.SetAddAsync(semesterKey, team.ArchivedTeamId.ToString());
             }
 
             await _redisService.ExpireAsync(
                 semesterKey,
-                TimeSpan.FromMinutes(5));
-
+                TimeSpan.FromMinutes(60));
             return archivedTeams;
         }
 
@@ -137,22 +143,19 @@ namespace Services
             var missingSemesterIds = new List<int>();
             foreach (var semesterId in semesterIds)
             {
-                var semesterKey = $"archivedTeams:semester:{semesterId}";
+                var semesterKey = $"fctms:archivedTeam:semester:{semesterId}";
                 var teamIds = await _redisService.SetMembersAsync(semesterKey);
 
                 if (teamIds.Any())
                 {
                     var teams = new List<ArchivedTeam>();
-
                     foreach (var id in teamIds)
                     {
                         var team = await _redisService
-                            .GetObjectAsync<ArchivedTeam>($"archivedTeam:{id}");
-
+                            .GetObjectAsync<ArchivedTeam>($"fctms:archivedTeam:id:{id}");
                         if (team != null)
                             teams.Add(team);
                     }
-
                     if (teams.Any())
                         result.AddRange(teams);
                 }
@@ -172,26 +175,22 @@ namespace Services
                 {
                     var semesterId = kvp.Key;
                     var teams = kvp.Value;
-
-                    var semesterKey = $"archivedTeams:semester:{semesterId}";
-
+                    var semesterKey = $"fctms:archivedTeam:semester:{semesterId}";
                     foreach (var team in teams)
                     {
                         await _redisService.SetObjectAsync(
-                            $"archivedTeam:{team.ArchivedTeamId}",
+                            $"fctms:archivedTeam:id:{team.ArchivedTeamId}",
                             team,
-                            TimeSpan.FromMinutes(5));
-
+                            TimeSpan.FromMinutes(60));
                         await _redisService.SetAddAsync(
                             semesterKey,
                             team.ArchivedTeamId.ToString());
-
                         result.Add(team);
                     }
 
                     await _redisService.ExpireAsync(
                         semesterKey,
-                        TimeSpan.FromMinutes(5));
+                        TimeSpan.FromMinutes(60));
                 }
             }
             return result;

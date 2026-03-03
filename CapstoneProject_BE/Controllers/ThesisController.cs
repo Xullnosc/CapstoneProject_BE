@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace CapstoneProject_BE.Controllers
 {
@@ -98,17 +99,45 @@ namespace CapstoneProject_BE.Controllers
         }
 
         /// <summary>
-        /// GET /api/thesis?status=Reviewing&amp;userId=5
-        /// Returns filtered list of all theses. Both query params are optional.
+        /// GET /api/thesis?status=Reviewing&amp;userId=5&amp;searchTitle=...
+        /// Returns filtered list of all theses. All query params are optional.
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetAllTheses([FromQuery] string? status, [FromQuery] int? userId)
+        [Authorize(Roles = "Admin,Reviewer")]
+        public async Task<IActionResult> GetAllTheses([FromQuery] string? status, [FromQuery] int? userId, [FromQuery] string? searchTitle)
         {
             try
             {
-                // If filters are provided, use filtered query; otherwise return all
-                var theses = await _thesisService.GetFilteredThesesAsync(status, userId);
+                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle);
                 return Ok(theses);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// PUT /api/thesis/{id}/review
+        /// Reviewer only: set thesis evaluation (Pass → Published, Fail → Rejected, or Need Update).
+        /// MUST be declared before PUT "{id}" so that /review is matched correctly.
+        /// </summary>
+        [HttpPut("{id}/review")]
+        [Authorize(Policy = "Reviewer")]
+        public async Task<IActionResult> ReviewThesis(string id, [FromBody] ReviewThesisDTO dto)
+        {
+            try
+            {
+                var allowed = new[] { "Published", "Rejected", "Need Update" };
+                if (string.IsNullOrWhiteSpace(dto?.Status) || !allowed.Contains(dto.Status, StringComparer.OrdinalIgnoreCase))
+                    return BadRequest(new { Message = "Status must be one of: Published, Rejected, Need Update." });
+
+                await _thesisService.UpdateThesisStatusAsync(id, dto.Status);
+                return Ok(new { Message = "Thesis evaluation updated.", Status = dto.Status });
+            }
+            catch (Exception ex) when (ex.Message?.Contains("not found") == true)
+            {
+                return NotFound(new { Message = ex.Message });
             }
             catch (Exception ex)
             {

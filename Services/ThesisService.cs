@@ -14,17 +14,20 @@ namespace Services
     public class ThesisService : IThesisService
     {
         private readonly IThesisRepository _thesisRepository;
+        private readonly ITeamRepository _teamRepository;
         private readonly IUserRepository _userRepository;
         private readonly ICloudinaryHelper _cloudinaryHelper;
         private readonly IMapper _mapper;
 
         public ThesisService(
             IThesisRepository thesisRepository,
+            ITeamRepository teamRepository,
             IUserRepository userRepository,
             ICloudinaryHelper cloudinaryHelper,
             IMapper mapper)
         {
             _thesisRepository = thesisRepository;
+            _teamRepository = teamRepository;
             _userRepository = userRepository;
             _cloudinaryHelper = cloudinaryHelper;
             _mapper = mapper;
@@ -52,7 +55,9 @@ namespace Services
             var thesis = new Thesis
             {
                 ThesisId = Guid.NewGuid().ToString(),
-                Title = req.Title,
+                Title = string.IsNullOrWhiteSpace(req.Title) 
+                    ? System.IO.Path.GetFileNameWithoutExtension(req.File.FileName) 
+                    : req.Title.Trim(),
                 ShortDescription = req.ShortDescription,
                 UserId = user.UserId,
                 FileUrl = fileUrl,
@@ -135,7 +140,14 @@ namespace Services
 
             // Update optional metadata fields
             if (!string.IsNullOrWhiteSpace(req.Title))
+            {
                 thesis.Title = req.Title.Trim();
+            }
+            else if (req.File != null)
+            {
+                // Sync Title with filename if a new file is uploaded and no title provided
+                thesis.Title = System.IO.Path.GetFileNameWithoutExtension(req.File.FileName);
+            }
 
             if (req.ShortDescription != null)
                 thesis.ShortDescription = req.ShortDescription.Trim();
@@ -157,7 +169,24 @@ namespace Services
             if (user == null)
                 throw new UnauthorizedAccessException("User not found.");
 
-            var theses = await _thesisRepository.GetThesesByUserIdAsync(user.UserId);
+            var ownerIds = new HashSet<int> { user.UserId };
+
+            // Find if user is in a team and get the leader's ID
+            var team = await _teamRepository.GetActiveTeamByStudentIdAsync(user.UserId);
+            if (team != null && team.LeaderId != user.UserId)
+            {
+                ownerIds.Add(team.LeaderId);
+            }
+
+            IEnumerable<Thesis> theses;
+            if (ownerIds.Count > 1)
+            {
+                theses = await _thesisRepository.GetThesesByUserIdsAsync(ownerIds);
+            }
+            else
+            {
+                theses = await _thesisRepository.GetThesesByUserIdAsync(user.UserId);
+            }
             
             // Apply filtering in memory
             if (!string.IsNullOrWhiteSpace(status))
@@ -188,12 +217,17 @@ namespace Services
         }
 
         /// <summary>
-        /// Get filtered list of theses. Both filters are optional.
+        /// Get filtered list of theses. All filters are optional.
         /// </summary>
-        public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId)
+        public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null)
         {
             var theses = await _thesisRepository.GetAllThesesFilteredAsync(status, userId);
-            return _mapper.Map<IEnumerable<ThesisDTO>>(theses);
+            var dtos = _mapper.Map<IEnumerable<ThesisDTO>>(theses);
+            if (!string.IsNullOrWhiteSpace(searchTitle))
+            {
+                dtos = dtos.Where(d => d.Title != null && d.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase));
+            }
+            return dtos;
         }
     }
 }
