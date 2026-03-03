@@ -20,5 +20,8 @@ namespace DataAccess
         Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id);
         Task AddThesisHistoryAsync(ThesisHistory history);
         Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds);
+
+        // Mentor Invitation Methods
+        Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId);
     }
 }

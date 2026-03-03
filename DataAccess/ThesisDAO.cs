@@ -135,5 +135,13 @@ namespace DataAccess
                 .OrderByDescending(t => t.UpdateDate)
                 .ToListAsync();
         }
+
+        public async Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId)
+        {
+            return await _context.Theses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.UserId == leaderId && 
+                                         (t.Status == "Approved" || t.Status == "Published"));
+        }
     }
 }

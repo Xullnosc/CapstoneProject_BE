@@ -12,6 +12,10 @@ namespace BusinessObjects.DTOs
         public string Description { get; set; }
         public int SemesterId { get; set; }
         public int LeaderId { get; set; }
+        public int? MentorId { get; set; }
+        public string MentorName { get; set; } = string.Empty;
+        public string MentorEmail { get; set; } = string.Empty;
+        public string MentorAvatar { get; set; } = string.Empty;
         public string Status { get; set; }
         public int MemberCount { get; set; }
         public DateTime CreatedAt { get; set; }

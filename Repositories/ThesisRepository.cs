@@ -37,5 +37,8 @@ namespace Repositories
 
         public Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds)
             => _thesisDAO.GetThesesByUserIdsAsync(userIds);
+
+        public Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId)
+            => _thesisDAO.GetApprovedThesisByLeaderIdAsync(leaderId);
     }
 }

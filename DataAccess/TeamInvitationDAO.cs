@@ -171,7 +171,7 @@ namespace DataAccess
         {
              var pendingInvitations = await _context.Teaminvitations
                 .Where(i => i.StudentId == studentId && i.Status == CampusConstants.InvitationStatus.Pending)
-                .ToListAsync();
+                .ToListAsync(); // No AsNoTracking — needs tracking to update
 
             if (pendingInvitations.Any())
             {
@@ -192,6 +192,99 @@ namespace DataAccess
                 .Include(i => i.Student)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.TeamId == teamId && i.StudentId == studentId && i.Status == CampusConstants.InvitationStatus.Pending);
+        }
+
+        // --- Mentor Invitation Methods ---
+
+        public async Task<List<Teaminvitation>> GetPendingMentorInvitationsByMentorIdAsync(int mentorId)
+        {
+            return await _context.Teaminvitations
+                .Include(i => i.Team)
+                    .ThenInclude(t => t.Teammembers)
+                .Include(i => i.Team)
+                    .ThenInclude(t => t.Leader)
+                .Include(i => i.InvitedByNavigation)
+                .Include(i => i.Student)
+                .AsNoTracking()
+                .Where(i => i.StudentId == mentorId 
+                         && i.Type == CampusConstants.InvitationType.Mentor 
+                         && i.Status == CampusConstants.InvitationStatus.Pending)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync();
+        }
+
+        public async Task<PagedResult<Teaminvitation>> GetPendingMentorInvitationsByMentorIdAsync(int mentorId, int pageIndex, int pageSize)
+        {
+            var query = _context.Teaminvitations
+                .Include(i => i.Team)
+                    .ThenInclude(t => t.Teammembers)
+                .Include(i => i.Team)
+                    .ThenInclude(t => t.Leader)
+                .Include(i => i.InvitedByNavigation)
+                .Include(i => i.Student)
+                .AsNoTracking()
+                .Where(i => i.StudentId == mentorId 
+                         && i.Type == CampusConstants.InvitationType.Mentor 
+                         && i.Status == CampusConstants.InvitationStatus.Pending);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(i => i.CreatedAt)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Teaminvitation>(items, totalCount, pageIndex, pageSize);
+        }
+
+        public async Task<List<Teaminvitation>> GetMentorInvitationsByTeamAsync(int teamId)
+        {
+            return await _context.Teaminvitations
+                .Include(i => i.Student)
+                .Include(i => i.InvitedByNavigation)
+                .AsNoTracking()
+                .Where(i => i.TeamId == teamId && i.Type == CampusConstants.InvitationType.Mentor)
+                .OrderByDescending(i => i.CreatedAt)
+                .ToListAsync();
+        }
+
+        public async Task<PagedResult<Teaminvitation>> GetMentorInvitationsByTeamAsync(int teamId, int pageIndex, int pageSize)
+        {
+            var query = _context.Teaminvitations
+                .Include(i => i.Student)
+                .Include(i => i.InvitedByNavigation)
+                .AsNoTracking()
+                .Where(i => i.TeamId == teamId && i.Type == CampusConstants.InvitationType.Mentor);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(i => i.CreatedAt)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<Teaminvitation>(items, totalCount, pageIndex, pageSize);
+        }
+
+        public async Task<Teaminvitation?> GetByTeamAndMentorAsync(int teamId, int mentorId)
+        {
+            return await _context.Teaminvitations
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.TeamId == teamId 
+                                       && i.StudentId == mentorId 
+                                       && i.Type == CampusConstants.InvitationType.Mentor 
+                                       && i.Status == CampusConstants.InvitationStatus.Pending);
+        }
+
+        public async Task<int> GetMentorActiveTeamCountAsync(int mentorId, int semesterId)
+        {
+            return await _context.Teams
+                .AsNoTracking()
+                .CountAsync(t => t.MentorId == mentorId 
+                              && t.SemesterId == semesterId 
+                              && t.Status != CampusConstants.TeamStatus.Disbanded);
         }
     }
 }
