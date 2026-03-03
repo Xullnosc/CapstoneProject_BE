@@ -13,12 +13,15 @@ namespace FCTMS.Tests.Services
     public class WhitelistServiceTests
     {
         private readonly Mock<IWhitelistRepository> _mockWhitelistRepository;
+        private readonly Mock<IRedisService> _mockRedisService;
         private readonly WhitelistService _whitelistService;
 
         public WhitelistServiceTests()
         {
             _mockWhitelistRepository = new Mock<IWhitelistRepository>();
-            _whitelistService = new WhitelistService(_mockWhitelistRepository.Object);
+            _mockRedisService = new Mock<IRedisService>();
+            _mockRedisService.Setup(x => x.DeleteValueAsync(It.IsAny<string>())).Returns(Task.CompletedTask);
+            _whitelistService = new WhitelistService(_mockWhitelistRepository.Object, _mockRedisService.Object);
         }
 
         [Fact]
