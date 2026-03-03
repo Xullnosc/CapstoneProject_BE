@@ -1,4 +1,5 @@
 using AutoMapper;
+using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Repositories;
@@ -16,6 +17,7 @@ namespace Services
         private readonly ITeamRepository _teamRepository;
         private readonly IUserRepository _userRepository;
         private readonly ICloudinaryHelper _cloudinaryHelper;
+        private readonly ISemesterRepository _semesterRepository;
         private readonly IMapper _mapper;
 
         public ThesisService(
@@ -23,12 +25,14 @@ namespace Services
             ITeamRepository teamRepository,
             IUserRepository userRepository,
             ICloudinaryHelper cloudinaryHelper,
+            ISemesterRepository semesterRepository,
             IMapper mapper)
         {
             _thesisRepository = thesisRepository;
             _teamRepository = teamRepository;
             _userRepository = userRepository;
             _cloudinaryHelper = cloudinaryHelper;
+            _semesterRepository = semesterRepository;
             _mapper = mapper;
         }
 
@@ -44,6 +48,8 @@ namespace Services
             if (req.File != null)
                 fileUrl = await _cloudinaryHelper.UploadFileAsync(req.File);
 
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+
             var thesis = new Thesis
             {
                 ThesisId = Guid.NewGuid().ToString(),
@@ -54,6 +60,7 @@ namespace Services
                 UserId = user.UserId,
                 FileUrl = fileUrl,
                 Status = "Reviewing",
+                SemesterId = currentSemester?.SemesterId,
                 UpDate = DateTime.UtcNow,
                 UpdateDate = DateTime.UtcNow
             };
@@ -161,24 +168,43 @@ namespace Services
             if (user == null)
                 throw new UnauthorizedAccessException("User not found.");
 
-            var ownerIds = new HashSet<int> { user.UserId };
+            var ownerIds = new HashSet<int>();
 
-            // Find if user is in a team and get the leader's ID
-            var team = await _teamRepository.GetActiveTeamByStudentIdAsync(user.UserId);
-            if (team != null && team.LeaderId != user.UserId)
+            if (user.Role?.RoleName == CampusConstants.Roles.Lecturer)
             {
-                ownerIds.Add(team.LeaderId);
-            }
+                // Lecturer/Mentor view: see theses of all teams they mentor in current semester
+                var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+                if (currentSemester != null)
+                {
+                    var allTeams = await _teamRepository.GetBySemesterAsync(currentSemester.SemesterId);
+                    var mentoredLeaderIds = allTeams
+                        .Where(t => t.MentorId == user.UserId && t.Status != CampusConstants.TeamStatus.Disbanded)
+                        .Select(t => t.LeaderId)
+                        .ToList();
 
-            IEnumerable<Thesis> theses;
-            if (ownerIds.Count > 1)
-            {
-                theses = await _thesisRepository.GetThesesByUserIdsAsync(ownerIds);
+                    foreach (var id in mentoredLeaderIds) ownerIds.Add(id);
+                }
             }
             else
             {
-                theses = await _thesisRepository.GetThesesByUserIdAsync(user.UserId);
+                // Student view: check if in a team
+                var team = await _teamRepository.GetActiveTeamByStudentIdAsync(user.UserId);
+                if (team != null)
+                {
+                    // Strictly see ONLY the leader's theses of their current team
+                    ownerIds.Add(team.LeaderId);
+                }
+                else
+                {
+                    // If not in any team, see their own proposed theses
+                    ownerIds.Add(user.UserId);
+                }
             }
+
+            if (!ownerIds.Any()) return new List<ThesisDTO>();
+
+            var currentSem = await _semesterRepository.GetCurrentSemesterAsync();
+            var theses = await _thesisRepository.GetThesesByUserIdsAsync(ownerIds, currentSem?.SemesterId);
             
             // Apply filtering in memory
             if (!string.IsNullOrWhiteSpace(status))

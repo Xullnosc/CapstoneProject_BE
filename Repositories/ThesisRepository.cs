@@ -35,10 +35,10 @@ namespace Repositories
         public Task AddThesisHistoryAsync(ThesisHistory history)
             => _thesisDAO.AddThesisHistoryAsync(history);
 
-        public Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds)
-            => _thesisDAO.GetThesesByUserIdsAsync(userIds);
+        public Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds, int? semesterId = null)
+            => _thesisDAO.GetThesesByUserIdsAsync(userIds, semesterId);
 
-        public Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId)
-            => _thesisDAO.GetApprovedThesisByLeaderIdAsync(leaderId);
+        public Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId, int? semesterId = null)
+            => _thesisDAO.GetApprovedThesisByLeaderIdAsync(leaderId, semesterId);
     }
 }

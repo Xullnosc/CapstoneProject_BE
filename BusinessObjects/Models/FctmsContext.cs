@@ -344,6 +344,10 @@ public partial class FctmsContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.Theses)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("fk_thesis_userid");
+
+            entity.HasOne(d => d.Semester).WithMany()
+                .HasForeignKey(d => d.SemesterId)
+                .HasConstraintName("fk_thesis_semester");
         });
 
         modelBuilder.Entity<ThesisHistory>(entity =>
