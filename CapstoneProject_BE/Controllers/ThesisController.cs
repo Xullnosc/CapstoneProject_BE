@@ -103,7 +103,6 @@ namespace CapstoneProject_BE.Controllers
         /// Returns filtered list of all theses. All query params are optional.
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "Admin,Reviewer")]
         public async Task<IActionResult> GetAllTheses([FromQuery] string? status, [FromQuery] int? userId, [FromQuery] string? searchTitle)
         {
             try
