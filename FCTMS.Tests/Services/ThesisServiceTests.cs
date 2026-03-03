@@ -354,5 +354,72 @@ namespace FCTMS.Tests.Services
             thesis.Title.Should().Be("New_Thesis_File");
             _mockThesisRepository.Verify(x => x.UpdateThesisAsync(thesis), Times.Once);
         }
+
+        [Fact]
+        public async Task CancelThesisAsync_ShouldUpdateStatusToCancelled_WhenValid()
+        {
+            // Arrange
+            string thesisId = "1";
+            string email = "owner@fpt.edu.vn";
+            int ownerId = 1;
+            
+            var user = new User { UserId = ownerId, Email = email };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = ownerId, Status = "Reviewing" };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId)).ReturnsAsync(thesis);
+            
+            var expectedDto = new ThesisDTO { ThesisId = thesisId, Status = "Cancelled" };
+            _mockMapper.Setup(m => m.Map<ThesisDTO>(It.IsAny<Thesis>())).Returns(expectedDto);
+
+            // Act
+            var result = await _thesisService.CancelThesisAsync(thesisId, email);
+
+            // Assert
+            thesis.Status.Should().Be("Cancelled");
+            thesis.UpdateDate.Should().NotBeNull();
+            _mockThesisRepository.Verify(x => x.UpdateThesisAsync(thesis), Times.Once);
+            result.Status.Should().Be("Cancelled");
+        }
+
+        [Fact]
+        public async Task CancelThesisAsync_ShouldThrowUnauthorized_WhenUserIsNotOwner()
+        {
+            // Arrange
+            string thesisId = "1";
+            string reqEmail = "other@fpt.edu.vn";
+            var dbUser = new User { UserId = 2, Email = reqEmail };
+            var dbThesis = new Thesis { ThesisId = thesisId, UserId = 1 }; // Owned by user 1
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(reqEmail)).ReturnsAsync(dbUser);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId)).ReturnsAsync(dbThesis);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.CancelThesisAsync(thesisId, reqEmail);
+
+            // Assert
+            await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("You are not authorized to cancel this thesis.");
+        }
+
+        [Fact]
+        public async Task CancelThesisAsync_ShouldThrowInvalidOperation_WhenStatusIsPublished()
+        {
+            // Arrange
+            string thesisId = "1";
+            string email = "owner@fpt.edu.vn";
+            int ownerId = 1;
+            
+            var user = new User { UserId = ownerId, Email = email };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = ownerId, Status = "Published" };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId)).ReturnsAsync(thesis);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.CancelThesisAsync(thesisId, email);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Cannot cancel a thesis that is 'Published'.");
+        }
     }
 }

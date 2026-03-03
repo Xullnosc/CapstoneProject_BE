@@ -10,6 +10,7 @@ namespace Repositories
         Task DeleteRangeAsync(IEnumerable<Whitelist> whitelists);
         Task<Whitelist?> GetByIdAsync(int id);
         Task UpdateAsync(Whitelist whitelist);
+        Task<List<Whitelist>> SearchAsync(string term, int semesterId);
     }
 }
 

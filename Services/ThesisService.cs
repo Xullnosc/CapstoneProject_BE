@@ -44,6 +44,13 @@ namespace Services
             if (user == null)
                 throw new Exception("User not found");
 
+            // Prevent multiple theses per leader, except for Lecturers
+            var existingTheses = await _thesisRepository.GetThesesByUserIdAsync(user.UserId);
+            if (existingTheses.Any() && user.Role?.RoleName != CampusConstants.Roles.Lecturer)
+            {
+                throw new InvalidOperationException("You have already proposed a thesis. You cannot propose more than one.");
+            }
+
             string? fileUrl = null;
             if (req.File != null)
                 fileUrl = await _cloudinaryHelper.UploadFileAsync(req.File);
@@ -160,6 +167,36 @@ namespace Services
         }
 
         /// <summary>
+        /// Cancel a thesis proposal.
+        /// Only the owner can cancel it.
+        /// </summary>
+        public async Task<ThesisDTO> CancelThesisAsync(string thesisId, string email)
+        {
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null)
+                throw new UnauthorizedAccessException("User not found.");
+
+            var thesis = await _thesisRepository.GetThesisByIdWithHistoriesAsync(thesisId);
+            if (thesis == null)
+                throw new KeyNotFoundException("Thesis not found.");
+
+            // Only the owner can cancel
+            if (thesis.UserId != user.UserId)
+                throw new UnauthorizedAccessException("You are not authorized to cancel this thesis.");
+
+            // Only cancel if not already matched or published (can refine logic here if needed, usually just allow if it's 'Reviewing' or 'Registered')
+            if (thesis.Status != "Reviewing" && thesis.Status != "Registered")
+                throw new InvalidOperationException($"Cannot cancel a thesis that is '{thesis.Status}'.");
+
+            thesis.Status = "Cancelled";
+            thesis.UpdateDate = DateTime.UtcNow;
+
+            await _thesisRepository.UpdateThesisAsync(thesis);
+
+            return _mapper.Map<ThesisDTO>(thesis);
+        }
+
+        /// <summary>
         /// Get all theses owned by the logged-in student.
         /// </summary>
         public async Task<IEnumerable<ThesisDTO>> GetMyThesesAsync(string email, string? status = null, string? searchTitle = null)
@@ -209,11 +246,11 @@ namespace Services
             // Apply filtering in memory
             if (!string.IsNullOrWhiteSpace(status))
             {
-                theses = theses.Where(t => t.Status.Equals(status, StringComparison.OrdinalIgnoreCase));
+                theses = theses.Where(t => string.Equals(t.Status, status, StringComparison.OrdinalIgnoreCase));
             }
             if (!string.IsNullOrWhiteSpace(searchTitle))
             {
-                theses = theses.Where(t => t.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase));
+                theses = theses.Where(t => t.Title != null && t.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase));
             }
 
             return _mapper.Map<IEnumerable<ThesisDTO>>(theses);

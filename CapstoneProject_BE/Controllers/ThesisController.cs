@@ -103,7 +103,6 @@ namespace CapstoneProject_BE.Controllers
         /// Returns filtered list of all theses. All query params are optional.
         /// </summary>
         [HttpGet]
-        [Authorize(Roles = "Admin,Reviewer")]
         public async Task<IActionResult> GetAllTheses([FromQuery] string? status, [FromQuery] int? userId, [FromQuery] string? searchTitle)
         {
             try
@@ -169,6 +168,41 @@ namespace CapstoneProject_BE.Controllers
             catch (KeyNotFoundException ex)
             {
                 return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// PUT /api/thesis/{id}/cancel
+        /// Cancel an existing thesis proposal.
+        /// Only the owner can cancel their own thesis.
+        /// </summary>
+        [HttpPut("{id}/cancel")]
+        public async Task<IActionResult> CancelThesis(string id)
+        {
+            try
+            {
+                var emailClaim = User.FindFirst(ClaimTypes.Email) ?? User.FindFirst("email");
+                if (emailClaim == null)
+                    return Unauthorized(new { Message = "Email claim not found in token." });
+
+                var updated = await _thesisService.CancelThesisAsync(id, emailClaim.Value);
+                return Ok(new { Message = "Thesis cancelled successfully.", Data = updated });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
             }
             catch (Exception ex)
             {

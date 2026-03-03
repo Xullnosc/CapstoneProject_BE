@@ -21,6 +21,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ICloudinaryHelper> _mockCloudinaryHelper;
         private readonly Mock<IArchivingService> _mockArchivingService;
         private readonly Mock<ITeamMemberRepository> _mockTeamMemberRepository;
+        private readonly Mock<IThesisRepository> _mockThesisRepository;
         private readonly TeamService _teamService;
 
         public TeamServiceTests()
@@ -31,6 +32,7 @@ namespace FCTMS.Tests.Services
             _mockCloudinaryHelper = new Mock<ICloudinaryHelper>();
             _mockArchivingService = new Mock<IArchivingService>();
             _mockTeamMemberRepository = new Mock<ITeamMemberRepository>();
+            _mockThesisRepository = new Mock<IThesisRepository>();
 
             _teamService = new TeamService(
                 _mockTeamRepository.Object,
@@ -38,7 +40,8 @@ namespace FCTMS.Tests.Services
                 _mockUserRepository.Object,
                 _mockCloudinaryHelper.Object,
                 _mockArchivingService.Object,
-                _mockTeamMemberRepository.Object
+                _mockTeamMemberRepository.Object,
+                _mockThesisRepository.Object
             );
         }
 
