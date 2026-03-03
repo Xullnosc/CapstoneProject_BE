@@ -55,7 +55,7 @@ namespace Services
                 if (existingUser != null && existingUser.UserId == currentUserId) continue;
 
                 // Ensure user has Student role
-                if (u.Role?.RoleName != CampusConstants.Roles.Student) continue;
+                if (w.Role?.RoleName != CampusConstants.Roles.Student && w.RoleId != 3) continue;
 
                 var dto = new UserInfoDTO
                 {
