@@ -20,7 +20,7 @@ namespace FCTMS.Tests.Services
         {
             _mockWhitelistRepository = new Mock<IWhitelistRepository>();
             _mockRedisService = new Mock<IRedisService>();
-            _mockRedisService.Setup(x => x.DeleteValueAsync(It.IsAny<string>())).Returns(Task.CompletedTask);
+            _mockRedisService.Setup(x => x.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
             _whitelistService = new WhitelistService(_mockWhitelistRepository.Object, _mockRedisService.Object);
         }
 
