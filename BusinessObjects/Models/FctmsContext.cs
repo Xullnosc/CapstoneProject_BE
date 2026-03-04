@@ -358,8 +358,8 @@ public partial class FctmsContext : DbContext
             entity.Property(e => e.FileUrl).HasMaxLength(500);
             entity.Property(e => e.ShortDescription).HasColumnType("text");
             entity.Property(e => e.Status)
-                .HasDefaultValueSql("'Reviewing'")
-                .HasColumnType("enum('Published','Updated','Need Update','Reviewing','Rejected','Registered')");
+                .HasDefaultValueSql("'On Mentor Inviting'")
+                .HasColumnType("enum('Published','Updated','Need Update','Reviewing','Rejected','Registered','Cancelled','On Mentor Inviting')");
             entity.Property(e => e.Title).HasMaxLength(255);
             entity.Property(e => e.UpDate)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")

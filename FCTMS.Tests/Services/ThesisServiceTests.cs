@@ -421,5 +421,65 @@ namespace FCTMS.Tests.Services
             // Assert
             await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Cannot cancel a thesis that is 'Published'.");
         }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldSetStatus_OnMentorInviting()
+        {
+            // Arrange
+            string email = "lecturer@fpt.edu.vn";
+            var user = new User { UserId = 10, Email = email, Role = new Role { RoleName = "Lecturer" } };
+            var currentSemester = new Semester { SemesterId = 1 };
+
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.FileName).Returns("thesis.docx");
+
+            var req = new ProposeThesisDTO { Title = "My Thesis", File = mockFile.Object };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(user.UserId)).ReturnsAsync(new List<Thesis>());
+            _mockCloudinaryHelper.Setup(x => x.UploadFileAsync(mockFile.Object)).ReturnsAsync("https://cloudinary.com/file.docx");
+            _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
+
+            Thesis? capturedThesis = null;
+            _mockThesisRepository
+                .Setup(x => x.CreateThesisAsync(It.IsAny<Thesis>()))
+                .Callback<Thesis>(t => capturedThesis = t)
+                .ReturnsAsync((Thesis t) => t);
+
+            // Act
+            var result = await _thesisService.ProposeThesisAsync(req, email);
+
+            // Assert
+            capturedThesis.Should().NotBeNull();
+            capturedThesis!.Status.Should().Be("On Mentor Inviting");
+        }
+
+        [Fact]
+        public async Task CancelThesisAsync_ShouldSucceed_WhenStatusIsOnMentorInviting()
+        {
+            // Arrange
+            string thesisId = "1";
+            string email = "owner@fpt.edu.vn";
+            int ownerId = 1;
+
+            var user = new User { UserId = ownerId, Email = email };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = ownerId, Status = "On Mentor Inviting" };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId)).ReturnsAsync(thesis);
+
+            var expectedDto = new ThesisDTO { ThesisId = thesisId, Status = "Cancelled" };
+            _mockMapper.Setup(m => m.Map<ThesisDTO>(It.IsAny<Thesis>())).Returns(expectedDto);
+
+            // Act
+            var result = await _thesisService.CancelThesisAsync(thesisId, email);
+
+            // Assert
+            thesis.Status.Should().Be("Cancelled");
+            thesis.UpdateDate.Should().NotBeNull();
+            _mockThesisRepository.Verify(x => x.UpdateThesisAsync(thesis), Times.Once);
+            result.Status.Should().Be("Cancelled");
+        }
     }
 }
+
