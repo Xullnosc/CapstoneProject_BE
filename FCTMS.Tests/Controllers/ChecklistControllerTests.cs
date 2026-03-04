@@ -35,7 +35,7 @@ namespace FCTMS.Tests.Controllers
         {
             var list = new List<ChecklistDTO>
             {
-                new ChecklistDTO { ChecklistId = 1, Title = "C1", Content = "Content 1", DisplayOrder = 0, IsCompleted = false }
+                new ChecklistDTO { ChecklistId = 1, Title = "C1", Content = "Content 1" }
             };
             _mockService.Setup(x => x.GetAllAsync()).ReturnsAsync(list);
 
@@ -59,7 +59,7 @@ namespace FCTMS.Tests.Controllers
         [Fact]
         public async Task GetById_ShouldReturnOk_WhenFound()
         {
-            var dto = new ChecklistDTO { ChecklistId = 1, Title = "T", Content = "C", DisplayOrder = 0, IsCompleted = true };
+            var dto = new ChecklistDTO { ChecklistId = 1, Title = "T", Content = "C" };
             _mockService.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(dto);
 
             var result = await _controller.GetById(1);
@@ -71,7 +71,7 @@ namespace FCTMS.Tests.Controllers
         [Fact]
         public async Task Update_ShouldReturnNoContent_WhenSuccess()
         {
-            var dto = new ChecklistUpdateDTO { Title = "T", Content = "C", DisplayOrder = 0, IsCompleted = false };
+            var dto = new ChecklistUpdateDTO { Title = "T", Content = "C" };
             _mockService.Setup(x => x.UpdateAsync(1, dto)).Returns(Task.CompletedTask);
 
             var result = await _controller.Update(1, dto);
@@ -83,7 +83,7 @@ namespace FCTMS.Tests.Controllers
         [Fact]
         public async Task Update_ShouldReturnNotFound_WhenKeyNotFoundException()
         {
-            var dto = new ChecklistUpdateDTO { Title = "T", Content = "C", DisplayOrder = 0, IsCompleted = false };
+            var dto = new ChecklistUpdateDTO { Title = "T", Content = "C" };
             _mockService.Setup(x => x.UpdateAsync(999, dto)).ThrowsAsync(new KeyNotFoundException("Checklist with id 999 not found."));
 
             var result = await _controller.Update(999, dto);

@@ -160,7 +160,18 @@ builder
 
 builder.Services.AddAuthorization(options =>
 {
+    // Reviewer policy: any user with IsReviewer=true (typically lecturers assigned as reviewer)
     options.AddPolicy("Reviewer", policy => policy.RequireClaim("IsReviewer", "true"));
+
+    // ReviewerOrHOD: allow either HOD role OR reviewer claim
+    options.AddPolicy(
+        "ReviewerOrHOD",
+        policy =>
+            policy.RequireAssertion(context =>
+                context.User.IsInRole(BusinessObjects.CampusConstants.Roles.HOD)
+                || context.User.HasClaim("IsReviewer", "true")
+            )
+    );
 });
 
 var app = builder.Build();
