@@ -22,6 +22,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ITeamRepository> _mockTeamRepository;
         private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<ICloudinaryHelper> _mockCloudinaryHelper;
+        private readonly Mock<ISemesterRepository> _mockSemesterRepository;
         private readonly Mock<IMapper> _mockMapper;
         private readonly ThesisService _thesisService;
 
@@ -31,7 +32,7 @@ namespace FCTMS.Tests.Services
             _mockTeamRepository = new Mock<ITeamRepository>();
             _mockUserRepository = new Mock<IUserRepository>();
             _mockCloudinaryHelper = new Mock<ICloudinaryHelper>();
-
+            _mockSemesterRepository = new Mock<ISemesterRepository>();
             _mockMapper = new Mock<IMapper>();
 
             _thesisService = new ThesisService(
@@ -39,6 +40,7 @@ namespace FCTMS.Tests.Services
                 _mockTeamRepository.Object,
                 _mockUserRepository.Object,
                 _mockCloudinaryHelper.Object,
+                _mockSemesterRepository.Object,
                 _mockMapper.Object
             );
         }
@@ -56,9 +58,11 @@ namespace FCTMS.Tests.Services
                 new Thesis { ThesisId = "2", Title = "Thesis 2", UserId = userId }
             };
 
+            var currentSemester = new Semester { SemesterId = 1 };
             _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
             _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync((Team?)null);
-            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(userId)).ReturnsAsync(theses);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.IsAny<IEnumerable<int>>(), currentSemester.SemesterId)).ReturnsAsync(theses);
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
             { 
                 new ThesisDTO { Title = "Thesis 1" }, 
@@ -294,11 +298,13 @@ namespace FCTMS.Tests.Services
                 new Thesis { ThesisId = "T2", Title = "Member Thesis", UserId = studentId }
             };
 
+            var currentSemester = new Semester { SemesterId = 1 };
             _mockUserRepository.Setup(x => x.GetByEmailAsync(studentEmail)).ReturnsAsync(user);
+            _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
             _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(studentId)).ReturnsAsync(team);
             
-            // Should call GetThesesByUserIdsAsync with [2, 1]
-            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.Is<IEnumerable<int>>(ids => ids.Contains(studentId) && ids.Contains(leaderId))))
+            // Should call GetThesesByUserIdsAsync with [2, 1] and semesterId 1
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.Is<IEnumerable<int>>(ids => ids.Contains(studentId) && ids.Contains(leaderId)), currentSemester.SemesterId))
                 .ReturnsAsync(theses);
 
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(It.IsAny<IEnumerable<Thesis>>())).Returns(new List<ThesisDTO> 
@@ -315,7 +321,7 @@ namespace FCTMS.Tests.Services
             result.Should().Contain(t => t.Title == "Leader Thesis");
             result.Should().Contain(t => t.Title == "Member Thesis");
             
-            _mockThesisRepository.Verify(x => x.GetThesesByUserIdsAsync(It.IsAny<IEnumerable<int>>()), Times.Once);
+            _mockThesisRepository.Verify(x => x.GetThesesByUserIdsAsync(It.IsAny<IEnumerable<int>>(), It.IsAny<int?>()), Times.Once);
             _mockThesisRepository.Verify(x => x.GetThesesByUserIdAsync(It.IsAny<int>()), Times.Never);
         }
 

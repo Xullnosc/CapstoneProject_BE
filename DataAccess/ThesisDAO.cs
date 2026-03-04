@@ -134,22 +134,34 @@ namespace DataAccess
             await _context.SaveChangesAsync();
         }
 
-        public async Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds)
+        public async Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds, int? semesterId = null)
         {
-            return await _context.Theses
+            var query = _context.Theses
                 .AsNoTracking()
                 .Include(t => t.User)
-                .Where(t => userIds.Contains(t.UserId))
-                .OrderByDescending(t => t.UpdateDate)
-                .ToListAsync();
+                .Where(t => userIds.Contains(t.UserId));
+
+            if (semesterId.HasValue)
+            {
+                query = query.Where(t => t.SemesterId == semesterId.Value);
+            }
+
+            return await query.OrderByDescending(t => t.UpdateDate).ToListAsync();
         }
 
-        public async Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId)
+        public async Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId, int? semesterId = null)
         {
-            return await _context.Theses
+            var query = _context.Theses
                 .AsNoTracking()
-                .FirstOrDefaultAsync(t => t.UserId == leaderId && 
-                                         (t.Status == "Approved" || t.Status == "Published"));
+                .Where(t => t.UserId == leaderId && 
+                           (t.Status == "Approved" || t.Status == "Published"));
+
+            if (semesterId.HasValue)
+            {
+                query = query.Where(t => t.SemesterId == semesterId.Value);
+            }
+
+            return await query.FirstOrDefaultAsync();
         }
     }
 }

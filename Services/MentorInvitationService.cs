@@ -98,17 +98,18 @@ namespace Services
             if (team.LeaderId != leaderId) throw new UnauthorizedAccessException("Only team leader can send mentor invitations.");
             if (team.MentorId != null) throw new Exception("Team already has a mentor.");
 
-            // Check if thesis is Approved or Published
-            var thesis = await _thesisRepo.GetApprovedThesisByLeaderIdAsync(leaderId);
+            // Check if current semester exists
+            var currentSemester = await _semesterRepo.GetCurrentSemesterAsync();
+            if (currentSemester == null) throw new Exception("Current semester not found.");
+
+            // Check if thesis is Approved or Published for the current semester
+            var thesis = await _thesisRepo.GetApprovedThesisByLeaderIdAsync(leaderId, currentSemester.SemesterId);
             if (thesis == null)
             {
                 throw new Exception("Your team must have an 'Approved' or 'Published' thesis before inviting a mentor.");
             }
 
             // Check if mentor is in Whitelist for the current semester
-            var currentSemester = await _semesterRepo.GetCurrentSemesterAsync();
-            if (currentSemester == null) throw new Exception("Current semester not found.");
-
             var whitelistEntry = await _whitelistRepo.GetByEmailAsync(mentorEmail);
             if (whitelistEntry == null || whitelistEntry.SemesterId != currentSemester.SemesterId)
             {
