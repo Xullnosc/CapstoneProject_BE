@@ -37,11 +37,39 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<Checklist> Checklists { get; set; }
 
+    public virtual DbSet<ThesisForm> ThesisForms { get; set; }
+
+    public virtual DbSet<ThesisFormHistory> ThesisFormHistories { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
             .UseCollation("utf8mb4_0900_ai_ci")
             .HasCharSet("utf8mb4");
+
+        modelBuilder.Entity<ThesisForm>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("thesis_forms");
+            
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<ThesisFormHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("thesis_form_histories");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+        });
 
         modelBuilder.Entity<ArchivedTeam>(entity =>
         {
