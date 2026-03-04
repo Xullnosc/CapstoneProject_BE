@@ -44,9 +44,11 @@ namespace Services
             if (user == null)
                 throw new Exception("User not found");
 
-            // Prevent multiple theses per leader, except for Lecturers
+            // Prevent multiple theses per leader, except for Lecturers.
+            // Allow re-proposing if all previous theses are Cancelled or Rejected.
             var existingTheses = await _thesisRepository.GetThesesByUserIdAsync(user.UserId);
-            if (existingTheses.Any() && user.Role?.RoleName != CampusConstants.Roles.Lecturer)
+            var hasActiveThesis = existingTheses.Any(t => t.Status != "Cancelled" && t.Status != "Rejected");
+            if (hasActiveThesis && user.Role?.RoleName != CampusConstants.Roles.Lecturer)
             {
                 throw new InvalidOperationException("You have already proposed a thesis. You cannot propose more than one.");
             }
@@ -66,7 +68,7 @@ namespace Services
                 ShortDescription = req.ShortDescription,
                 UserId = user.UserId,
                 FileUrl = fileUrl,
-                Status = "Reviewing",
+                Status = "On Mentor Inviting",
                 SemesterId = currentSemester?.SemesterId,
                 UpDate = DateTime.UtcNow,
                 UpdateDate = DateTime.UtcNow
@@ -185,7 +187,7 @@ namespace Services
                 throw new UnauthorizedAccessException("You are not authorized to cancel this thesis.");
 
             // Only cancel if not already matched or published (can refine logic here if needed, usually just allow if it's 'Reviewing' or 'Registered')
-            if (thesis.Status != "Reviewing" && thesis.Status != "Registered")
+            if (thesis.Status != "Reviewing" && thesis.Status != "Registered" && thesis.Status != "On Mentor Inviting")
                 throw new InvalidOperationException($"Cannot cancel a thesis that is '{thesis.Status}'.");
 
             thesis.Status = "Cancelled";
