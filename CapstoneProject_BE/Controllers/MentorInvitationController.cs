@@ -58,17 +58,12 @@ namespace CapstoneProject_BE.Controllers
 
         [HttpGet("search-mentors")]
         [Authorize(Roles = "Student")]
-        public async Task<IActionResult> SearchMentors([FromQuery] string term, [FromQuery] int? teamId = null)
+        public async Task<IActionResult> SearchMentors([FromQuery] string? term, [FromQuery] int? teamId = null)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(term))
-                {
-                    return BadRequest(new { message = "Search term cannot be empty" });
-                }
-
                 int currentUserId = GetCurrentUserId();
-                var lecturers = await _userService.SearchLecturersAsync(term, currentUserId, teamId);
+                var lecturers = await _userService.SearchLecturersAsync(term ?? string.Empty, currentUserId, teamId);
                 return Ok(lecturers);
             }
             catch (Exception ex)

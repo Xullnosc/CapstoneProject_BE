@@ -14,19 +14,22 @@ namespace Services
         private readonly ITeamMemberRepository _teamMemberRepository;
         private readonly ITeamInvitationRepository _teamInvitationRepository;
         private readonly IWhitelistRepository _whitelistRepository;
+        private readonly ITeamRepository _teamRepository;
 
         public UserService(
             IUserRepository userRepository, 
             ISemesterRepository semesterRepository, 
             ITeamMemberRepository teamMemberRepository,
             ITeamInvitationRepository teamInvitationRepository,
-            IWhitelistRepository whitelistRepository)
+            IWhitelistRepository whitelistRepository,
+            ITeamRepository teamRepository)
         {
             _userRepository = userRepository;
             _semesterRepository = semesterRepository;
             _teamMemberRepository = teamMemberRepository;
             _teamInvitationRepository = teamInvitationRepository;
             _whitelistRepository = whitelistRepository;
+            _teamRepository = teamRepository;
         }
 
         public async Task<List<UserInfoDTO>> SearchStudentsAsync(string term, int currentUserId, int? teamId = null)
@@ -88,23 +91,31 @@ namespace Services
 
         public async Task<List<UserInfoDTO>> SearchLecturersAsync(string term, int currentUserId, int? teamId = null)
         {
-            if (string.IsNullOrWhiteSpace(term))
-            {
-                return new List<UserInfoDTO>();
-            }
-
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
             if (currentSemester == null) return new List<UserInfoDTO>();
 
             // Search from Whitelist instead of User table
             var whitelistedLecturers = await _whitelistRepository.GetBySemesterIdAsync(currentSemester.SemesterId);
+            if (whitelistedLecturers == null) return new List<UserInfoDTO>();
             
-            // Filter by search term and role
-            var filtered = whitelistedLecturers.Where(w => 
-                (w.FullName.Contains(term, StringComparison.OrdinalIgnoreCase) || 
-                 w.Email.Contains(term, StringComparison.OrdinalIgnoreCase)) &&
-                (w.Role?.RoleName == CampusConstants.Roles.Lecturer || w.RoleId == 2) // Assuming 2 is Lecturer if Role object is not loaded
-            ).ToList();
+            List<BusinessObjects.Models.Whitelist> filtered;
+
+            if (string.IsNullOrWhiteSpace(term))
+            {
+                // Return top 20 mentors if no term is provided
+                filtered = whitelistedLecturers.Where(w => 
+                    (w.Role?.RoleName == CampusConstants.Roles.Lecturer || w.RoleId == 2)
+                ).Take(20).ToList();
+            }
+            else
+            {
+                // Filter by search term and role
+                filtered = whitelistedLecturers.Where(w => 
+                    (w.FullName.Contains(term, StringComparison.OrdinalIgnoreCase) || 
+                     w.Email.Contains(term, StringComparison.OrdinalIgnoreCase)) &&
+                    (w.Role?.RoleName == CampusConstants.Roles.Lecturer || w.RoleId == 2)
+                ).ToList();
+            }
 
             var result = new List<UserInfoDTO>();
 
@@ -114,6 +125,16 @@ namespace Services
                 var user = await _userRepository.GetByEmailAsync(w.Email);
                 
                 if (user != null && user.UserId == currentUserId) continue;
+
+                // Exclude already assigned mentors
+                if (teamId.HasValue && user != null)
+                {
+                    var team = await _teamRepository.GetByIdAsync(teamId.Value);
+                    if (team != null && (team.MentorId == user.UserId || team.MentorId2 == user.UserId))
+                    {
+                        continue;
+                    }
+                }
 
                 var dto = new UserInfoDTO
                 {

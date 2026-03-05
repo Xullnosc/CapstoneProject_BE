@@ -66,6 +66,8 @@ namespace Services
                     SemesterId = t.SemesterId,
                     LeaderId = t.LeaderId,
                     Status = t.Status,
+                    MentorId = t.MentorId,
+                    MentorId2 = t.MentorId2,
                     ArchivedAt = DateTime.UtcNow,
                     // Simple serialization for snapshot
                     JsonData = System.Text.Json.JsonSerializer.Serialize(new
@@ -90,6 +92,8 @@ namespace Services
                 SemesterId = team.SemesterId,
                 LeaderId = team.LeaderId,
                 Status = "Disbanded",
+                MentorId = team.MentorId,
+                MentorId2 = team.MentorId2,
                 ArchivedAt = DateTime.UtcNow,
                 JsonData = System.Text.Json.JsonSerializer.Serialize(new
                 {

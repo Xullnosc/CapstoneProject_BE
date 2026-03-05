@@ -96,18 +96,18 @@ namespace Services
             var team = await _teamRepo.GetByIdAsync(teamId);
             if (team == null) throw new Exception("Team not found.");
             if (team.LeaderId != leaderId) throw new UnauthorizedAccessException("Only team leader can send mentor invitations.");
-            if (team.MentorId != null) throw new Exception("Team already has a mentor.");
+            if (team.MentorId != null && team.MentorId2 != null) throw new Exception("Team already has the maximum of 2 mentors.");
 
             // Check if current semester exists
             var currentSemester = await _semesterRepo.GetCurrentSemesterAsync();
             if (currentSemester == null) throw new Exception("Current semester not found.");
 
             // Check if thesis is Approved or Published for the current semester
-            var thesis = await _thesisRepo.GetApprovedThesisByLeaderIdAsync(leaderId, currentSemester.SemesterId);
-            if (thesis == null)
-            {
-                throw new Exception("Your team must have an 'Approved' or 'Published' thesis before inviting a mentor.");
-            }
+            // var thesis = await _thesisRepo.GetApprovedThesisByLeaderIdAsync(leaderId, currentSemester.SemesterId);
+            // if (thesis == null)
+            // {
+            //     throw new Exception("Your team must have an 'Approved' or 'Published' thesis before inviting a mentor.");
+            // }
 
             // Check if mentor is in Whitelist for the current semester
             var whitelistEntry = await _whitelistRepo.GetByEmailAsync(mentorEmail);
@@ -139,6 +139,11 @@ namespace Services
             }
             
             if (mentor.UserId == leaderId) throw new Exception("You cannot invite yourself.");
+            
+            if (team.MentorId == mentor.UserId || team.MentorId2 == mentor.UserId)
+            {
+                throw new Exception("This user is already a mentor of your team.");
+            }
 
             var existingInvite = await _invitationRepo.GetByTeamAndMentorAsync(teamId, mentor.UserId);
             if (existingInvite != null && existingInvite.Status == CampusConstants.InvitationStatus.Pending)
@@ -178,7 +183,7 @@ namespace Services
                     }
                 }
 
-                string link = $"{frontendUrl}/teams/team";
+                string link = $"{frontendUrl}/mentor-invitations";
                 string subject = $"[FCTMS] Mentor Invitation for Team {teamName}";
 
                 string htmlContent = EmailTemplateConstants.MentorInvitationTemplate
@@ -215,9 +220,15 @@ namespace Services
 
             var team = await _teamRepo.GetByIdAsync(invitation.TeamId);
             if (team == null) throw new Exception("Team not found.");
-            if (team.MentorId != null)
+            
+            if (team.MentorId != null && team.MentorId2 != null)
             {
-                throw new Exception("This team already has a mentor.");
+                throw new Exception("This team already has the maximum of 2 mentors.");
+            }
+
+            if (team.MentorId == mentorId || team.MentorId2 == mentorId)
+            {
+                throw new Exception("You are already a mentor of this team.");
             }
 
             int activeTeamCount = await _invitationRepo.GetMentorActiveTeamCountAsync(mentorId, team.SemesterId);
@@ -226,7 +237,14 @@ namespace Services
                 throw new Exception("You have reached the maximum limit of 4 teams for this semester.");
             }
 
-            team.MentorId = mentorId;
+            if (team.MentorId == null)
+            {
+                team.MentorId = mentorId;
+            }
+            else
+            {
+                team.MentorId2 = mentorId;
+            }
             await _teamRepo.UpdateAsync(team);
             await _invitationRepo.UpdateStatusAsync(invitationId, CampusConstants.InvitationStatus.Accepted);
 

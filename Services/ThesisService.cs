@@ -217,7 +217,7 @@ namespace Services
                 {
                     var allTeams = await _teamRepository.GetBySemesterAsync(currentSemester.SemesterId);
                     var mentoredLeaderIds = allTeams
-                        .Where(t => t.MentorId == user.UserId && t.Status != CampusConstants.TeamStatus.Disbanded)
+                        .Where(t => (t.MentorId == user.UserId || t.MentorId2 == user.UserId) && t.Status != CampusConstants.TeamStatus.Disbanded)
                         .Select(t => t.LeaderId)
                         .ToList();
 
