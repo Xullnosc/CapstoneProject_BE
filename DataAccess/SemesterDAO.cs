@@ -97,7 +97,11 @@ namespace DataAccess
         public async Task<int> GetStudentRoleIdAsync()
         {
             var role = await _context.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.RoleName == "Student");
-            return role?.RoleId ?? 3; // Fallback to 3 if "Student" role not found (based on migration V2)
+            if (role == null)
+            {
+                throw new InvalidOperationException("Student role not found in the system. Database may be in an inconsistent state.");
+            }
+            return role.RoleId;
         }
 
         public async Task<List<Role>> GetAllRolesAsync()

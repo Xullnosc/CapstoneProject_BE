@@ -4,6 +4,7 @@ using BusinessObjects;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BusinessObjects.Models;
 
 namespace Services
 {
@@ -14,19 +15,22 @@ namespace Services
         private readonly ITeamMemberRepository _teamMemberRepository;
         private readonly ITeamInvitationRepository _teamInvitationRepository;
         private readonly IWhitelistRepository _whitelistRepository;
+        private readonly ITeamRepository _teamRepository;
 
         public UserService(
             IUserRepository userRepository, 
             ISemesterRepository semesterRepository, 
             ITeamMemberRepository teamMemberRepository,
             ITeamInvitationRepository teamInvitationRepository,
-            IWhitelistRepository whitelistRepository)
+            IWhitelistRepository whitelistRepository,
+            ITeamRepository teamRepository)
         {
             _userRepository = userRepository;
             _semesterRepository = semesterRepository;
             _teamMemberRepository = teamMemberRepository;
             _teamInvitationRepository = teamInvitationRepository;
             _whitelistRepository = whitelistRepository;
+            _teamRepository = teamRepository;
         }
 
         public async Task<List<UserInfoDTO>> SearchStudentsAsync(string term, int currentUserId, int? teamId = null)
@@ -88,32 +92,60 @@ namespace Services
 
         public async Task<List<UserInfoDTO>> SearchLecturersAsync(string term, int currentUserId, int? teamId = null)
         {
-            if (string.IsNullOrWhiteSpace(term))
-            {
-                return new List<UserInfoDTO>();
-            }
-
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
             if (currentSemester == null) return new List<UserInfoDTO>();
 
             // Search from Whitelist instead of User table
             var whitelistedLecturers = await _whitelistRepository.GetBySemesterIdAsync(currentSemester.SemesterId);
+            if (whitelistedLecturers == null) return new List<UserInfoDTO>();
             
-            // Filter by search term and role
-            var filtered = whitelistedLecturers.Where(w => 
-                (w.FullName.Contains(term, StringComparison.OrdinalIgnoreCase) || 
-                 w.Email.Contains(term, StringComparison.OrdinalIgnoreCase)) &&
-                (w.Role?.RoleName == CampusConstants.Roles.Lecturer || w.RoleId == 2) // Assuming 2 is Lecturer if Role object is not loaded
-            ).ToList();
+            List<BusinessObjects.Models.Whitelist> filtered;
+
+            if (string.IsNullOrWhiteSpace(term))
+            {
+                // Return top 20 mentors if no term is provided
+                filtered = whitelistedLecturers.Where(w => 
+                    (w.Role?.RoleName == CampusConstants.Roles.Lecturer || w.RoleId == 2)
+                ).Take(20).ToList();
+            }
+            else
+            {
+                // Filter by search term and role
+                filtered = whitelistedLecturers.Where(w => 
+                    (w.FullName.Contains(term, StringComparison.OrdinalIgnoreCase) || 
+                     w.Email.Contains(term, StringComparison.OrdinalIgnoreCase)) &&
+                    (w.Role?.RoleName == CampusConstants.Roles.Lecturer || w.RoleId == 2)
+                ).ToList();
+            }
 
             var result = new List<UserInfoDTO>();
 
+            Team? team = null;
+            if (teamId.HasValue)
+            {
+                team = await _teamRepository.GetByIdAsync(teamId.Value);
+            }
+
+            // Batch fetch all User records for the whitelisted emails to avoid N+1 queries
+            var emails = filtered.Select(w => w.Email).Distinct().ToList();
+            var users = await _userRepository.GetUsersByEmailsAsync(emails);
+            var userMap = users.ToDictionary(u => u.Email, u => u, StringComparer.OrdinalIgnoreCase);
+
             foreach (var w in filtered)
             {
-                // Get User object to get UserId (Mapping Email to User)
-                var user = await _userRepository.GetByEmailAsync(w.Email);
+                // Get User object from map instead of per-loop DB call
+                userMap.TryGetValue(w.Email, out var user);
                 
                 if (user != null && user.UserId == currentUserId) continue;
+
+                // Exclude already assigned mentors
+                if (team != null && user != null)
+                {
+                    if (team.MentorId == user.UserId || team.MentorId2 == user.UserId)
+                    {
+                        continue;
+                    }
+                }
 
                 var dto = new UserInfoDTO
                 {
