@@ -48,6 +48,11 @@ namespace FCTMS.Tests.Services
             _mockRedisService.Setup(r => r.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
 
+            // Mock roles and whitelists to prevent null references when merging global lecturers
+            var roles = new List<Role> { new Role { RoleId = 1, RoleName = "Lecturer" } };
+            _mockSemesterRepository.Setup(r => r.GetAllRolesAsync()).ReturnsAsync(roles);
+            _mockWhitelistRepository.Setup(w => w.GetByRoleAsync(1)).ReturnsAsync(new List<Whitelist>());
+
             // Default configuration TTL
             _mockConfiguration.SetupGet(c => c["RedisSettings:SemesterTTLMinutes"]).Returns("30");
 
