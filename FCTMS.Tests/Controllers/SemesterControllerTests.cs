@@ -10,12 +10,14 @@ namespace FCTMS.Tests.Controllers
     public class SemesterControllerTests
     {
         private readonly Mock<ISemesterService> _mockSemesterService;
+        private readonly Mock<IImportService> _mockImportService;
         private readonly SemesterController _controller;
 
         public SemesterControllerTests()
         {
             _mockSemesterService = new Mock<ISemesterService>();
-            _controller = new SemesterController(_mockSemesterService.Object);
+            _mockImportService = new Mock<IImportService>();
+            _controller = new SemesterController(_mockSemesterService.Object, _mockImportService.Object);
 
              // Mock User (ClaimsPrincipal) - Role HOD
             var user = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]

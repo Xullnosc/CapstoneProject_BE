@@ -1,8 +1,12 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using BusinessObjects;
 using BusinessObjects.DTOs;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Services;
 
@@ -144,7 +148,7 @@ namespace CapstoneProject_BE.Controllers
 
         [HttpPost("{id}/whitelist/import")]
         [Authorize(Roles = CampusConstants.Roles.HOD)]
-        public async Task<IActionResult> ImportWhitelist(int id, [FromForm] IFormFile file)
+        public async Task<IActionResult> ImportWhitelist(int id, [FromForm] IFormFile file, [FromForm] string? commit = "false")
         {
             if (file == null || file.Length == 0)
             {
@@ -169,8 +173,23 @@ namespace CapstoneProject_BE.Controllers
             try
             {
                 using var stream = file.OpenReadStream();
-                var importedWhiteLists = await _importService.ImportWhitelistFromExcel(stream);
-                return Ok(importedWhiteLists);
+                var importResult = await _importService.ImportWhitelistFromExcel(stream);
+
+                var commitFlag = false;
+                if (!string.IsNullOrWhiteSpace(commit))
+                {
+                    bool.TryParse(commit, out commitFlag);
+                }
+
+                if (commitFlag)
+                {
+                    // Persist parsed items (implementation in ImportService)
+                    var uploadedBy = User?.Identity?.Name;
+                    await _importService.SaveWhitelistBatchAsync(importResult, file.FileName, uploadedBy);
+                }
+
+                // Return both parsed items and any validation errors so caller can decide next steps
+                return Ok(importResult);
             }
             catch (KeyNotFoundException ex)
             {

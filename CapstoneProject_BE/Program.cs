@@ -15,7 +15,8 @@ using StackExchange.Redis;
 var builder = WebApplication.CreateBuilder(args);
 
 // EPPlus license context (set globally once during startup)
-ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+// EPPlus 8+: set license via the static `License` property
+ExcelPackage.License.SetNonCommercialOrganization("Capstone Project");
 
 //Redis Configuration
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>

@@ -10,6 +10,14 @@ namespace Services.Helpers
 {
     public class ImportHelper : IImportHelper
     {
+        private static readonly Dictionary<int, string> RoleNameMapping = new()
+        {
+            { 1, "HOD" },
+            { 2, "Lecturer" },
+            { 3, "Student" },
+            { 4, "Admin" }
+        };
+
         public ImportResult<WhitelistImportDTO> ImportWhitelistFromExcel(Stream excelStream)
         {
             if (excelStream == null || excelStream.Length == 0)
@@ -118,6 +126,7 @@ namespace Services.Helpers
                             .Cells[row, headerMap[CampusConstants.WhitelistImportColumns.FullName]]
                             .Text.Trim(),
                         RoleId = roleIdParsed,
+                        Role = RoleNameMapping.TryGetValue(roleIdParsed, out var rName) ? rName : "Unknown",
                         Campus = worksheet
                             .Cells[row, headerMap[CampusConstants.WhitelistImportColumns.Campus]]
                             .Text.Trim(),

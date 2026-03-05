@@ -1,9 +1,11 @@
 using BusinessObjects.DTOs;
+using Services.Helpers;
 
 namespace Services
 {
     public interface IImportService
     {
-        Task<List<WhitelistImportDTO>> ImportWhitelistFromExcel(Stream excelStream);
+        Task<ImportResult<WhitelistImportDTO>> ImportWhitelistFromExcel(Stream excelStream);
+        Task SaveWhitelistBatchAsync(ImportResult<WhitelistImportDTO> importResult, string fileUrl, string? uploadedBy = null);
     }
 }
