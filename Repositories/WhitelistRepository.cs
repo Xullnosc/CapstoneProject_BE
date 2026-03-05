@@ -17,6 +17,11 @@ namespace Repositories
             return await _whitelistDAO.GetByEmailAsync(email);
         }
 
+        public async Task AddRangeAsync(IEnumerable<Whitelist> whitelists)
+        {
+            await _whitelistDAO.AddRangeAsync(whitelists);
+        }
+
         public async Task<IEnumerable<Whitelist>> GetByRoleAsync(int roleId)
         {
             return await _whitelistDAO.GetByRoleAsync(roleId);
@@ -30,6 +35,12 @@ namespace Repositories
         {
             await _whitelistDAO.DeleteRangeAsync(whitelists);
         }
+
+        public async Task ReplaceStudentsBySemesterAsync(int semesterId, int studentRoleId, IEnumerable<Whitelist> newStudents)
+        {
+            await _whitelistDAO.ReplaceStudentsBySemesterAsync(semesterId, studentRoleId, newStudents);
+        }
+
         public async Task<Whitelist?> GetByIdAsync(int id)
         {
             return await _whitelistDAO.GetByIdAsync(id);

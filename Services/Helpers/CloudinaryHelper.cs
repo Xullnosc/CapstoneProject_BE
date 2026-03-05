@@ -1,9 +1,9 @@
+using System;
+using System.Threading.Tasks;
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Threading.Tasks;
 
 namespace Services.Helpers
 {
@@ -17,7 +17,11 @@ namespace Services.Helpers
             var apiKey = configuration["Cloudinary:ApiKey"];
             var apiSecret = configuration["Cloudinary:ApiSecret"];
 
-            if (string.IsNullOrEmpty(cloudName) || string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(apiSecret))
+            if (
+                string.IsNullOrEmpty(cloudName)
+                || string.IsNullOrEmpty(apiKey)
+                || string.IsNullOrEmpty(apiSecret)
+            )
             {
                 throw new Exception("Cloudinary settings are missing in Configuration");
             }
@@ -36,7 +40,7 @@ namespace Services.Helpers
             var uploadParams = new ImageUploadParams
             {
                 File = new FileDescription(file.FileName, stream),
-                Transformation = new Transformation().Height(500).Width(500).Crop("fill")
+                Transformation = new Transformation().Height(500).Width(500).Crop("fill"),
             };
 
             var uploadResult = await _cloudinary.UploadAsync(uploadParams);

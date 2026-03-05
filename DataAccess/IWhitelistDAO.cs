@@ -11,6 +11,8 @@ namespace DataAccess
         Task<List<Whitelist>> GetByRoleAsync(int roleId);
         Task<PagedResult<Whitelist>> GetByRoleAsync(int roleId, int pageIndex, int pageSize);
         Task DeleteRangeAsync(IEnumerable<Whitelist> whitelists);
+        Task AddRangeAsync(IEnumerable<Whitelist> whitelists);
+        Task ReplaceStudentsBySemesterAsync(int semesterId, int studentRoleId, IEnumerable<Whitelist> newStudents);
         Task<Whitelist?> GetByIdAsync(int id);
         Task UpdateAsync(Whitelist whitelist);
         Task<List<Whitelist>> SearchAsync(string term, int semesterId);
