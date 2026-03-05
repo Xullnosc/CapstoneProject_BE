@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using BusinessObjects;
 
 namespace Services.Mappings
 {
@@ -25,7 +26,12 @@ namespace Services.Mappings
             CreateMap<Whitelist, WhitelistDTO>()
                 .ForMember(dest => dest.RoleId, opt => opt.MapFrom(src => src.RoleId))
                 .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.Role != null ? src.Role.RoleName : null))
-                .ForMember(dest => dest.IsReviewer, opt => opt.MapFrom(src => src.IsReviewer));
+                .ForMember(dest => dest.IsReviewer, opt => opt.MapFrom(src => src.IsReviewer))
+                .ForMember(dest => dest.Avatar, opt => opt.MapFrom(src => src.Avatar))
+                .ForMember(dest => dest.Campus, opt => opt.MapFrom(src => CampusConstants.MapCodeToFullName(src.Campus)))
+                .ForMember(dest => dest.StudentCode, opt => opt.MapFrom(src => src.StudentCode))
+                .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
+                .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.FullName));
 
             // Team -> TeamSimpleDTO (Minimal info for lists)
             CreateMap<Team, TeamSimpleDTO>()
@@ -60,11 +66,13 @@ namespace Services.Mappings
 
             // ArchivedWhitelist -> WhitelistDTO
             CreateMap<ArchivedWhitelist, WhitelistDTO>()
-                .ForMember(
-                    dest => dest.WhitelistId,
-                    opt => opt.MapFrom(src => src.OriginalWhitelistId)
-                )
-                .ForMember(dest => dest.RoleId, opt => opt.MapFrom(src => src.RoleId));
+                .ForMember(dest => dest.WhitelistId, opt => opt.MapFrom(src => src.OriginalWhitelistId))
+                .ForMember(dest => dest.RoleId, opt => opt.MapFrom(src => src.RoleId))
+                .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
+                .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.FullName))
+                .ForMember(dest => dest.Avatar, opt => opt.MapFrom(src => src.Avatar))
+                .ForMember(dest => dest.Campus, opt => opt.MapFrom(src => CampusConstants.MapCodeToFullName(src.Campus)))
+                .ForMember(dest => dest.StudentCode, opt => opt.MapFrom(src => src.StudentCode));
 
             // Semester -> SemesterDTO
             CreateMap<Semester, SemesterDTO>()

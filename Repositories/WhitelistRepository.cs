@@ -51,6 +51,16 @@ namespace Repositories
             await _whitelistDAO.UpdateAsync(whitelist);
         }
 
+        public async Task AddAsync(Whitelist whitelist)
+        {
+            await _whitelistDAO.AddAsync(whitelist);
+        }
+
+        public async Task DeleteAsync(Whitelist whitelist)
+        {
+            await _whitelistDAO.DeleteAsync(whitelist);
+        }
+
         public async Task<List<Whitelist>> SearchAsync(string term, int semesterId)
         {
             return await _whitelistDAO.SearchAsync(term, semesterId);

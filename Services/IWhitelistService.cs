@@ -8,6 +8,8 @@ namespace Services
     {
         Task<IEnumerable<Whitelist>> GetWhitelistByRoleAsync(int roleId);
         Task UpdateReviewerStatusAsync(int whitelistId, bool isReviewer);
-    
+        Task<Whitelist> AddStudentToWhitelistAsync(Whitelist whitelist);
+        Task UpdateWhitelistAsync(Whitelist whitelist);
+        Task DeleteWhitelistAsync(int id);
     }
 }

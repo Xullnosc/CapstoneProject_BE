@@ -130,6 +130,18 @@ namespace DataAccess
             await _context.SaveChangesAsync();
         }
 
+        public async Task AddAsync(Whitelist whitelist)
+        {
+            await _context.Whitelists.AddAsync(whitelist);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(Whitelist whitelist)
+        {
+            _context.Whitelists.Remove(whitelist);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<List<Whitelist>> SearchAsync(string term, int semesterId)
         {
             return await _context.Whitelists

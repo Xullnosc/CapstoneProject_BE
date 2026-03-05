@@ -15,6 +15,8 @@ namespace DataAccess
         Task ReplaceStudentsBySemesterAsync(int semesterId, int studentRoleId, IEnumerable<Whitelist> newStudents);
         Task<Whitelist?> GetByIdAsync(int id);
         Task UpdateAsync(Whitelist whitelist);
+        Task AddAsync(Whitelist whitelist);
+        Task DeleteAsync(Whitelist whitelist);
         Task<List<Whitelist>> SearchAsync(string term, int semesterId);
     }
 }

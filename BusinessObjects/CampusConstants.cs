@@ -23,6 +23,21 @@ namespace BusinessObjects
             QuyNhon,
         };
 
+        public static string? MapCodeToFullName(string? code)
+        {
+            if (string.IsNullOrWhiteSpace(code)) return code;
+
+            return code.ToUpper() switch
+            {
+                "HO" => HoaLac,
+                "HCM" => HoChiMinh,
+                "DN" => DaNang,
+                "CT" => CanTho,
+                "QN" => QuyNhon,
+                _ => code // Return as-is if already mapped or unknown
+            };
+        }
+
         public static class Roles
         {
             public const string HOD = "HOD";
