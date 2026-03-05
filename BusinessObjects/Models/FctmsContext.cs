@@ -201,6 +201,9 @@ public partial class FctmsContext : DbContext
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
 
+            entity.Property(e => e.MentorId).HasColumnName("MentorId");
+            entity.Property(e => e.MentorId2).HasColumnName("MentorId2");
+
             entity.HasOne(d => d.Leader).WithMany(p => p.Teams)
                 .HasForeignKey(d => d.LeaderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -210,6 +213,14 @@ public partial class FctmsContext : DbContext
                 .HasForeignKey(d => d.SemesterId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("teams_ibfk_1");
+
+            entity.HasOne(d => d.Mentor).WithMany()
+                .HasForeignKey(d => d.MentorId)
+                .HasConstraintName("FK_Teams_Users_MentorId");
+
+            entity.HasOne(d => d.Mentor2).WithMany()
+                .HasForeignKey(d => d.MentorId2)
+                .HasConstraintName("FK_Teams_Users_MentorId2");
         });
 
         modelBuilder.Entity<Teaminvitation>(entity =>
