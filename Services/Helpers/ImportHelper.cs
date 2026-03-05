@@ -57,7 +57,6 @@ namespace Services.Helpers
                 CampusConstants.WhitelistImportColumns.Email,
                 CampusConstants.WhitelistImportColumns.StudentCode,
                 CampusConstants.WhitelistImportColumns.FullName,
-                CampusConstants.WhitelistImportColumns.RoleId,
                 CampusConstants.WhitelistImportColumns.Campus,
                 CampusConstants.WhitelistImportColumns.SemesterId,
             };
@@ -100,15 +99,6 @@ namespace Services.Helpers
                         .Text.Trim();
                     string? studentCode = string.IsNullOrEmpty(studentCodeRaw) ? null : studentCodeRaw;
 
-                    var roleText = worksheet
-                        .Cells[row, headerMap[CampusConstants.WhitelistImportColumns.RoleId]]
-                        .Text.Trim();
-                    if (!int.TryParse(roleText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int roleIdParsed) || roleIdParsed <= 0)
-                    {
-                        result.Errors.Add(new ImportError { Row = row, Column = CampusConstants.WhitelistImportColumns.RoleId, Message = "Invalid RoleId" });
-                        continue;
-                    }
-
                     var semesterText = worksheet
                         .Cells[row, headerMap[CampusConstants.WhitelistImportColumns.SemesterId]]
                         .Text.Trim();
@@ -125,13 +115,27 @@ namespace Services.Helpers
                         FullName = worksheet
                             .Cells[row, headerMap[CampusConstants.WhitelistImportColumns.FullName]]
                             .Text.Trim(),
-                        RoleId = roleIdParsed,
-                        Role = RoleNameMapping.TryGetValue(roleIdParsed, out var rName) ? rName : "Unknown",
+                        RoleId = 3,  // Always set to Student role
+                        Role = "Student",
                         Campus = worksheet
                             .Cells[row, headerMap[CampusConstants.WhitelistImportColumns.Campus]]
                             .Text.Trim(),
                         SemesterId = semesterIdParsed,
                     };
+
+                    // Validate FullName is not empty
+                    if (string.IsNullOrWhiteSpace(whitelistDto.FullName))
+                    {
+                        result.Errors.Add(new ImportError { Row = row, Column = CampusConstants.WhitelistImportColumns.FullName, Message = "FullName cannot be empty" });
+                        continue;
+                    }
+
+                    // Validate Campus is not empty
+                    if (string.IsNullOrWhiteSpace(whitelistDto.Campus))
+                    {
+                        result.Errors.Add(new ImportError { Row = row, Column = CampusConstants.WhitelistImportColumns.Campus, Message = "Campus cannot be empty" });
+                        continue;
+                    }
 
                     result.Items.Add(whitelistDto);
                 }

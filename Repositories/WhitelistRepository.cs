@@ -35,6 +35,12 @@ namespace Repositories
         {
             await _whitelistDAO.DeleteRangeAsync(whitelists);
         }
+
+        public async Task ReplaceStudentsBySemesterAsync(int semesterId, int studentRoleId, IEnumerable<Whitelist> newStudents)
+        {
+            await _whitelistDAO.ReplaceStudentsBySemesterAsync(semesterId, studentRoleId, newStudents);
+        }
+
         public async Task<Whitelist?> GetByIdAsync(int id)
         {
             return await _whitelistDAO.GetByIdAsync(id);

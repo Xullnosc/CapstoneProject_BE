@@ -3,6 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
+using Microsoft.Extensions.Logging;
 using Repositories;
 using Services.Helpers;
 
@@ -12,11 +13,15 @@ namespace Services
     {
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly ISemesterRepository _semesterRepository;
+        private readonly ILogger<ImportService> _logger;
+        private readonly IRedisService _redisService;
 
-        public ImportService(IWhitelistRepository whitelistRepository, ISemesterRepository semesterRepository)
+        public ImportService(IWhitelistRepository whitelistRepository, ISemesterRepository semesterRepository, ILogger<ImportService> logger, IRedisService redisService)
         {
             _whitelistRepository = whitelistRepository;
             _semesterRepository = semesterRepository;
+            _logger = logger;
+            _redisService = redisService;
         }
 
         public async Task<ImportResult<WhitelistImportDTO>> ImportWhitelistFromExcel(Stream excelStream)
@@ -34,51 +39,89 @@ namespace Services
             var items = importResult.Items ?? new List<WhitelistImportDTO>();
             if (!items.Any())
             {
-                // nothing to save
+                _logger.LogInformation("Import whitelist: No valid items to save. File: {fileUrl}", fileUrl);
                 return;
             }
 
-            var now = DateTime.UtcNow;
+            _logger.LogInformation("Starting whitelist import. File: {fileUrl}, UploadedBy: {uploadedBy}, ItemCount: {itemCount}", 
+                fileUrl, uploadedBy ?? "unknown", items.Count);
 
-            // map DTOs to model entities
-            var entities = items.Select(dto => new Whitelist
+            try
             {
-                Email = dto.Email,
-                StudentCode = dto.StudentCode,
-                FullName = dto.FullName,
-                RoleId = dto.RoleId,
-                Campus = dto.Campus,
-                SemesterId = dto.SemesterId,
-                AddedDate = now
-            }).ToList();
+                var now = DateTime.UtcNow;
 
-            // determine affected semesters and replace per-semester whitelist data
-            var semesterIds = entities.Select(e => e.SemesterId).Where(s => s.HasValue).Select(s => s!.Value).Distinct();
-            int studentRoleId = await _semesterRepository.GetStudentRoleIdAsync();
+                // Validate all SemesterIds exist before proceeding
+                var semesterIds = items.Select(dto => dto.SemesterId).Where(s => s.HasValue).Select(s => s!.Value).Distinct().ToList();
 
-            foreach (var semId in semesterIds)
-            {
-                var existing = await _whitelistRepository.GetBySemesterIdAsync(semId);
-                if (existing != null && existing.Any())
+                foreach (var semId in semesterIds)
                 {
-                    // CRITICAL FIX: Only delete existing students. Lecturers/Mentors are preserved.
-                    var existingStudents = existing.Where(w => w.RoleId == studentRoleId).ToList();
-                    if (existingStudents.Any())
+                    var semesterExists = await _semesterRepository.SemesterExistsAsync(semId);
+                    if (!semesterExists)
                     {
-                        await _whitelistRepository.DeleteRangeAsync(existingStudents);
+                        _logger.LogError("Import failed: SemesterId {semesterId} does not exist", semId);
+                        throw new ArgumentException($"SemesterId {semId} does not exist in the system");
                     }
                 }
 
-                var toAdd = entities.Where(e => e.SemesterId == semId).ToList();
-                if (toAdd.Any())
+                // Get the student role ID for all imports
+                int studentRoleId = await _semesterRepository.GetStudentRoleIdAsync();
+
+                // map DTOs to model entities (all with student role)
+                var entities = items.Select(dto => new Whitelist
                 {
-                    await _whitelistRepository.AddRangeAsync(toAdd);
+                    Email = dto.Email,
+                    StudentCode = dto.StudentCode,
+                    FullName = dto.FullName,
+                    RoleId = studentRoleId,  // All imports are students
+                    Campus = dto.Campus,
+                    SemesterId = dto.SemesterId,
+                    AddedDate = now
+                }).ToList();
+
+                // Process each semester to replace per-semester whitelist data
+                int totalProcessed = 0;
+                foreach (var semId in semesterIds)
+                {
+                    var toAdd = entities.Where(e => e.SemesterId == semId).ToList();
+                    try
+                    {
+                        await _whitelistRepository.ReplaceStudentsBySemesterAsync(semId, studentRoleId, toAdd);
+                        totalProcessed += toAdd.Count;
+                        _logger.LogInformation("Successfully imported {count} whitelists for semester {semesterId}", toAdd.Count, semId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to import whitelists for semester {semesterId}. This semester import was rolled back.", semId);
+                        throw;
+                    }
                 }
+
+                _logger.LogInformation("Whitelist import completed successfully. File: {fileUrl}, TotalProcessed: {totalProcessed}, UploadedBy: {uploadedBy}", 
+                    fileUrl, totalProcessed, uploadedBy ?? "unknown");
+
+                // Invalidate semester cache since whitelist counts have changed
+                await InvalidateSemesterCacheAsync(semesterIds);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Whitelist import failed. File: {fileUrl}, UploadedBy: {uploadedBy}", 
+                    fileUrl, uploadedBy ?? "unknown");
+                throw;
+            }
+        }
+
+        private async Task InvalidateSemesterCacheAsync(List<int> semesterIds)
+        {
+            // Invalidate the "all semesters" cache since whitelist counts changed
+            await _redisService.DeleteValueAsync("fctms:semester:all");
+
+            // Also invalidate cache for specific semesters if they exist
+            foreach (var semesterId in semesterIds)
+            {
+                await _redisService.DeleteValueAsync($"fctms:semester:id:{semesterId}");
             }
 
-            // Note: Import batch metadata (fileUrl, uploadedBy, version) is recorded by migration
-            // but persisting a row in ImportBatches is not implemented here; consider adding
-            // an ImportBatch repository/DAO to persist the fileUrl and version atomically with changes.
+            _logger.LogInformation("Invalidated semester cache for {count} semesters", semesterIds.Count);
         }
     }
 }

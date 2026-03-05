@@ -87,6 +87,38 @@ namespace DataAccess
                 throw;
             }
         }
+
+        public async Task ReplaceStudentsBySemesterAsync(int semesterId, int studentRoleId, IEnumerable<Whitelist> newStudents)
+        {
+            await using var tx = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var existingStudents = await _context.Whitelists
+                    .Where(w => w.SemesterId == semesterId && w.RoleId == studentRoleId)
+                    .ToListAsync();
+
+                if (existingStudents.Any())
+                {
+                    _context.Whitelists.RemoveRange(existingStudents);
+                }
+
+                var studentsToAdd = newStudents.ToList();
+                if (studentsToAdd.Any())
+                {
+                    await _context.Whitelists.AddRangeAsync(studentsToAdd);
+                }
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+        }
+
         public async Task<Whitelist?> GetByIdAsync(int id)
         {
             return await _context.Whitelists.FindAsync(id);

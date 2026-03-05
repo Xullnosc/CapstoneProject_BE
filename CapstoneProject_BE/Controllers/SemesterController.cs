@@ -191,19 +191,28 @@ namespace CapstoneProject_BE.Controllers
                 // Return both parsed items and any validation errors so caller can decide next steps
                 return Ok(importResult);
             }
+            catch (ArgumentException ex)
+            {
+                // Validation errors - safe to return to client
+                return BadRequest(new { message = ex.Message });
+            }
             catch (KeyNotFoundException ex)
             {
                 return NotFound(new { message = ex.Message });
             }
-            catch (Exception ex)
+            catch (InvalidOperationException)
             {
-                // In production, log this error
+                // Database/system state issues
+                return BadRequest(new { message = "An error occurred while importing. Please verify the Excel file and try again." });
+            }
+            catch (Exception)
+            {
+                // Generic exception - log internally, return generic message
                 return StatusCode(
                     500,
                     new
                     {
-                        message = "An error occurred while importing the whitelist.",
-                        detail = ex.Message,
+                        message = "An error occurred while importing the whitelist. Please check the file format and try again.",
                     }
                 );
             }

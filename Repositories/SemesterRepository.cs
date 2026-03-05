@@ -34,5 +34,11 @@ namespace Repositories
 
         public async Task<bool> IsOverlapAsync(DateTime start, DateTime end, int? excludeId) 
             => await _semesterDAO.IsOverlapAsync(start, end, excludeId);
+
+        public async Task<bool> SemesterExistsAsync(int semesterId)
+        {
+            var semester = await _semesterDAO.GetByIdAsync(semesterId);
+            return semester != null;
+        }
     }
 }
