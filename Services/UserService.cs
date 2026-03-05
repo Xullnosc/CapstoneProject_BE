@@ -119,18 +119,28 @@ namespace Services
 
             var result = new List<UserInfoDTO>();
 
+            Team? team = null;
+            if (teamId.HasValue)
+            {
+                team = await _teamRepository.GetByIdAsync(teamId.Value);
+            }
+
+            // Batch fetch all User records for the whitelisted emails to avoid N+1 queries
+            var emails = filtered.Select(w => w.Email).Distinct().ToList();
+            var users = await _userRepository.GetUsersByEmailsAsync(emails);
+            var userMap = users.ToDictionary(u => u.Email, u => u, StringComparer.OrdinalIgnoreCase);
+
             foreach (var w in filtered)
             {
-                // Get User object to get UserId (Mapping Email to User)
-                var user = await _userRepository.GetByEmailAsync(w.Email);
+                // Get User object from map instead of per-loop DB call
+                userMap.TryGetValue(w.Email, out var user);
                 
                 if (user != null && user.UserId == currentUserId) continue;
 
                 // Exclude already assigned mentors
-                if (teamId.HasValue && user != null)
+                if (team != null && user != null)
                 {
-                    var team = await _teamRepository.GetByIdAsync(teamId.Value);
-                    if (team != null && (team.MentorId == user.UserId || team.MentorId2 == user.UserId))
+                    if (team.MentorId == user.UserId || team.MentorId2 == user.UserId)
                     {
                         continue;
                     }

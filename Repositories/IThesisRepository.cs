@@ -20,5 +20,6 @@ namespace Repositories
 
         // Mentor Invitation Methods
         Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId, int? semesterId = null);
+        Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int? semesterId = null);
     }
 }

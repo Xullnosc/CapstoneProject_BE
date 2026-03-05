@@ -102,12 +102,12 @@ namespace Services
             var currentSemester = await _semesterRepo.GetCurrentSemesterAsync();
             if (currentSemester == null) throw new Exception("Current semester not found.");
 
-            // Check if thesis is Approved or Published for the current semester
-            // var thesis = await _thesisRepo.GetApprovedThesisByLeaderIdAsync(leaderId, currentSemester.SemesterId);
-            // if (thesis == null)
-            // {
-            //     throw new Exception("Your team must have an 'Approved' or 'Published' thesis before inviting a mentor.");
-            // }
+            // Check if thesis is in "On Mentor Inviting" status for the current semester
+            var thesis = await _thesisRepo.GetThesisForInvitationAsync(leaderId, currentSemester.SemesterId);
+            if (thesis == null)
+            {
+                throw new Exception("Your team must have a valid thesis (Proposed, Approved, or Published) before inviting a mentor.");
+            }
 
             // Check if mentor is in Whitelist for the current semester
             var whitelistEntry = await _whitelistRepo.GetByEmailAsync(mentorEmail);
