@@ -21,6 +21,8 @@ namespace FCTMS.Tests.Services
         private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<IRedisService> _mockRedisService;
         private readonly Mock<Microsoft.Extensions.Configuration.IConfiguration> _mockConfiguration;
+        private readonly Mock<ILecturerRepository> _mockLecturerRepository;
+        private readonly Mock<IWhitelistRepository> _mockWhitelistRepository;
         private readonly SemesterService _semesterService;
 
         public SemesterServiceTests()
@@ -31,6 +33,8 @@ namespace FCTMS.Tests.Services
             _mockUserRepository = new Mock<IUserRepository>();
             _mockRedisService = new Mock<IRedisService>();
             _mockConfiguration = new Mock<Microsoft.Extensions.Configuration.IConfiguration>();
+            _mockLecturerRepository = new Mock<ILecturerRepository>();
+            _mockWhitelistRepository = new Mock<IWhitelistRepository>();
 
             // Default redis mock behaviors
             _mockRedisService.Setup(r => r.GetObjectAsync<List<SemesterDTO>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -53,7 +57,9 @@ namespace FCTMS.Tests.Services
                 _mockMapper.Object,
                 _mockUserRepository.Object,
                 _mockRedisService.Object,
-                _mockConfiguration.Object
+                _mockConfiguration.Object,
+                _mockLecturerRepository.Object,
+                _mockWhitelistRepository.Object
             );
         }
 
