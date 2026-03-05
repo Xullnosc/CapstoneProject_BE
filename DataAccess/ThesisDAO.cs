@@ -163,5 +163,20 @@ namespace DataAccess
 
             return await query.FirstOrDefaultAsync();
         }
+
+        public async Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int? semesterId = null)
+        {
+            var query = _context.Theses
+                .AsNoTracking()
+                .Where(t => t.UserId == leaderId && 
+                           (t.Status == "On Mentor Inviting" || t.Status == "Approved" || t.Status == "Published"));
+
+            if (semesterId.HasValue)
+            {
+                query = query.Where(t => t.SemesterId == semesterId.Value);
+            }
+
+            return await query.FirstOrDefaultAsync();
+        }
     }
 }

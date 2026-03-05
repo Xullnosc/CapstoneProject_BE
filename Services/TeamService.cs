@@ -119,7 +119,7 @@ namespace Services
 
             // Allow access if user is a member OR the Mentor
             bool isMember = team.Teammembers.Any(tm => tm.StudentId == userId);
-            bool isMentor = team.MentorId == userId;
+            bool isMentor = team.MentorId == userId || team.MentorId2 == userId;
             
             if (!isMember && !isMentor)
             {
@@ -169,7 +169,7 @@ namespace Services
              {
                  // Check if user is a mentor for any team in this semester
                  var mentoredTeams = await _teamRepository.GetBySemesterAsync(currentSemester.SemesterId);
-                 team = mentoredTeams.FirstOrDefault(t => t.MentorId == studentId);
+                 team = mentoredTeams.FirstOrDefault(t => t.MentorId == studentId || t.MentorId2 == studentId);
              }
              return team == null ? null : MapToDTO(team);
         }
@@ -181,7 +181,7 @@ namespace Services
 
             var allTeams = await _teamRepository.GetBySemesterAsync(currentSemester.SemesterId);
             return allTeams
-                .Where(t => t.MentorId == mentorId && t.Status != "Disbanded")
+                .Where(t => (t.MentorId == mentorId || t.MentorId2 == mentorId) && t.Status != "Disbanded")
                 .Select(MapToDTO)
                 .ToList();
         }
@@ -214,7 +214,11 @@ namespace Services
                 MentorId = team.MentorId,
                 MentorName = team.Mentor?.FullName ?? (team.MentorId != null ? "Assigned Mentor" : string.Empty),
                 MentorEmail = team.Mentor?.Email ?? string.Empty,
-                MentorAvatar = team.Mentor?.Avatar ?? string.Empty
+                MentorAvatar = team.Mentor?.Avatar ?? string.Empty,
+                MentorId2 = team.MentorId2,
+                Mentor2Name = team.Mentor2?.FullName ?? (team.MentorId2 != null ? "Assigned Mentor" : string.Empty),
+                Mentor2Email = team.Mentor2?.Email ?? string.Empty,
+                Mentor2Avatar = team.Mentor2?.Avatar ?? string.Empty
             };
         }
 

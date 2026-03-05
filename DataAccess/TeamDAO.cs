@@ -30,6 +30,7 @@ namespace DataAccess
                 .Include(t => t.Teammembers)
                 .ThenInclude(tm => tm.Student)
                 .Include(t => t.Mentor)
+                .Include(t => t.Mentor2)
                 .FirstOrDefaultAsync(t => t.TeamId == teamId);
         }
 
@@ -45,6 +46,7 @@ namespace DataAccess
                 .Include(t => t.Teammembers)
                 .ThenInclude(tm => tm.Student)
                 .Include(t => t.Mentor)
+                .Include(t => t.Mentor2)
                 .Where(t => t.SemesterId == semesterId && t.Status != "Disbanded")
                 .ToListAsync();
         }
@@ -129,6 +131,7 @@ namespace DataAccess
                 .Include(t => t.Teammembers)
                 .ThenInclude(tm => tm.Student)
                 .Include(t => t.Mentor)
+                .Include(t => t.Mentor2)
                 .Where(t => t.SemesterId == semesterId && t.Status != "Disbanded")
                 .FirstOrDefaultAsync(t => t.Teammembers.Any(tm => tm.StudentId == studentId));
         }
@@ -200,6 +203,7 @@ namespace DataAccess
                 .Include(t => t.Teammembers)
                 .ThenInclude(tm => tm.Student)
                 .Include(t => t.Mentor)
+                .Include(t => t.Mentor2)
                 .Where(t => t.Status != "Disbanded" && t.Teammembers.Any(tm => tm.StudentId == studentId))
                 .OrderByDescending(t => t.CreatedAt)
                 .FirstOrDefaultAsync();

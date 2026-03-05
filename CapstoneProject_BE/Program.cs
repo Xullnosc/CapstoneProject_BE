@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using OfficeOpenXml;
 using Repositories;
 using Services;
 using Services.Helpers;
@@ -12,6 +13,10 @@ using Services.Mappings;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// EPPlus license context (set globally once during startup)
+// EPPlus 8+: set license via the static `License` property
+ExcelPackage.License.SetNonCommercialOrganization("Capstone Project");
 
 //Redis Configuration
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
@@ -99,13 +104,13 @@ builder.Services.AddScoped<ICloudinaryHelper, Services.Helpers.CloudinaryHelper>
 builder.Services.AddScoped<ITeamInvitationService, TeamInvitationService>();
 builder.Services.AddScoped<IMentorInvitationService, MentorInvitationService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<IWhitelistService, WhitelistService>();
 builder.Services.AddScoped<IRedisService, RedisService>();
 builder.Services.AddScoped<IThesisService, ThesisService>();
 builder.Services.AddScoped<IChecklistService, ChecklistService>();
 builder.Services.AddScoped<IThesisFormService, ThesisFormService>();
 builder.Services.AddScoped<ILecturerService, LecturerService>();
-
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();

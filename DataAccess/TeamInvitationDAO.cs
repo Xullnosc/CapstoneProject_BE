@@ -282,7 +282,7 @@ namespace DataAccess
         {
             return await _context.Teams
                 .AsNoTracking()
-                .CountAsync(t => t.MentorId == mentorId 
+                .CountAsync(t => (t.MentorId == mentorId || t.MentorId2 == mentorId)
                               && t.SemesterId == semesterId 
                               && t.Status != CampusConstants.TeamStatus.Disbanded);
         }

@@ -19,6 +19,8 @@ public partial class ArchivedTeam
 
     public int? MentorId { get; set; }
 
+    public int? MentorId2 { get; set; }
+
     public string? Status { get; set; }
 
     public DateTime? ArchivedAt { get; set; }

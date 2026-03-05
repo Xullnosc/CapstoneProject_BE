@@ -17,7 +17,10 @@ namespace Services.Mappings
         {
             // User -> UserInfoDTO
             CreateMap<User, UserInfoDTO>()
-                .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.Role != null ? src.Role.RoleName : null));
+                .ForMember(
+                    dest => dest.RoleName,
+                    opt => opt.MapFrom(src => src.Role != null ? src.Role.RoleName : null)
+                );
 
             // Whitelist -> WhitelistDTO
             CreateMap<Whitelist, WhitelistDTO>()
@@ -32,27 +35,34 @@ namespace Services.Mappings
 
             // Team -> TeamSimpleDTO (Minimal info for lists)
             CreateMap<Team, TeamSimpleDTO>()
-                .ForMember(dest => dest.MemberCount, opt => opt.MapFrom(src => src.Teammembers != null ? src.Teammembers.Count : 0));
+                .ForMember(
+                    dest => dest.MemberCount,
+                    opt => opt.MapFrom(src => src.Teammembers != null ? src.Teammembers.Count : 0)
+                );
 
             // ArchivedTeam -> TeamSimpleDTO
             CreateMap<ArchivedTeam, TeamSimpleDTO>()
                 .ForMember(dest => dest.TeamId, opt => opt.MapFrom(src => src.OriginalTeamId))
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status ?? "Archived"))
-                .AfterMap((src, dest) =>
-                {
-                    if (!string.IsNullOrEmpty(src.JsonData))
+                .AfterMap(
+                    (src, dest) =>
                     {
-                        try
+                        if (!string.IsNullOrEmpty(src.JsonData))
                         {
-                            using var doc = System.Text.Json.JsonDocument.Parse(src.JsonData);
-                            if (doc.RootElement.TryGetProperty("Members", out var members))
+                            try
                             {
-                                dest.MemberCount = members.GetArrayLength();
+                                using var doc = System.Text.Json.JsonDocument.Parse(src.JsonData);
+                                if (doc.RootElement.TryGetProperty("Members", out var members))
+                                {
+                                    dest.MemberCount = members.GetArrayLength();
+                                }
+                            }
+                            catch
+                            { /* Fallback to 0 if JSON is malformed */
                             }
                         }
-                        catch { /* Fallback to 0 if JSON is malformed */ }
                     }
-                });
+                );
 
             // ArchivedWhitelist -> WhitelistDTO
             CreateMap<ArchivedWhitelist, WhitelistDTO>()
@@ -64,12 +74,20 @@ namespace Services.Mappings
                 .ForMember(dest => dest.Campus, opt => opt.MapFrom(src => CampusConstants.MapCodeToFullName(src.Campus)))
                 .ForMember(dest => dest.StudentCode, opt => opt.MapFrom(src => src.StudentCode));
 
-
             // Semester -> SemesterDTO
             CreateMap<Semester, SemesterDTO>()
-                .ForMember(dest => dest.TeamCount, opt => opt.MapFrom(src => src.Teams != null ? src.Teams.Count : 0))
-                .ForMember(dest => dest.Teams, opt => opt.MapFrom(src => src.Teams ?? new List<Team>()))
-                .ForMember(dest => dest.Whitelists, opt => opt.MapFrom(src => src.Whitelists ?? new List<Whitelist>()));
+                .ForMember(
+                    dest => dest.TeamCount,
+                    opt => opt.MapFrom(src => src.Teams != null ? src.Teams.Count : 0)
+                )
+                .ForMember(
+                    dest => dest.Teams,
+                    opt => opt.MapFrom(src => src.Teams ?? new List<Team>())
+                )
+                .ForMember(
+                    dest => dest.Whitelists,
+                    opt => opt.MapFrom(src => src.Whitelists ?? new List<Whitelist>())
+                );
 
             // Reverse map for Create/Update
             CreateMap<SemesterDTO, Semester>();

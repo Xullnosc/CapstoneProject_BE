@@ -40,5 +40,8 @@ namespace Repositories
 
         public Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId, int? semesterId = null)
             => _thesisDAO.GetApprovedThesisByLeaderIdAsync(leaderId, semesterId);
+
+        public Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int? semesterId = null)
+            => _thesisDAO.GetThesisForInvitationAsync(leaderId, semesterId);
     }
 }
