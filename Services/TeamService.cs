@@ -17,7 +17,16 @@ namespace Services
         private readonly ICloudinaryHelper _cloudinaryHelper;
         private readonly IArchivingService _archivingService;
         private readonly ITeamMemberRepository _teamMemberRepository;
-        public TeamService(ITeamRepository teamRepository, ISemesterRepository semesterRepository, IUserRepository userRepository, ICloudinaryHelper cloudinaryHelper, IArchivingService archivingService, ITeamMemberRepository teamMemberRepository)
+        private readonly IThesisRepository _thesisRepository;
+
+        public TeamService(
+            ITeamRepository teamRepository, 
+            ISemesterRepository semesterRepository, 
+            IUserRepository userRepository, 
+            ICloudinaryHelper cloudinaryHelper, 
+            IArchivingService archivingService, 
+            ITeamMemberRepository teamMemberRepository,
+            IThesisRepository thesisRepository)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
@@ -25,6 +34,7 @@ namespace Services
             _cloudinaryHelper = cloudinaryHelper;
             _archivingService = archivingService;
             _teamMemberRepository = teamMemberRepository;
+            _thesisRepository = thesisRepository;
         }
 
         public async Task<TeamDTO> CreateTeamAsync(int leaderId, CreateTeamDTO createTeamDto)
@@ -107,11 +117,13 @@ namespace Services
             var team = await _teamRepository.GetByIdAsync(teamId);
             if (team == null) return null;
 
-            // Check if user is a member of the team
+            // Allow access if user is a member OR the Mentor
             bool isMember = team.Teammembers.Any(tm => tm.StudentId == userId);
-            if (!isMember)
+            bool isMentor = team.MentorId == userId || team.MentorId2 == userId;
+            
+            if (!isMember && !isMentor)
             {
-                throw new UnauthorizedAccessException("You are not a member of this team.");
+                throw new UnauthorizedAccessException("You are not authorized to view this team.");
             }
 
             return MapToDTO(team);
@@ -153,7 +165,25 @@ namespace Services
              if (currentSemester == null) return null;
 
              var team = await _teamRepository.GetTeamByStudentIdAsync(studentId, currentSemester.SemesterId);
+             if (team == null)
+             {
+                 // Check if user is a mentor for any team in this semester
+                 var mentoredTeams = await _teamRepository.GetBySemesterAsync(currentSemester.SemesterId);
+                 team = mentoredTeams.FirstOrDefault(t => t.MentorId == studentId || t.MentorId2 == studentId);
+             }
              return team == null ? null : MapToDTO(team);
+        }
+
+        public async Task<List<TeamDTO>> GetMentorTeamsAsync(int mentorId)
+        {
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester == null) return new List<TeamDTO>();
+
+            var allTeams = await _teamRepository.GetBySemesterAsync(currentSemester.SemesterId);
+            return allTeams
+                .Where(t => (t.MentorId == mentorId || t.MentorId2 == mentorId) && t.Status != "Disbanded")
+                .Select(MapToDTO)
+                .ToList();
         }
 
         private TeamDTO MapToDTO(Team team)
@@ -180,7 +210,15 @@ namespace Services
                     Avatar = tm.Student?.Avatar,
                     Role = tm.Role,
                     JoinedAt = tm.JoinedAt ?? DateTime.UtcNow
-                }).ToList() ?? new List<TeamMemberDTO>()
+                }).ToList() ?? new List<TeamMemberDTO>(),
+                MentorId = team.MentorId,
+                MentorName = team.Mentor?.FullName ?? (team.MentorId != null ? "Assigned Mentor" : string.Empty),
+                MentorEmail = team.Mentor?.Email ?? string.Empty,
+                MentorAvatar = team.Mentor?.Avatar ?? string.Empty,
+                MentorId2 = team.MentorId2,
+                Mentor2Name = team.Mentor2?.FullName ?? (team.MentorId2 != null ? "Assigned Mentor" : string.Empty),
+                Mentor2Email = team.Mentor2?.Email ?? string.Empty,
+                Mentor2Avatar = team.Mentor2?.Avatar ?? string.Empty
             };
         }
 
@@ -236,6 +274,16 @@ namespace Services
             team.UpdatedAt = DateTime.UtcNow;
 
             await _teamRepository.UpdateAsync(team);
+
+            // Transfer Thesis Ownership
+            var activeTheses = await _thesisRepository.GetThesesByUserIdAsync(currentLeaderId);
+            var activeThesis = activeTheses.FirstOrDefault();
+            if (activeThesis != null)
+            {
+                activeThesis.UserId = newLeaderId;
+                await _thesisRepository.UpdateThesisAsync(activeThesis);
+            }
+
             return true;
         }
 

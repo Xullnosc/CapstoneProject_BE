@@ -102,12 +102,14 @@ builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IArchivingService, ArchivingService>();
 builder.Services.AddScoped<ICloudinaryHelper, Services.Helpers.CloudinaryHelper>();
 builder.Services.AddScoped<ITeamInvitationService, TeamInvitationService>();
+builder.Services.AddScoped<IMentorInvitationService, MentorInvitationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<IWhitelistService, WhitelistService>();
 builder.Services.AddScoped<IRedisService, RedisService>();
 builder.Services.AddScoped<IThesisService, ThesisService>();
 builder.Services.AddScoped<IChecklistService, ChecklistService>();
+builder.Services.AddScoped<IThesisFormService, ThesisFormService>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
@@ -131,6 +133,7 @@ builder.Services.AddScoped<ITeamInvitationRepository, TeamInvitationRepository>(
 builder.Services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
 builder.Services.AddScoped<IThesisRepository, ThesisRepository>();
 builder.Services.AddScoped<IChecklistRepository, ChecklistRepository>();
+builder.Services.AddScoped<IThesisFormRepository, ThesisFormRepository>();
 
 //Middleware
 // AutoMapper
@@ -164,7 +167,18 @@ builder
 
 builder.Services.AddAuthorization(options =>
 {
+    // Reviewer policy: any user with IsReviewer=true (typically lecturers assigned as reviewer)
     options.AddPolicy("Reviewer", policy => policy.RequireClaim("IsReviewer", "true"));
+
+    // ReviewerOrHOD: allow either HOD role OR reviewer claim
+    options.AddPolicy(
+        "ReviewerOrHOD",
+        policy =>
+            policy.RequireAssertion(context =>
+                context.User.IsInRole(BusinessObjects.CampusConstants.Roles.HOD)
+                || context.User.HasClaim("IsReviewer", "true")
+            )
+    );
 });
 
 var app = builder.Build();

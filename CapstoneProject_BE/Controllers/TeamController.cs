@@ -12,7 +12,7 @@ namespace CapstoneProject_BE.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = CampusConstants.Roles.Student)]
+    [Authorize(Roles = "Student,Lecturer")]
     public class TeamController : ControllerBase
     {
         private readonly ITeamService _teamService;
@@ -23,6 +23,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "Student")]
         public async Task<IActionResult> CreateTeam([FromBody] CreateTeamDTO createTeamDto)
         {
             try
@@ -87,6 +88,24 @@ namespace CapstoneProject_BE.Controllers
                 var team = await _teamService.GetTeamByStudentIdAsync(userId);
                 if (team == null) return NotFound(new { message = "You are not in any team" });
                 return Ok(team);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("my-mentor-teams")]
+        [Authorize(Roles = "Lecturer")]
+        public async Task<IActionResult> GetMyMentorTeams()
+        {
+            try
+            {
+                if (!int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out int userId))
+                    return Unauthorized(new { message = "Invalid user identifier." });
+
+                var teams = await _teamService.GetMentorTeamsAsync(userId);
+                return Ok(teams);
             }
             catch (Exception ex)
             {

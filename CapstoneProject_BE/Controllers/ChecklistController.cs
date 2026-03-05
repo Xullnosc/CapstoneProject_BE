@@ -21,16 +21,18 @@ namespace CapstoneProject_BE.Controllers
             _checklistService = checklistService;
         }
 
-        /// <summary>GET /api/checklist - Get all checklist items (any authenticated user, e.g. for thesis evaluation view).</summary>
+        /// <summary>GET /api/checklist - Get all checklist items (HOD + reviewers can view).</summary>
         [HttpGet]
+        [Authorize(Policy = "ReviewerOrHOD")]
         public async Task<ActionResult<IEnumerable<ChecklistDTO>>> GetAll()
         {
             var list = await _checklistService.GetAllAsync();
             return Ok(list);
         }
 
-        /// <summary>GET /api/checklist/{id}</summary>
+        /// <summary>GET /api/checklist/{id} - HOD + reviewers can view.</summary>
         [HttpGet("{id}")]
+        [Authorize(Policy = "ReviewerOrHOD")]
         public async Task<ActionResult<ChecklistDTO>> GetById(int id)
         {
             var item = await _checklistService.GetByIdAsync(id);

@@ -16,5 +16,10 @@ namespace Repositories
         Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId);
         Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id);
         Task AddThesisHistoryAsync(ThesisHistory history);
+        Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds, int? semesterId = null);
+
+        // Mentor Invitation Methods
+        Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId, int? semesterId = null);
+        Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int? semesterId = null);
     }
 }

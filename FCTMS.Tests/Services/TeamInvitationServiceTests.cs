@@ -20,6 +20,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ITeamRepository> _mockTeamRepository;
         private readonly Mock<ISemesterRepository> _mockSemesterRepository;
         private readonly Mock<IUserRepository> _mockUserRepository;
+        private readonly Mock<IWhitelistRepository> _mockWhitelistRepository;
         private readonly Mock<IEmailService> _mockEmailService; // Added
         private readonly Mock<IConfiguration> _mockConfiguration; // Added
         private readonly TeamInvitationService _service;
@@ -31,6 +32,7 @@ namespace FCTMS.Tests.Services
             _mockTeamRepository = new Mock<ITeamRepository>();
             _mockSemesterRepository = new Mock<ISemesterRepository>();
             _mockUserRepository = new Mock<IUserRepository>();
+            _mockWhitelistRepository = new Mock<IWhitelistRepository>();
             _mockEmailService = new Mock<IEmailService>(); // Added
             _mockConfiguration = new Mock<IConfiguration>(); // Added
 
@@ -44,6 +46,7 @@ namespace FCTMS.Tests.Services
                 _mockTeamRepository.Object,
                 _mockSemesterRepository.Object,
                 _mockUserRepository.Object,
+                _mockWhitelistRepository.Object,
                 _mockEmailService.Object,
                 _mockConfiguration.Object
             );

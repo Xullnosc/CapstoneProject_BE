@@ -129,5 +129,14 @@ namespace DataAccess
             _context.Whitelists.Update(whitelist);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<List<Whitelist>> SearchAsync(string term, int semesterId)
+        {
+            return await _context.Whitelists
+                .Where(w => w.SemesterId == semesterId &&
+                            (w.FullName.Contains(term) || w.Email.Contains(term) || w.StudentCode.Contains(term)))
+                .Take(10)
+                .ToListAsync();
+        }
     }
 }

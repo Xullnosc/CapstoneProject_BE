@@ -34,7 +34,6 @@ namespace Services
         public async Task<ChecklistDTO> CreateAsync(ChecklistCreateDTO dto)
         {
             var entity = _mapper.Map<Checklist>(dto);
-            entity.CreatedAt = DateTime.UtcNow;
             entity = await _repository.AddAsync(entity);
             return _mapper.Map<ChecklistDTO>(entity);
         }
@@ -47,8 +46,7 @@ namespace Services
 
             entity.Title = dto.Title;
             entity.Content = dto.Content;
-            entity.DisplayOrder = dto.DisplayOrder;
-            entity.IsCompleted = dto.IsCompleted;
+            entity.UpdatedAt = DateTime.UtcNow;
             await _repository.UpdateAsync(entity);
         }
 

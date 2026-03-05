@@ -39,6 +39,12 @@ namespace BusinessObjects
             public const string Cancelled = "Cancelled";
         }
 
+        public static class InvitationType
+        {
+            public const string Member = "Member";
+            public const string Mentor = "Mentor";
+        }
+
         public static class TeamStatus
         {
             public const string Pending = "Pending";
