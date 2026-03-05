@@ -86,7 +86,7 @@ namespace FCTMS.Tests.Services
             // Assert
             Assert.Single(result);
             Assert.Equal(1, result[0].InvitationId);
-            Assert.Equal("Test Team", result[0].Team.TeamName);
+            Assert.Equal("Test Team", result[0].Team!.TeamName);
             _mockInvitationRepository.Verify(r => r.GetPendingInvitationsByStudentAsync(studentId), Times.Once);
         }
 

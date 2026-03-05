@@ -202,7 +202,7 @@ namespace FCTMS.Tests.Controllers
 
             // Assert
             var badRequestResult = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
-            badRequestResult.Value.ToString().Should().Contain("Semester code 'SP26' already exists.");
+            badRequestResult.Value!.ToString().Should().Contain("Semester code 'SP26' already exists.");
         }
 
         [Fact]
@@ -219,7 +219,7 @@ namespace FCTMS.Tests.Controllers
 
             // Assert
             var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
-            badRequestResult.Value.ToString().Should().Contain("Semester code 'SP26' already exists.");
+            badRequestResult.Value!.ToString().Should().Contain("Semester code 'SP26' already exists.");
         }
     }
 }

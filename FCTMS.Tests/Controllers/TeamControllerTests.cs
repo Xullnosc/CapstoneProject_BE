@@ -282,7 +282,7 @@ namespace FCTMS.Tests.Controllers
 
             // Assert
             var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-            okResult.Value.ToString().Should().Contain("Leadership transferred successfully");
+            okResult.Value!.ToString().Should().Contain("Leadership transferred successfully");
         }
 
         [Fact]
@@ -302,7 +302,7 @@ namespace FCTMS.Tests.Controllers
             // Assert
             var statusCodeResult = result.Should().BeOfType<ObjectResult>().Subject;
             statusCodeResult.StatusCode.Should().Be(403);
-            statusCodeResult.Value.ToString().Should().Contain("Only the current team leader can transfer leadership");
+            statusCodeResult.Value!.ToString().Should().Contain("Only the current team leader can transfer leadership");
         }
 
         [Fact]
@@ -321,7 +321,7 @@ namespace FCTMS.Tests.Controllers
 
             // Assert
             var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
-            badRequestResult.Value.ToString().Should().Contain("The new leader must be a member of the team");
+            badRequestResult.Value!.ToString().Should().Contain("The new leader must be a member of the team");
         }
 
         [Fact]
@@ -340,7 +340,7 @@ namespace FCTMS.Tests.Controllers
 
             // Assert
             var notFoundResult = result.Should().BeOfType<NotFoundObjectResult>().Subject;
-            notFoundResult.Value.ToString().Should().Contain("Team not found");
+            notFoundResult.Value!.ToString().Should().Contain("Team not found");
         }
     }
 

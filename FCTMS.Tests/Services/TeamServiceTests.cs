@@ -212,7 +212,7 @@ namespace FCTMS.Tests.Services
 
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId))
                 .ReturnsAsync(new User { UserId = userId, RoleId = 3, IsAuthorized = true });
-            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team)null);
+            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team?)null);
             _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1)).ReturnsAsync(new List<string>()); // No existing teams
 
             _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>()))
@@ -235,7 +235,7 @@ namespace FCTMS.Tests.Services
              _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync())
                 .ReturnsAsync(new Semester { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026", IsActive = true });
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { UserId = userId, RoleId = 3, IsAuthorized = true });
-             _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team)null);
+             _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team?)null);
 
             // Existing teams: SE_01, SE_02, SE_15
             _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1))
