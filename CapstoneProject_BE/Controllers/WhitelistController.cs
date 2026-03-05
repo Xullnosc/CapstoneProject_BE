@@ -37,5 +37,27 @@ namespace CapstoneProject_BE.Controllers
                 return NotFound(new { message = ex.Message });
             }
         }
+
+        [HttpPost]
+        public async Task<ActionResult<Whitelist>> Add([FromBody] Whitelist whitelist)
+        {
+            var result = await _whitelistService.AddStudentToWhitelistAsync(whitelist);
+            return Ok(result);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] Whitelist whitelist)
+        {
+            if (id != whitelist.WhitelistId) return BadRequest();
+            await _whitelistService.UpdateWhitelistAsync(whitelist);
+            return NoContent();
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            await _whitelistService.DeleteWhitelistAsync(id);
+            return NoContent();
+        }
     }
 }

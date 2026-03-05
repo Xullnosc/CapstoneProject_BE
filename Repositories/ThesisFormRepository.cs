@@ -1,53 +1,41 @@
 using BusinessObjects.Models;
-using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace Repositories
 {
     public class ThesisFormRepository : IThesisFormRepository
     {
-        private readonly FctmsContext _context;
+        private readonly DataAccess.IThesisFormDAO _thesisFormDAO;
 
-        public ThesisFormRepository(FctmsContext context)
+        public ThesisFormRepository(DataAccess.IThesisFormDAO thesisFormDAO)
         {
-            _context = context;
+            _thesisFormDAO = thesisFormDAO;
         }
 
         public async Task<ThesisForm?> GetLatestFormAsync()
         {
-            return await _context.ThesisForms
-                .Include(tf => tf.Histories)
-                .Include(tf => tf.Uploader)
-                .FirstOrDefaultAsync();
+            return await _thesisFormDAO.GetLatestFormAsync();
         }
 
         public async Task<ThesisForm> AddFormAsync(ThesisForm form)
         {
-            _context.ThesisForms.Add(form);
-            await _context.SaveChangesAsync();
-            return form;
+            return await _thesisFormDAO.AddFormAsync(form);
         }
 
         public async Task UpdateFormAsync(ThesisForm form)
         {
-            _context.ThesisForms.Update(form);
-            await _context.SaveChangesAsync();
+            await _thesisFormDAO.UpdateFormAsync(form);
         }
 
         public async Task AddFormHistoryAsync(ThesisFormHistory history)
         {
-            _context.ThesisFormHistories.Add(history);
-            await _context.SaveChangesAsync();
+            await _thesisFormDAO.AddFormHistoryAsync(history);
         }
 
         public async Task<IEnumerable<ThesisFormHistory>> GetFormHistoriesAsync()
         {
-            return await _context.ThesisFormHistories
-                .Include(h => h.Uploader)
-                .OrderByDescending(h => h.VersionNumber)
-                .ToListAsync();
+            return await _thesisFormDAO.GetFormHistoriesAsync();
         }
     }
 }

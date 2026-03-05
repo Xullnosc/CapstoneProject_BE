@@ -14,6 +14,7 @@ namespace Services
         private readonly ITeamRepository _teamRepository;
         private readonly IRedisService _redisService;
         private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
+        private readonly ISemesterRepository _semesterRepository;
         private readonly TimeSpan _archivedTtl;
 
         public ArchivingService(
@@ -21,12 +22,14 @@ namespace Services
             IWhitelistRepository whitelistRepository, 
             ITeamRepository teamRepository, 
             IRedisService redisService,
+            ISemesterRepository semesterRepository,
             Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             _whitelistRepository = whitelistRepository;
             _archivingRepository = archivingRepository;
             _teamRepository = teamRepository;
             _redisService = redisService;
+            _semesterRepository = semesterRepository;
             _configuration = configuration;
             
             var ttlStr = _configuration["RedisSettings:ArchivedTTLMinutes"];
@@ -39,6 +42,14 @@ namespace Services
         public async Task ArchiveSemesterAsync(int semesterId)
         {
             var whitelistsToArchive = await _whitelistRepository.GetBySemesterIdAsync(semesterId);
+            
+            var roles = await _semesterRepository.GetAllRolesAsync();
+            var lecturerRole = roles.FirstOrDefault(r => r.RoleName == "Lecturer");
+            if (lecturerRole != null)
+            {
+                whitelistsToArchive = whitelistsToArchive.Where(w => w.RoleId != lecturerRole.RoleId).ToList();
+            }
+
             if (whitelistsToArchive.Any())
             {
                 var archivedWhitelists = whitelistsToArchive.Select(w => new ArchivedWhitelist
@@ -48,6 +59,7 @@ namespace Services
                     Email = w.Email,
                     FullName = w.FullName,
                     RoleId = w.RoleId,
+                    Avatar = w.Avatar,
                     Campus = w.Campus,
                     SemesterId = semesterId,
                     ArchivedAt = DateTime.UtcNow

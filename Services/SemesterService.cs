@@ -1,5 +1,6 @@
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
+using BusinessObjects;
 using AutoMapper;
 using Repositories;
 using Microsoft.Extensions.Configuration;
@@ -15,6 +16,8 @@ namespace Services
         private readonly IUserRepository _userRepository;
         private readonly IRedisService _redisService;
         private readonly IConfiguration _configuration;
+        private readonly ILecturerRepository _lecturerRepository;
+        private readonly IWhitelistRepository _whitelistRepository;
         private readonly System.Threading.SemaphoreSlim _semaphore = new System.Threading.SemaphoreSlim(1, 1);
 
         public SemesterService(
@@ -23,7 +26,9 @@ namespace Services
             IMapper mapper,
             IUserRepository userRepository,
             IRedisService redisService,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ILecturerRepository lecturerRepository,
+            IWhitelistRepository whitelistRepository)
         {
             _semesterRepository = semesterRepository;
             _archivingService = archivingService;
@@ -31,6 +36,8 @@ namespace Services
             _userRepository = userRepository;
             _redisService = redisService;
             _configuration = configuration;
+            _lecturerRepository = lecturerRepository;
+            _whitelistRepository = whitelistRepository;
         }
 
         /// <summary>
@@ -181,6 +188,33 @@ namespace Services
                     dto.Whitelists.AddRange(archivedWlDTOs);
                 }
 
+                // 2.5 Merge Global Lecturers (SemesterId is null)
+                var allDbRoles = await _semesterRepository.GetAllRolesAsync();
+                var lecturerRole = allDbRoles.FirstOrDefault(r => r.RoleName == "Lecturer");
+                if (lecturerRole != null)
+                {
+                    // Using WhitelistRepository to get all whitelists with Lecturer role
+                    var globalWhitelists = await _whitelistRepository.GetByRoleAsync(lecturerRole.RoleId);
+                    var globalLecturers = globalWhitelists.Where(w => w.SemesterId == null).ToList();
+
+                    // Convert to DTO
+                    var globalLecturerDTOs = _mapper.Map<List<WhitelistDTO>>(globalLecturers);
+                    foreach (var gl in globalLecturerDTOs)
+                    {
+                        // Prevent duplicates if there is a leftover legacy entry with a semester ID
+                        if (!dto.Whitelists.Any(w => string.Equals(w.Email, gl.Email, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            gl.RoleName = lecturerRole.RoleName;
+                            dto.Whitelists.Add(gl);
+                        }
+                        else
+                        {
+                            // If a semester-specific entry already exists, consider transferring IsReviewer state visually
+                            // (Though they want to move to purely global list, so this is just a safety check)
+                        }
+                    }
+                }
+
                 // POPULATE AVATARS FOR ALL WHITELISTS
                 if (dto.Whitelists.Any())
                 {
@@ -206,11 +240,16 @@ namespace Services
                     foreach (var wl in dto.Whitelists)
                     {
                         if (string.IsNullOrWhiteSpace(wl.Email)) continue;
+                        string emailKey = wl.Email.Trim().ToLower();
+                        bool hasNoAvatar = string.IsNullOrWhiteSpace(wl.Avatar) || wl.Avatar == "N/A";
 
-                        if (avatarDict.TryGetValue(wl.Email.Trim(), out var avatar))
+                        if (hasNoAvatar && avatarDict.TryGetValue(emailKey, out var avatar) && !string.IsNullOrWhiteSpace(avatar))
                         {
                             wl.Avatar = avatar;
                         }
+
+                        // Also ensure campus is mapped to full name for display
+                        wl.Campus = CampusConstants.MapCodeToFullName(wl.Campus);
                     }
                 }
 
@@ -250,8 +289,30 @@ namespace Services
 
             var semester = _mapper.Map<Semester>(semesterCreateDTO);
             // Force IsActive to false on create. Must be started manually.
-            semester.IsActive = false; 
             var createdSemester = await _semesterRepository.CreateSemesterAsync(semester);
+
+            // Automatically add all active lecturers to the whitelist
+            var activeLecturers = await _lecturerRepository.GetActiveLecturersAsync();
+            var roles = await _semesterRepository.GetAllRolesAsync();
+            var lecturerRole = roles.FirstOrDefault(r => r.RoleName == "Lecturer");
+            
+            if (lecturerRole != null)
+            {
+                foreach (var lecturer in activeLecturers)
+                {
+                    await _whitelistRepository.AddAsync(new Whitelist
+                    {
+                        Email = lecturer.Email,
+                        FullName = lecturer.FullName,
+                        Avatar = lecturer.Avatar,
+                        Campus = CampusConstants.MapCodeToFullName(lecturer.Campus),
+                        RoleId = lecturerRole.RoleId,
+                        SemesterId = createdSemester.SemesterId,
+                        AddedDate = DateTime.UtcNow
+                    });
+                }
+            }
+
             await InvalidateSemesterCacheAsync();
             return _mapper.Map<SemesterDTO>(createdSemester);
         }

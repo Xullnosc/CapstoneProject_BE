@@ -40,6 +40,7 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<ThesisForm> ThesisForms { get; set; }
 
     public virtual DbSet<ThesisFormHistory> ThesisFormHistories { get; set; }
+    public virtual DbSet<Lecturer> Lecturers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -425,6 +426,25 @@ public partial class FctmsContext : DbContext
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
             entity.Property(e => e.UpdatedAt)
+                .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<Lecturer>(entity =>
+        {
+            entity.HasKey(e => e.LecturerId).HasName("PRIMARY");
+            entity.ToTable("lecturers");
+
+            entity.HasIndex(e => e.Email, "UQ_Lecturers_Email").IsUnique();
+
+            entity.Property(e => e.Email).HasMaxLength(255);
+            entity.Property(e => e.FullName).HasMaxLength(255);
+            entity.Property(e => e.Campus).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
         });
 

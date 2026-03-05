@@ -85,7 +85,7 @@ namespace DataAccess
             if (emails == null || !emails.Any()) return new List<User>();
 
             return await _context.Users
-                .Where(u => emails.Contains(u.Email))
+                .Where(u => emails.Contains(u.Email.ToLower()))
                 .AsNoTracking()
                 .ToListAsync();
         }
@@ -96,7 +96,7 @@ namespace DataAccess
                 return new PagedResult<User>(new List<User>(), 0, pageIndex, pageSize);
 
             var query = _context.Users
-                .Where(u => emails.Contains(u.Email))
+                .Where(u => emails.Contains(u.Email.ToLower()))
                 .AsNoTracking();
 
             var totalCount = await query.CountAsync();
