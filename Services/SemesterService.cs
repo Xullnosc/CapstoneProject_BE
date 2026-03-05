@@ -198,7 +198,7 @@ namespace Services
                     var globalLecturers = globalWhitelists.Where(w => w.SemesterId == null).ToList();
 
                     // Convert to DTO
-                    var globalLecturerDTOs = _mapper.Map<List<WhitelistDTO>>(globalLecturers);
+                    var globalLecturerDTOs = _mapper.Map<List<WhitelistDTO>>(globalLecturers ?? new List<Whitelist>());
                     foreach (var gl in globalLecturerDTOs)
                     {
                         // Prevent duplicates if there is a leftover legacy entry with a semester ID
