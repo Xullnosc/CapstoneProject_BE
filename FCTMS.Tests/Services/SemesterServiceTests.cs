@@ -274,11 +274,44 @@ namespace FCTMS.Tests.Services
         {
             // Arrange
             int id = 1;
-            var semester = new Semester { SemesterId = id, SemesterCode = "SP26" };
-            var semesterDTO = new SemesterDTO { SemesterId = id, SemesterCode = "SP26" };
+            var semester = new Semester
+            {
+                SemesterId = id,
+                SemesterCode = "SP26",
+                Teams = new List<Team>(),
+                Whitelists = new List<Whitelist>()
+            };
+            var semesterDTO = new SemesterDTO
+            {
+                SemesterId = id,
+                SemesterCode = "SP26",
+                Teams = new List<TeamSimpleDTO>(),
+                Whitelists = new List<WhitelistDTO>()
+            };
 
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
             _mockMapper.Setup(m => m.Map<SemesterDTO>(semester)).Returns(semesterDTO);
+
+            // Mock archived data (empty)
+            _mockArchivingService.Setup(s => s.GetArchivedTeamsBySemesterAsync(id))
+                .ReturnsAsync(new List<ArchivedTeam>());
+            _mockArchivingService.Setup(s => s.GetArchivedWhitelistsBySemesterIdsAsync(It.IsAny<List<int>>()))
+                .ReturnsAsync(new List<ArchivedWhitelist>());
+
+            // Mock studentRoleId
+            _mockSemesterRepository.Setup(r => r.GetStudentRoleIdAsync()).ReturnsAsync(2);
+
+            // Mock mapper for list types used inside the method
+            _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(It.IsAny<List<Whitelist>>()))
+                .Returns(new List<WhitelistDTO>());
+            _mockMapper.Setup(m => m.Map<List<TeamSimpleDTO>>(It.IsAny<List<ArchivedTeam>>()))
+                .Returns(new List<TeamSimpleDTO>());
+            _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(It.IsAny<List<ArchivedWhitelist>>()))
+                .Returns(new List<WhitelistDTO>());
+
+            // Mock user lookup for avatar population
+            _mockUserRepository.Setup(u => u.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
+                .ReturnsAsync(new List<User>());
 
             // Act
             var result = await _semesterService.GetSemesterByIdAsync(id);
