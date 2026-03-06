@@ -83,18 +83,21 @@ namespace Services
                 foreach (var dto in semesterDTOs)
                 {
                     // Add Active Count (assumed mapped) + Archived Count for Teams
-                    int activeTeamCount = dto.Teams?.Count ?? 0;
+                    int liveTeamTotal = dto.Teams?.Count ?? 0;
+                    int liveActiveTeams = dto.Teams?
+                        .Count(t => string.Equals(t.Status, CampusConstants.TeamStatus.Active, StringComparison.OrdinalIgnoreCase)) ?? 0;
                     int archivedTeamCount = 0;
                     if (archivedTeamsBySemester.TryGetValue(dto.SemesterId, out var archivedTeamsList))
                     {
                         archivedTeamCount = archivedTeamsList.Count;
                     }
 
-                    dto.TeamCount = activeTeamCount + archivedTeamCount;
+                    dto.TeamCount = liveTeamTotal + archivedTeamCount;
+                    dto.ActiveTeamCount = liveActiveTeams; // Only teams with Status = Active
 
                     // Student Count Logic:
-                    // Live/Upcoming -> Count Whitelist (Role = Student)
-                    // Ended -> Count ArchivedWhitelist (Role = Student)
+                    // Status != Ended -> Count Whitelist (Role = Student)
+                    // Status == Ended -> Count ArchivedWhitelist (Role = Student)
                     
                     int liveStudentCount = dto.Whitelists?
                         .Count(w => w.RoleId == studentRoleId) ?? 0;
@@ -106,9 +109,6 @@ namespace Services
                     }
 
                     dto.WhitelistCount = liveStudentCount + archivedStudentCount;
-                    
-                    // Set IsArchived flag if any archived data exists
-                    dto.IsArchived = archivedTeamCount > 0 || archivedStudentCount > 0;
                     
                     // CRITICAL OPTIMIZATION: Clear the Teams and Whitelists lists for the Dashboard view.
                     dto.Teams = new List<TeamSimpleDTO>(); 
@@ -255,13 +255,13 @@ namespace Services
 
                 // 3. Calculate Counts (Total = Live + Archived)
                 int liveTeamCount = semester.Teams?.Count ?? 0;
+                int liveActiveTeams = semester.Teams?
+                    .Count(t => string.Equals(t.Status, CampusConstants.TeamStatus.Active, StringComparison.OrdinalIgnoreCase)) ?? 0;
                 int liveStudentCount = semester.Whitelists?.Count(w => w.RoleId == studentRoleId) ?? 0;
 
                 dto.TeamCount = liveTeamCount + archivedTeamCount;
+                dto.ActiveTeamCount = liveActiveTeams; // Only count Qualified teams
                 dto.WhitelistCount = liveStudentCount + archivedStudentCount;
-                
-                // 4. Set IsArchived flag
-                dto.IsArchived = archivedTeamCount > 0 || archivedStudentCount > 0;
 
                 var ttlStr = _configuration["RedisSettings:SemesterTTLMinutes"];
                 int ttlMinutes2;
@@ -288,30 +288,9 @@ namespace Services
             }
 
             var semester = _mapper.Map<Semester>(semesterCreateDTO);
-            // Force IsActive to false on create. Must be started manually.
+            // Force Status to Upcoming. Must be started manually.
+            semester.Status = "Upcoming";
             var createdSemester = await _semesterRepository.CreateSemesterAsync(semester);
-
-            // Automatically add all active lecturers to the whitelist
-            var activeLecturers = await _lecturerRepository.GetActiveLecturersAsync();
-            var roles = await _semesterRepository.GetAllRolesAsync();
-            var lecturerRole = roles.FirstOrDefault(r => r.RoleName == "Lecturer");
-            
-            if (lecturerRole != null)
-            {
-                foreach (var lecturer in activeLecturers)
-                {
-                    await _whitelistRepository.AddAsync(new Whitelist
-                    {
-                        Email = lecturer.Email,
-                        FullName = lecturer.FullName,
-                        Avatar = lecturer.Avatar,
-                        Campus = CampusConstants.MapCodeToFullName(lecturer.Campus),
-                        RoleId = lecturerRole.RoleId,
-                        SemesterId = createdSemester.SemesterId,
-                        AddedDate = DateTime.UtcNow
-                    });
-                }
-            }
 
             await InvalidateSemesterCacheAsync();
             return _mapper.Map<SemesterDTO>(createdSemester);
@@ -382,7 +361,7 @@ namespace Services
 
                 // 1. Deactivate all other active semesters
                 var allSemesters = await _semesterRepository.GetAllSemestersAsync();
-                var currentActiveIds = allSemesters.Where(s => s.IsActive).Select(s => s.SemesterId).ToList();
+                var currentActiveIds = allSemesters.Where(s => s.Status == "Active").Select(s => s.SemesterId).ToList();
 
                 foreach (var activeId in currentActiveIds)
                 {
@@ -396,9 +375,9 @@ namespace Services
                 // 2. Activate target semester
                 // CRITICAL FIX: Reload fresh entity to ensure tracking state is clean before Update
                 var semesterToActivate = await _semesterRepository.GetSemesterByIdAsync(id);
-                if (semesterToActivate != null && !semesterToActivate.IsActive)
+                if (semesterToActivate != null && semesterToActivate.Status != "Active")
                 {
-                    semesterToActivate.IsActive = true;
+                    semesterToActivate.Status = "Active";
                     // Detach navigation properties to prevent EF tracking conflicts
                     semesterToActivate.Teams = null!;
                     semesterToActivate.Whitelists = null!;
@@ -439,15 +418,23 @@ namespace Services
                     throw new KeyNotFoundException($"Semester with ID {id} not found.");
                 }
 
-                // 1. Mark as Inactive
-                semester.IsActive = false;
+                // 1. Mark as Ended (Always succeed)
+                semester.Status = "Ended";
                 // Detach navigation properties to prevent EF tracking conflicts
                 semester.Teams = null!;
                 semester.Whitelists = null!;
                 await _semesterRepository.UpdateSemesterAsync(semester);
 
-                // 2. Archive Data
-                await _archivingService.ArchiveSemesterAsync(id);
+                // 2. Archive Data (Best effort - not blocking the status change)
+                try 
+                {
+                    await _archivingService.ArchiveSemesterAsync(id);
+                }
+                catch (Exception)
+                {
+                    // Log warning but don't fail the transaction
+                    // In a real app we'd log this: _logger.LogWarning("Archiving failed for semester {id}", id);
+                }
 
                 transaction.Complete();
                 await InvalidateSemesterCacheAsync(id);
@@ -459,7 +446,7 @@ namespace Services
             }
         }
 
-        private async Task InvalidateSemesterCacheAsync(int? id = null)
+        public async Task InvalidateSemesterCacheAsync(int? id = null)
         {
             await _redisService.DeleteValueAsync("fctms:semester:all");
             if (id.HasValue)

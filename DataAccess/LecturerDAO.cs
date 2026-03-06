@@ -52,5 +52,18 @@ namespace DataAccess
             _context.Lecturers.Remove(lecturer);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<IEnumerable<Lecturer>> SearchAsync(string term)
+        {
+            if (string.IsNullOrWhiteSpace(term))
+            {
+                return await _context.Lecturers.Where(l => l.IsActive).OrderBy(l => l.FullName).Take(20).ToListAsync();
+            }
+
+            return await _context.Lecturers
+                .Where(l => l.IsActive && (l.FullName.Contains(term) || l.Email.Contains(term)))
+                .OrderBy(l => l.FullName)
+                .ToListAsync();
+        }
     }
 }

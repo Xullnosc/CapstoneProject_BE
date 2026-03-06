@@ -13,5 +13,6 @@ namespace Repositories
         Task AddAsync(Lecturer lecturer);
         Task UpdateAsync(Lecturer lecturer);
         Task DeleteAsync(Lecturer lecturer);
+        Task<IEnumerable<Lecturer>> SearchAsync(string term);
     }
 }

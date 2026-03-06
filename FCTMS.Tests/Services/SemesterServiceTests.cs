@@ -79,8 +79,7 @@ namespace FCTMS.Tests.Services
                 SemesterCode = "SP26",
                 SemesterName = "Spring 2026",
                 StartDate = DateTime.UtcNow,
-                EndDate = DateTime.UtcNow.AddMonths(4),
-                IsActive = true
+                EndDate = DateTime.UtcNow.AddMonths(4)
             };
 
             var semester = new Semester
@@ -120,7 +119,7 @@ namespace FCTMS.Tests.Services
             // Assert
             result.Should().NotBeNull();
             result.SemesterCode.Should().Be("SP26");
-            _mockSemesterRepository.Verify(r => r.CreateSemesterAsync(semester), Times.Once);
+            _mockSemesterRepository.Verify(r => r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == "Upcoming")), Times.Once);
         }
 
         [Fact]
@@ -140,6 +139,32 @@ namespace FCTMS.Tests.Services
             // Assert
             await act.Should().ThrowAsync<InvalidOperationException>()
                 .WithMessage($"Semester code '{createDto.SemesterCode}' already exists.");
+            
+            _mockSemesterRepository.Verify(r => r.CreateSemesterAsync(It.IsAny<Semester>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CreateSemesterAsync_ShouldThrow_WhenDatesOverlap()
+        {
+            // Arrange
+            var createDto = new SemesterCreateDTO 
+            { 
+                SemesterCode = "SP26", 
+                SemesterName = "Spring 2026",
+                StartDate = DateTime.UtcNow,
+                EndDate = DateTime.UtcNow.AddMonths(4)
+            };
+
+            // Setup: IsOverlapAsync returns true
+            _mockSemesterRepository.Setup(r => r.IsOverlapAsync(createDto.StartDate, createDto.EndDate, null))
+                .ReturnsAsync(true);
+
+            // Act
+            Func<Task> act = async () => await _semesterService.CreateSemesterAsync(createDto);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("Semester dates overlap with another existing semester.");
             
             _mockSemesterRepository.Verify(r => r.CreateSemesterAsync(It.IsAny<Semester>()), Times.Never);
         }
@@ -345,7 +370,7 @@ namespace FCTMS.Tests.Services
         {
             // Arrange
             int id = 1;
-            var semester = new Semester { SemesterId = id, IsActive = true };
+            var semester = new Semester { SemesterId = id, Status = "Active" };
 
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
             _mockSemesterRepository.Setup(r => r.UpdateSemesterAsync(semester)).Returns(Task.CompletedTask);
@@ -355,7 +380,27 @@ namespace FCTMS.Tests.Services
             await _semesterService.EndSemesterAsync(id);
 
             // Assert
-            semester.IsActive.Should().BeFalse();
+            semester.Status.Should().Be("Ended");
+            _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(semester), Times.Once);
+            _mockArchivingService.Verify(s => s.ArchiveSemesterAsync(id), Times.Once);
+        }
+
+        [Fact]
+        public async Task EndSemesterAsync_ShouldStillEnd_WhenArchivingFails()
+        {
+            // Arrange
+            int id = 1;
+            var semester = new Semester { SemesterId = id, Status = "Active" };
+
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
+            _mockSemesterRepository.Setup(r => r.UpdateSemesterAsync(semester)).Returns(Task.CompletedTask);
+            _mockArchivingService.Setup(s => s.ArchiveSemesterAsync(id)).ThrowsAsync(new Exception("Archive failed"));
+
+            // Act
+            await _semesterService.EndSemesterAsync(id);
+
+            // Assert
+            semester.Status.Should().Be("Ended"); // Should still be Ended
             _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(semester), Times.Once);
             _mockArchivingService.Verify(s => s.ArchiveSemesterAsync(id), Times.Once);
         }

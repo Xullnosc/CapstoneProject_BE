@@ -15,7 +15,7 @@ public partial class Semester
 
     public DateTime EndDate { get; set; }
 
-    public bool IsActive { get; set; }
+    public string Status { get; set; } = "Upcoming";
 
     public virtual ICollection<Team> Teams { get; set; } = new List<Team>();
 
