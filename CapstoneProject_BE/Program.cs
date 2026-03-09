@@ -91,6 +91,7 @@ if (!string.IsNullOrEmpty(allowedOrigins))
                     .WithOrigins(allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries))
                     .AllowAnyMethod()
                     .AllowAnyHeader()
+                    .AllowCredentials()
         );
     });
 }
