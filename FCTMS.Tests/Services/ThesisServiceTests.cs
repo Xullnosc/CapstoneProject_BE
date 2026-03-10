@@ -62,7 +62,7 @@ namespace FCTMS.Tests.Services
             _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
             _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
             _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync((Team?)null);
-            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.IsAny<IEnumerable<int>>(), currentSemester.SemesterId)).ReturnsAsync(theses);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.IsAny<IEnumerable<int>>(), It.Is<int?>(id => id == currentSemester.SemesterId))).ReturnsAsync(theses);
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
             { 
                 new ThesisDTO { Title = "Thesis 1" }, 
@@ -142,7 +142,7 @@ namespace FCTMS.Tests.Services
             {
                 new Thesis { ThesisId = "1", Status = "Reviewing" }
             };
-            _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync("Reviewing", null)).ReturnsAsync(theses);
+            _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync(It.IsAny<string?>(), It.IsAny<int?>())).ReturnsAsync(theses);
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
             { 
                 new ThesisDTO { ThesisId = "1", Status = "Reviewing" } 
@@ -304,7 +304,7 @@ namespace FCTMS.Tests.Services
             _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(studentId)).ReturnsAsync(team);
             
             // Should call GetThesesByUserIdsAsync with [2, 1] and semesterId 1
-            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.Is<IEnumerable<int>>(ids => ids.Contains(studentId) && ids.Contains(leaderId)), currentSemester.SemesterId))
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.Is<IEnumerable<int>>(ids => ids.Contains(studentId) && ids.Contains(leaderId)), It.Is<int?>(id => id == currentSemester.SemesterId)))
                 .ReturnsAsync(theses);
 
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(It.IsAny<IEnumerable<Thesis>>())).Returns(new List<ThesisDTO> 
