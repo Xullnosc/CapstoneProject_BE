@@ -211,6 +211,9 @@ namespace Services
 
             if (user.Role?.RoleName == CampusConstants.Roles.Lecturer)
             {
+                // Always add their own ID so they can see their proposed theses
+                ownerIds.Add(user.UserId);
+
                 // Lecturer/Mentor view: see theses of all teams they mentor in current semester
                 var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
                 if (currentSemester != null)
