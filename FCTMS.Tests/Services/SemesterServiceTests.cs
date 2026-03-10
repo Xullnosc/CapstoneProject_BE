@@ -155,16 +155,18 @@ namespace FCTMS.Tests.Services
                 EndDate = DateTime.UtcNow.AddMonths(4)
             };
 
-            // Setup: IsOverlapAsync returns true
+            var conflictSemester = new Semester { SemesterCode = "SU26", SemesterName = "Summer 2026" };
+
+            // Setup: IsOverlapAsync returns conflict semester
             _mockSemesterRepository.Setup(r => r.IsOverlapAsync(createDto.StartDate, createDto.EndDate, null))
-                .ReturnsAsync(true);
+                .ReturnsAsync(conflictSemester);
 
             // Act
             Func<Task> act = async () => await _semesterService.CreateSemesterAsync(createDto);
 
             // Assert
             await act.Should().ThrowAsync<InvalidOperationException>()
-                .WithMessage("Semester dates overlap with another existing semester.");
+                .WithMessage("Semester dates overlap with another existing semester: 'Summer 2026' (SU26).");
             
             _mockSemesterRepository.Verify(r => r.CreateSemesterAsync(It.IsAny<Semester>()), Times.Never);
         }
