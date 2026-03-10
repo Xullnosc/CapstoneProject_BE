@@ -102,7 +102,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
         if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
 
         // Resolve 2 reviewers from Team.MentorId and Team.MentorId2 (mentors of thesis owner's team)
-        var activeSemester = await _context.Semesters.AsNoTracking().FirstOrDefaultAsync(s => s.IsActive);
+        var activeSemester = await _context.Semesters.AsNoTracking().FirstOrDefaultAsync(s => s.Status == "Active");
         var now = DateTime.UtcNow;
         var currentSemester = activeSemester
             ?? await _context.Semesters.AsNoTracking().FirstOrDefaultAsync(s => s.StartDate <= now && s.EndDate >= now);
