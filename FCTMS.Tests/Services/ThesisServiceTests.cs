@@ -480,6 +480,120 @@ namespace FCTMS.Tests.Services
             _mockThesisRepository.Verify(x => x.UpdateThesisAsync(thesis), Times.Once);
             result.Status.Should().Be("Cancelled");
         }
+
+        // ─── ProposeThesisAsync – Team Validation Tests ─────────────────────────
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldThrow_WhenStudentHasNoActiveTeam()
+        {
+            // Arrange
+            string email = "student@fpt.edu.vn";
+            var user = new User { UserId = 5, Email = email, Role = new Role { RoleName = "Student" } };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(user.UserId)).ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(user.UserId)).ReturnsAsync((Team?)null);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.ProposeThesisAsync(
+                new ProposeThesisDTO { Title = "T", File = new Mock<IFormFile>().Object }, email);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("You must be in an active team to propose a thesis.");
+        }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldThrow_WhenStudentIsNotTeamLeader()
+        {
+            // Arrange
+            string email = "member@fpt.edu.vn";
+            int userId = 5;
+            var user = new User { UserId = userId, Email = email, Role = new Role { RoleName = "Student" } };
+            // LeaderId is different from userId → user is NOT the leader
+            var team = new Team { TeamId = 1, LeaderId = 99, Teammembers = new List<Teammember> { new(), new(), new(), new() } };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(userId)).ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync(team);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.ProposeThesisAsync(
+                new ProposeThesisDTO { Title = "T", File = new Mock<IFormFile>().Object }, email);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("Only the team leader can propose a thesis.");
+        }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldThrow_WhenTeamHasFewerThan4Members()
+        {
+            // Arrange
+            string email = "leader@fpt.edu.vn";
+            int userId = 5;
+            var user = new User { UserId = userId, Email = email, Role = new Role { RoleName = "Student" } };
+            // Leader but only 3 members
+            var team = new Team
+            {
+                TeamId = 1,
+                LeaderId = userId,
+                Teammembers = new List<Teammember> { new(), new(), new() } // 3 members
+            };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(userId)).ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync(team);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.ProposeThesisAsync(
+                new ProposeThesisDTO { Title = "T", File = new Mock<IFormFile>().Object }, email);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("Your team must have at least 4 members to propose a thesis. Current members: 3.");
+        }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldSucceed_WhenStudentLeaderWithFourMembers()
+        {
+            // Arrange
+            string email = "leader@fpt.edu.vn";
+            int userId = 5;
+            var user = new User { UserId = userId, Email = email, Role = new Role { RoleName = "Student" } };
+            var team = new Team
+            {
+                TeamId = 1,
+                LeaderId = userId,
+                Teammembers = new List<Teammember> { new(), new(), new(), new() } // exactly 4
+            };
+            var currentSemester = new Semester { SemesterId = 1 };
+
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.FileName).Returns("thesis.docx");
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(userId)).ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync(team);
+            _mockCloudinaryHelper.Setup(x => x.UploadFileAsync(mockFile.Object)).ReturnsAsync("https://cloudinary.com/file.docx");
+            _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
+
+            Thesis? capturedThesis = null;
+            _mockThesisRepository
+                .Setup(x => x.CreateThesisAsync(It.IsAny<Thesis>()))
+                .Callback<Thesis>(t => capturedThesis = t)
+                .ReturnsAsync((Thesis t) => t);
+
+            // Act
+            var result = await _thesisService.ProposeThesisAsync(
+                new ProposeThesisDTO { Title = "My Thesis", File = mockFile.Object }, email);
+
+            // Assert
+            capturedThesis.Should().NotBeNull();
+            capturedThesis!.Status.Should().Be("On Mentor Inviting");
+            capturedThesis.UserId.Should().Be(userId);
+            _mockThesisRepository.Verify(x => x.CreateThesisAsync(It.IsAny<Thesis>()), Times.Once);
+        }
     }
 }
 
