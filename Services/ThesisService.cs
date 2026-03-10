@@ -53,6 +53,21 @@ namespace Services
                 throw new InvalidOperationException("You have already proposed a thesis. You cannot propose more than one.");
             }
 
+            // Students must be the team leader and the team must have at least 4 members.
+            if (user.Role?.RoleName != CampusConstants.Roles.Lecturer)
+            {
+                var team = await _teamRepository.GetActiveTeamByStudentIdAsync(user.UserId);
+                if (team == null)
+                    throw new InvalidOperationException("You must be in an active team to propose a thesis.");
+
+                if (team.LeaderId != user.UserId)
+                    throw new InvalidOperationException("Only the team leader can propose a thesis.");
+
+                if (team.Teammembers.Count < 4)
+                    throw new InvalidOperationException(
+                        $"Your team must have at least 4 members to propose a thesis. Current members: {team.Teammembers.Count}.");
+            }
+
             string? fileUrl = null;
             if (req.File != null)
                 fileUrl = await _cloudinaryHelper.UploadFileAsync(req.File);
