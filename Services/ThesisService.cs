@@ -14,6 +14,7 @@ namespace Services
     public class ThesisService : IThesisService
     {
         private readonly IThesisRepository _thesisRepository;
+        private readonly IThesisReviewRepository _thesisReviewRepository;
         private readonly ITeamRepository _teamRepository;
         private readonly IUserRepository _userRepository;
         private readonly ICloudinaryHelper _cloudinaryHelper;
@@ -22,6 +23,7 @@ namespace Services
 
         public ThesisService(
             IThesisRepository thesisRepository,
+            IThesisReviewRepository thesisReviewRepository,
             ITeamRepository teamRepository,
             IUserRepository userRepository,
             ICloudinaryHelper cloudinaryHelper,
@@ -29,6 +31,7 @@ namespace Services
             IMapper mapper)
         {
             _thesisRepository = thesisRepository;
+            _thesisReviewRepository = thesisReviewRepository;
             _teamRepository = teamRepository;
             _userRepository = userRepository;
             _cloudinaryHelper = cloudinaryHelper;
@@ -256,6 +259,115 @@ namespace Services
             }
 
             return _mapper.Map<IEnumerable<ThesisDTO>>(theses);
+        }
+
+        // ─── Review workflow ────────────────────────────────────────────────────
+
+        public Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId)
+            => _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+
+        public async Task<ThesisReviewStatusDTO> AssignReviewersAsync(string thesisId, int[] reviewerIds, int assignedByUserId)
+        {
+            if (reviewerIds == null) reviewerIds = [];
+            var distinct = reviewerIds.Distinct().ToArray();
+            if (distinct.Length < 2)
+                throw new ArgumentException("At least 2 reviewers are required.");
+
+            var thesis = await _thesisRepository.GetThesisByIdAsync(thesisId);
+            if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
+
+            await _thesisReviewRepository.ReplaceAssignmentsAsync(thesisId, distinct, assignedByUserId);
+
+            // reset status to Reviewing when (re)assigning reviewers
+            thesis.Status = "Reviewing";
+            thesis.UpdateDate = DateTime.UtcNow;
+            await _thesisRepository.UpdateThesisAsync(thesis);
+
+            return await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+        }
+
+        public async Task<ThesisReviewStatusDTO> SubmitReviewerDecisionAsync(string thesisId, int reviewerUserId, SubmitThesisDecisionDTO dto)
+        {
+            if (dto == null) throw new ArgumentNullException(nameof(dto));
+            var decision = (dto.Decision ?? "").Trim();
+            if (!string.Equals(decision, "Pass", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Decision must be Pass or Fail.");
+
+            if (string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase)
+                && string.IsNullOrWhiteSpace(dto.Note))
+                throw new ArgumentException("Fail reason is required.");
+
+            // ensure reviewer is assigned
+            var assignments = await _thesisReviewRepository.GetAssignmentsAsync(thesisId);
+            if (!assignments.Any(a => a.ReviewerId == reviewerUserId))
+                throw new UnauthorizedAccessException("You are not assigned as a reviewer for this thesis.");
+
+            await _thesisReviewRepository.UpsertReviewerReviewAsync(thesisId, reviewerUserId, decision.Equals("Pass", StringComparison.OrdinalIgnoreCase) ? "Pass" : "Fail", dto.Note?.Trim());
+
+            // apply business rules after all reviewers decided
+            var status = await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+            await ApplyDecisionToThesisStatusAsync(thesisId, status);
+            return await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+        }
+
+        public async Task<ThesisReviewStatusDTO> SubmitHodDecisionAsync(string thesisId, int hodUserId, SubmitThesisDecisionDTO dto)
+        {
+            if (dto == null) throw new ArgumentNullException(nameof(dto));
+            var decision = (dto.Decision ?? "").Trim();
+            if (!string.Equals(decision, "Pass", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Decision must be Pass or Fail.");
+
+            if (string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase)
+                && string.IsNullOrWhiteSpace(dto.Note))
+                throw new ArgumentException("Fail reason is required.");
+
+            var status = await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+            if (!status.RequiresHodDecision)
+                throw new InvalidOperationException("HOD decision is not required for this thesis.");
+
+            await _thesisReviewRepository.UpsertHodDecisionAsync(thesisId, hodUserId, decision.Equals("Pass", StringComparison.OrdinalIgnoreCase) ? "Pass" : "Fail", dto.Note?.Trim());
+
+            await ApplyDecisionToThesisStatusAsync(thesisId, await _thesisReviewRepository.GetReviewStatusAsync(thesisId));
+            return await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+        }
+
+        private async Task ApplyDecisionToThesisStatusAsync(string thesisId, ThesisReviewStatusDTO status)
+        {
+            var thesis = await _thesisRepository.GetThesisByIdAsync(thesisId);
+            if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
+
+            // If HOD has decided, that is final for split cases
+            if (status.HodDecision != null)
+            {
+                thesis.Status = string.Equals(status.HodDecision.Decision, "Pass", StringComparison.OrdinalIgnoreCase)
+                    ? "Published"
+                    : "Rejected";
+                thesis.UpdateDate = DateTime.UtcNow;
+                await _thesisRepository.UpdateThesisAsync(thesis);
+                return;
+            }
+
+            if (string.Equals(status.OverallStatus, "Pass", StringComparison.OrdinalIgnoreCase))
+            {
+                thesis.Status = "Published";
+            }
+            else if (string.Equals(status.OverallStatus, "Fail", StringComparison.OrdinalIgnoreCase))
+            {
+                thesis.Status = "Rejected";
+            }
+            else if (string.Equals(status.OverallStatus, "Split", StringComparison.OrdinalIgnoreCase))
+            {
+                thesis.Status = "HOD Reviewing";
+            }
+            else
+            {
+                thesis.Status = "Reviewing";
+            }
+
+            thesis.UpdateDate = DateTime.UtcNow;
+            await _thesisRepository.UpdateThesisAsync(thesis);
         }
 
         /// <summary>

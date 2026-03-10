@@ -21,5 +21,11 @@ namespace Services
         Task<IEnumerable<ThesisDTO>> GetMyThesesAsync(string email, string? status = null, string? searchTitle = null);
         Task<ThesisDTO?> GetThesisDetailAsync(string id);
         Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null);
+
+        // Review workflow (multi reviewer + optional HOD final decision)
+        Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId);
+        Task<ThesisReviewStatusDTO> AssignReviewersAsync(string thesisId, int[] reviewerIds, int assignedByUserId);
+        Task<ThesisReviewStatusDTO> SubmitReviewerDecisionAsync(string thesisId, int reviewerUserId, SubmitThesisDecisionDTO dto);
+        Task<ThesisReviewStatusDTO> SubmitHodDecisionAsync(string thesisId, int hodUserId, SubmitThesisDecisionDTO dto);
     }
 }
