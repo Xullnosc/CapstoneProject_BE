@@ -10,6 +10,7 @@ namespace BusinessObjects.DTOs
         public string? ShortDescription { get; set; }
         public string? FileUrl { get; set; }
         public string? Status { get; set; }
+        public bool IsLocked { get; set; }
         public DateTime? UpDate { get; set; }
         public DateTime? UpdateDate { get; set; }
         public int UserId { get; set; }

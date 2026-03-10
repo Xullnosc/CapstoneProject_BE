@@ -431,6 +431,9 @@ public partial class FctmsContext : DbContext
             entity.Property(e => e.Status)
                 .HasDefaultValueSql("'On Mentor Inviting'")
                 .HasColumnType("enum('Published','Updated','Need Update','Reviewing','Rejected','Registered','Cancelled','On Mentor Inviting')");
+            entity.Property(e => e.IsLocked)
+                .HasDefaultValue(false)
+                .HasColumnName("IsLocked");
             entity.Property(e => e.Title).HasMaxLength(255);
             entity.Property(e => e.UpDate)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")

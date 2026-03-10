@@ -72,7 +72,7 @@ namespace DataAccess
             // Priority 1: Check for explicitly ACTIVE semester (The "Golden Rule")
             var activeSemester = await _context.Semesters
                 .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.IsActive);
+                .FirstOrDefaultAsync(s => s.Status == "Active");
 
             if (activeSemester != null)
             {
@@ -80,7 +80,7 @@ namespace DataAccess
             }
 
             // Priority 2: Fallback to Date Range (Backward Compatibility)
-            // If no semester is flagged IsActive, we fall back to checking dates.
+            // If no semester is explicitly Active, we fall back to checking which semester includes 'now' in its date range.
             var now = DateTime.UtcNow;
             return await _context
                 .Semesters.AsNoTracking()
@@ -124,9 +124,9 @@ namespace DataAccess
             return new PagedResult<Role>(items, totalCount, pageIndex, pageSize);
         }
 
-        public async Task<bool> IsOverlapAsync(DateTime start, DateTime end, int? excludeId)
+        public async Task<Semester?> IsOverlapAsync(DateTime start, DateTime end, int? excludeId)
         {
-            return await _context.Semesters.AnyAsync(s => 
+            return await _context.Semesters.AsNoTracking().FirstOrDefaultAsync(s => 
                 (excludeId == null || s.SemesterId != excludeId) &&
                 start.Date <= s.EndDate.Date && end.Date >= s.StartDate.Date);
         }

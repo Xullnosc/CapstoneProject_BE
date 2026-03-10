@@ -16,6 +16,7 @@ namespace Services
         private readonly ITeamInvitationRepository _teamInvitationRepository;
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly ITeamRepository _teamRepository;
+        private readonly ILecturerRepository _lecturerRepository;
 
         public UserService(
             IUserRepository userRepository, 
@@ -23,7 +24,8 @@ namespace Services
             ITeamMemberRepository teamMemberRepository,
             ITeamInvitationRepository teamInvitationRepository,
             IWhitelistRepository whitelistRepository,
-            ITeamRepository teamRepository)
+            ITeamRepository teamRepository,
+            ILecturerRepository lecturerRepository)
         {
             _userRepository = userRepository;
             _semesterRepository = semesterRepository;
@@ -31,6 +33,7 @@ namespace Services
             _teamInvitationRepository = teamInvitationRepository;
             _whitelistRepository = whitelistRepository;
             _teamRepository = teamRepository;
+            _lecturerRepository = lecturerRepository;
         }
 
         public async Task<List<UserInfoDTO>> SearchStudentsAsync(string term, int currentUserId, int? teamId = null)
@@ -95,27 +98,37 @@ namespace Services
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
             if (currentSemester == null) return new List<UserInfoDTO>();
 
-            // Search from Whitelist instead of User table
-            var whitelistedLecturers = await _whitelistRepository.GetBySemesterIdAsync(currentSemester.SemesterId);
-            if (whitelistedLecturers == null) return new List<UserInfoDTO>();
+            // 1. Search from Global Lecturer Pool (Primary Source)
+            var globalLecturers = await _lecturerRepository.SearchAsync(term ?? string.Empty);
             
-            List<BusinessObjects.Models.Whitelist> filtered;
+            // 2. Search from Whitelist (Secondary Source / Fallback)
+            var whitelistedLecturers = await _whitelistRepository.GetBySemesterIdAsync(currentSemester.SemesterId);
+            
+            // Internal helper class for merging
+            List<LecturerSearchItem> combinedList = new List<LecturerSearchItem>();
 
-            if (string.IsNullOrWhiteSpace(term))
+            foreach (var l in globalLecturers)
             {
-                // Return top 20 mentors if no term is provided
-                filtered = whitelistedLecturers.Where(w => 
-                    (w.Role?.RoleName == CampusConstants.Roles.Lecturer || w.RoleId == 2)
-                ).Take(20).ToList();
+                combinedList.Add(new LecturerSearchItem { Email = l.Email, FullName = l.FullName, RoleId = 2, Avatar = l.Avatar });
             }
-            else
+
+            if (whitelistedLecturers != null)
             {
-                // Filter by search term and role
-                filtered = whitelistedLecturers.Where(w => 
-                    (w.FullName.Contains(term, StringComparison.OrdinalIgnoreCase) || 
-                     w.Email.Contains(term, StringComparison.OrdinalIgnoreCase)) &&
-                    (w.Role?.RoleName == CampusConstants.Roles.Lecturer || w.RoleId == 2)
-                ).ToList();
+                foreach (var w in whitelistedLecturers)
+                {
+                    if (w.RoleId == 2 || (w.Role != null && w.Role.RoleName == CampusConstants.Roles.Lecturer))
+                    {
+                        // Check search term for Whitelist entries
+                        bool matches = string.IsNullOrWhiteSpace(term) || 
+                                       w.Email.Contains(term, StringComparison.OrdinalIgnoreCase) || 
+                                       w.FullName.Contains(term, StringComparison.OrdinalIgnoreCase);
+                                       
+                        if (matches && !combinedList.Any(c => c.Email.Equals(w.Email, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            combinedList.Add(new LecturerSearchItem { Email = w.Email, FullName = w.FullName, RoleId = w.RoleId, Avatar = w.Avatar });
+                        }
+                    }
+                }
             }
 
             var result = new List<UserInfoDTO>();
@@ -126,34 +139,28 @@ namespace Services
                 team = await _teamRepository.GetByIdAsync(teamId.Value);
             }
 
-            // Batch fetch all User records for the whitelisted emails to avoid N+1 queries
-            var emails = filtered.Select(w => w.Email).Distinct().ToList();
+            // Batch fetch all User records
+            var emails = combinedList.Select(c => c.Email).Distinct().ToList();
             var users = await _userRepository.GetUsersByEmailsAsync(emails);
             var userMap = users.ToDictionary(u => u.Email, u => u, StringComparer.OrdinalIgnoreCase);
 
-            foreach (var w in filtered)
+            foreach (var item in combinedList)
             {
-                // Get User object from map instead of per-loop DB call
-                userMap.TryGetValue(w.Email, out var user);
+                userMap.TryGetValue(item.Email, out User? user);
                 
                 if (user != null && user.UserId == currentUserId) continue;
 
-                // Exclude already assigned mentors
                 if (team != null && user != null)
                 {
-                    if (team.MentorId == user.UserId || team.MentorId2 == user.UserId)
-                    {
-                        continue;
-                    }
+                    if (team.MentorId == user.UserId || team.MentorId2 == user.UserId) continue;
                 }
 
                 var dto = new UserInfoDTO
                 {
-                    UserId = user?.UserId ?? 0, // 0 if whitelisted but hasn't logged in yet
-                    Email = w.Email,
-                    FullName = w.FullName ?? string.Empty,
-                    StudentCode = w.StudentCode,
-                    Avatar = user?.Avatar,
+                    UserId = user?.UserId ?? 0,
+                    Email = item.Email,
+                    FullName = item.FullName ?? string.Empty,
+                    Avatar = user?.Avatar ?? item.Avatar,
                     HasTeam = false
                 };
 
@@ -170,6 +177,14 @@ namespace Services
             }
 
             return result;
+        }
+
+        private class LecturerSearchItem
+        {
+            public string Email { get; set; } = null!;
+            public string? FullName { get; set; }
+            public int? RoleId { get; set; }
+            public string? Avatar { get; set; }
         }
     }
 }

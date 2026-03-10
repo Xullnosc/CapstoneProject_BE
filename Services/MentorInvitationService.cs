@@ -18,6 +18,7 @@ namespace Services
         private readonly IThesisRepository _thesisRepo;
         private readonly IWhitelistRepository _whitelistRepo;
         private readonly ISemesterRepository _semesterRepo;
+        private readonly ILecturerRepository _lecturerRepo;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
         private readonly IRedisService _redisService;
@@ -35,6 +36,7 @@ namespace Services
             IThesisRepository thesisRepo,
             IWhitelistRepository whitelistRepo,
             ISemesterRepository semesterRepo,
+            ILecturerRepository lecturerRepo,
             IEmailService emailService,
             IConfiguration configuration,
             IRedisService redisService)
@@ -45,6 +47,7 @@ namespace Services
             _thesisRepo = thesisRepo;
             _whitelistRepo = whitelistRepo;
             _semesterRepo = semesterRepo;
+            _lecturerRepo = lecturerRepo;
             _emailService = emailService;
             _configuration = configuration;
             _redisService = redisService;
@@ -109,24 +112,36 @@ namespace Services
                 throw new Exception("Your team must have a valid thesis (Proposed, Approved, or Published) before inviting a mentor.");
             }
 
-            // Check if mentor is in Whitelist for the current semester
+            // 1. Try to find in Global Lecturer Pool (Priority)
+            var globalLecturer = await _lecturerRepo.GetByEmailAsync(mentorEmail);
+            
+            // 2. Try to find in Whitelist (Fallback/Legacy)
             var whitelistEntry = await _whitelistRepo.GetByEmailAsync(mentorEmail);
-            if (whitelistEntry == null || whitelistEntry.SemesterId != currentSemester.SemesterId)
+
+            if (globalLecturer == null && whitelistEntry == null)
             {
-                throw new Exception("Mentor is not in the whitelist for the current semester.");
+                throw new Exception("Mentor is not found in the global lecturer pool or semester whitelist.");
+            }
+
+            // If it's a student in whitelist, we reject if we specifically want a mentor (lecturer role)
+            // But usually, lecturers are managed in the Lecturers table now.
+            if (globalLecturer == null && whitelistEntry != null && whitelistEntry.RoleId != 2)
+            {
+                throw new Exception("Invited user is not a lecturer.");
             }
 
             var mentor = await _userRepo.GetByEmailAsync(mentorEmail);
             
-            // If mentor doesn't exist, create Shell Account
+            // If mentor user record doesn't exist, create Shell Account from either Pool or Whitelist
             if (mentor == null)
             {
                 mentor = new User
                 {
-                    Email = whitelistEntry.Email,
-                    FullName = whitelistEntry.FullName ?? "Lecturer",
-                    RoleId = whitelistEntry.RoleId ?? 2, // Default to Lecturer role id if not set (2)
-                    Campus = whitelistEntry.Campus,
+                    Email = globalLecturer?.Email ?? whitelistEntry!.Email,
+                    FullName = globalLecturer?.FullName ?? whitelistEntry?.FullName ?? "Lecturer",
+                    Avatar = globalLecturer?.Avatar ?? whitelistEntry?.Avatar ?? "",
+                    RoleId = 2, // Default to Lecturer role id
+                    Campus = globalLecturer?.Campus ?? whitelistEntry?.Campus,
                     IsAuthorized = true,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -134,7 +149,8 @@ namespace Services
             }
             else
             {
-                if (mentor.Role?.RoleName != CampusConstants.Roles.Lecturer && whitelistEntry.RoleId != 2) 
+                // Check if the user is actually a lecturer
+                if (mentor.Role?.RoleName != CampusConstants.Roles.Lecturer && mentor.RoleId != 2) 
                     throw new Exception("Invited user is not a lecturer.");
             }
             
