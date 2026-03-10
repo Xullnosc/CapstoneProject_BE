@@ -91,7 +91,7 @@ namespace DataAccess
 
         // ─── Phase 02: New Methods ───────────────────────────────────────────────
 
-        public async Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId)
+        public async Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null)
         {
             var query = _context.Theses
                 .AsNoTracking()
@@ -103,6 +103,9 @@ namespace DataAccess
 
             if (userId.HasValue)
                 query = query.Where(t => t.UserId == userId.Value);
+
+            if (semesterId.HasValue)
+                query = query.Where(t => t.SemesterId == semesterId.Value);
 
             return await query.OrderByDescending(t => t.UpdateDate).ToListAsync();
         }

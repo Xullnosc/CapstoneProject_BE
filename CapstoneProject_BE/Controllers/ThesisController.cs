@@ -103,11 +103,11 @@ namespace CapstoneProject_BE.Controllers
         /// Returns filtered list of all theses. All query params are optional.
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetAllTheses([FromQuery] string? status, [FromQuery] int? userId, [FromQuery] string? searchTitle)
+        public async Task<IActionResult> GetAllTheses([FromQuery] string? status, [FromQuery] int? userId, [FromQuery] string? searchTitle, [FromQuery] int? semesterId)
         {
             try
             {
-                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle);
+                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle, semesterId);
                 return Ok(theses);
             }
             catch (Exception ex)

@@ -17,6 +17,6 @@ namespace DataAccess
         Task<int> GetStudentRoleIdAsync();
         Task<List<Role>> GetAllRolesAsync();
         Task<PagedResult<Role>> GetAllRolesAsync(int pageIndex, int pageSize);
-        Task<bool> IsOverlapAsync(DateTime start, DateTime end, int? excludeId);
+        Task<Semester?> IsOverlapAsync(DateTime start, DateTime end, int? excludeId);
     }
 }

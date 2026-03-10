@@ -44,7 +44,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = CampusConstants.Roles.HOD)]
+        [Authorize(Roles = CampusConstants.Roles.HOD + "," + CampusConstants.Roles.Admin)]
         public async Task<ActionResult<SemesterDTO>> CreateSemester(
             SemesterCreateDTO semesterCreateDTO
         )
@@ -58,6 +58,10 @@ namespace CapstoneProject_BE.Controllers
                     created
                 );
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { message = ex.Message });
@@ -65,7 +69,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpPut("{id}")]
-        [Authorize(Roles = CampusConstants.Roles.HOD)]
+        [Authorize(Roles = CampusConstants.Roles.HOD + "," + CampusConstants.Roles.Admin)]
         public async Task<IActionResult> UpdateSemester(int id, SemesterCreateDTO semesterCreateDTO)
         {
             if (id != semesterCreateDTO.SemesterId)
@@ -77,6 +81,10 @@ namespace CapstoneProject_BE.Controllers
             {
                 await _semesterService.UpdateSemesterAsync(semesterCreateDTO);
                 return NoContent();
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
             }
             catch (InvalidOperationException ex)
             {

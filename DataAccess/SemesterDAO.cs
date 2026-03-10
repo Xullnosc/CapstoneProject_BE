@@ -124,9 +124,9 @@ namespace DataAccess
             return new PagedResult<Role>(items, totalCount, pageIndex, pageSize);
         }
 
-        public async Task<bool> IsOverlapAsync(DateTime start, DateTime end, int? excludeId)
+        public async Task<Semester?> IsOverlapAsync(DateTime start, DateTime end, int? excludeId)
         {
-            return await _context.Semesters.AnyAsync(s => 
+            return await _context.Semesters.AsNoTracking().FirstOrDefaultAsync(s => 
                 (excludeId == null || s.SemesterId != excludeId) &&
                 start.Date <= s.EndDate.Date && end.Date >= s.StartDate.Date);
         }

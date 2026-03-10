@@ -330,11 +330,11 @@ namespace Services
             if (prefix == "SU" && !name.Contains("summer")) throw new ArgumentException("Code 'SU' (Summer) requires 'Summer' in Semester Name.");
             if (prefix == "FA" && !name.Contains("fall")) throw new ArgumentException("Code 'FA' (Fall) requires 'Fall' in Semester Name.");
 
-            // 3. Check Date Overlap (Optimized to use Database AnyAsync)
-            bool isOverlap = await _semesterRepository.IsOverlapAsync(dto.StartDate, dto.EndDate, dto.SemesterId > 0 ? dto.SemesterId : null);
-            if (isOverlap)
+            // 3. Check Date Overlap (Optimized to use Database FirstOrDefaultAsync)
+            var overlapSemester = await _semesterRepository.IsOverlapAsync(dto.StartDate, dto.EndDate, dto.SemesterId > 0 ? dto.SemesterId : null);
+            if (overlapSemester != null)
             {
-                throw new InvalidOperationException($"Semester dates overlap with another existing semester.");
+                throw new InvalidOperationException($"Semester dates overlap with another existing semester: '{overlapSemester.SemesterName}' ({overlapSemester.SemesterCode}).");
             }
         }
 
