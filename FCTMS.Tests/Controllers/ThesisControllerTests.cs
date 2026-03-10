@@ -98,10 +98,10 @@ namespace FCTMS.Tests.Controllers
             {
                 new ThesisDTO { ThesisId = "1", Status = "Reviewing" }
             };
-            _mockThesisService.Setup(x => x.GetFilteredThesesAsync("Reviewing", null, null, It.IsAny<int?>())).ReturnsAsync(dtos);
+            _mockThesisService.Setup(x => x.GetFilteredThesesAsync("Reviewing", null, null, It.IsAny<int?>(), null, false)).ReturnsAsync(dtos);
 
             // Act
-            var result = await _controller.GetAllTheses("Reviewing", null, null, null);
+            var result = await _controller.GetAllTheses("Reviewing", null, null, null, null, false);
 
             // Assert
             var okResult = result.Should().BeOfType<OkObjectResult>().Subject;

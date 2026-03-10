@@ -1,0 +1,2 @@
+ALTER TABLE `thesis`
+    ADD COLUMN `IsLocked` TINYINT(1) NOT NULL DEFAULT 0;
