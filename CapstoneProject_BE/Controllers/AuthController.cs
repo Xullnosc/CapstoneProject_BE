@@ -1,59 +1,125 @@
-﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Services;
 using Services.DTOs;
-using StackExchange.Redis;
 
-namespace capstone_be.Controllers
+namespace capstone_be.Controllers;
+
+[Route("api/[controller]")]
+[ApiController]
+public class AuthController : ControllerBase
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class AuthController : ControllerBase
+    private const string RefreshTokenCookieName = "refreshToken";
+    private readonly IAuthService _authService;
+    private readonly ILogger<AuthController> _logger;
+    private readonly IWebHostEnvironment _env;
+
+    public AuthController(IAuthService authService, ILogger<AuthController> logger, IWebHostEnvironment env)
     {
-        private readonly IAuthService _authService;
-        private readonly ILogger<AuthController> _logger;
+        _authService = authService;
+        _logger = logger;
+        _env = env;
+    }
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequestDTO request)
+    {
+        try
         {
-            _authService = authService;
-            _logger = logger;
-        }
+            if (request == null)
+                return BadRequest(new { message = "Request body is null" });
+            if (string.IsNullOrWhiteSpace(request.IdToken))
+            {
+                Console.WriteLine($"Login failed. IdToken is empty. Campus: {request.Campus}");
+                return BadRequest(new { message = "IdToken is required" });
+            }
 
-        [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequestDTO request)
+            var result = await _authService.GoogleLoginAsync(request);
+            SetRefreshTokenCookie(result.RefreshToken, result.RefreshTokenExpiresAt);
+            return Ok(new LoginResponseDTO
+            {
+                AccessToken = result.AccessToken,
+                Token = result.AccessToken,
+                UserInfo = result.UserInfo
+            });
+        }
+        catch (UnauthorizedAccessException ex)
         {
-            try
-            {
-                if (request == null)
-                {
-                    return BadRequest(new { message = "Request body is null" });
-                }
-
-                if (string.IsNullOrWhiteSpace(request.IdToken))
-                {
-                    // Debugging: Log what we received
-                    Console.WriteLine($"Login failed. IdToken is empty. Campus: {request.Campus}");
-                    return BadRequest(new { message = "IdToken is required" });
-                }
-
-                var response = await _authService.GoogleLoginAsync(request);
-                return Ok(response);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                _logger.LogWarning(ex, "Unauthorized login attempt");
-                return Unauthorized(new { message = ex.Message });
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogError(ex, "Configuration error during login");
-                return StatusCode(500, new { message = "Server configuration error" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Unexpected error during login");
-                return StatusCode(500, new { message = ex.ToString() });
-            }
+            _logger.LogWarning(ex, "Unauthorized login attempt");
+            return Unauthorized(new { message = ex.Message });
         }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "Configuration error during login");
+            return StatusCode(500, new { message = "Server configuration error" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during login");
+            return StatusCode(500, new { message = ex.ToString() });
+        }
+    }
+
+    [HttpPost("login/credentials")]
+    public async Task<IActionResult> LoginWithCredentials([FromBody] CredentialLoginRequestDTO request)
+    {
+        try
+        {
+            if (request == null)
+                return BadRequest(new { message = "Request body is null" });
+
+            var result = await _authService.CredentialLoginAsync(request);
+            SetRefreshTokenCookie(result.RefreshToken, result.RefreshTokenExpiresAt);
+            return Ok(new LoginResponseDTO
+            {
+                AccessToken = result.AccessToken,
+                Token = result.AccessToken,
+                UserInfo = result.UserInfo
+            });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning(ex, "Unauthorized credential login attempt");
+            return Unauthorized(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during credential login");
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh()
+    {
+        var refreshToken = Request.Cookies[RefreshTokenCookieName];
+        var result = await _authService.RefreshTokenAsync(refreshToken);
+        if (result == null)
+            return Unauthorized(new { message = "Invalid or expired refresh token" });
+        SetRefreshTokenCookie(result.RefreshToken, result.RefreshTokenExpiresAt);
+        return Ok(new RefreshResponseDTO { AccessToken = result.AccessToken });
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        var refreshToken = Request.Cookies[RefreshTokenCookieName];
+        await _authService.RevokeRefreshTokenAsync(refreshToken);
+        Response.Cookies.Delete(RefreshTokenCookieName);
+        return Ok(new { message = "Logged out" });
+    }
+
+    private void SetRefreshTokenCookie(string? refreshToken, DateTime? expiresAt)
+    {
+        if (string.IsNullOrEmpty(refreshToken))
+            return;
+        var options = new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = !_env.IsDevelopment(),
+            SameSite = SameSiteMode.Lax,
+            Path = "/",
+            MaxAge = expiresAt.HasValue ? (TimeSpan)(expiresAt.Value - DateTime.UtcNow) : TimeSpan.FromDays(7)
+        };
+        Response.Cookies.Append(RefreshTokenCookieName, refreshToken, options);
     }
 }

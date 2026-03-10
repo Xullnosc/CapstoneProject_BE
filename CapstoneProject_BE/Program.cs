@@ -11,6 +11,7 @@ using Services;
 using Services.Helpers;
 using Services.Mappings;
 using StackExchange.Redis;
+using CapstoneProject_BE.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -90,12 +91,14 @@ if (!string.IsNullOrEmpty(allowedOrigins))
                     .WithOrigins(allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries))
                     .AllowAnyMethod()
                     .AllowAnyHeader()
+                    .AllowCredentials()
         );
     });
 }
 
 //Services (Services Layer)
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddScoped<ISemesterService, SemesterService>();
 builder.Services.AddScoped<ITeamService, TeamService>();
@@ -114,6 +117,8 @@ builder.Services.AddScoped<ILecturerService, LecturerService>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
+builder.Services.AddScoped<ISystemUserCredentialDAO, SystemUserCredentialDAO>();
+builder.Services.AddScoped<IRefreshTokenDAO, RefreshTokenDAO>();
 builder.Services.AddScoped<IWhitelistDAO, WhitelistDAO>();
 builder.Services.AddScoped<ISemesterDAO, SemesterDAO>();
 builder.Services.AddScoped<ITeamDAO, TeamDAO>();
@@ -128,6 +133,8 @@ builder.Services.AddScoped<ILecturerDAO, LecturerDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ISystemUserCredentialRepository, SystemUserCredentialRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IWhitelistRepository, WhitelistRepository>();
 builder.Services.AddScoped<ISemesterRepository, SemesterRepository>();
 builder.Services.AddScoped<ITeamRepository, TeamRepository>();
@@ -244,6 +251,9 @@ app.MapGet(
         );
     }
 );
+
+// Seed default Admin account on first run (if no Admin exists)
+app.SeedDefaultAdmin();
 
 // Health endpoint for readiness checks
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" })).WithName("Health");

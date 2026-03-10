@@ -1,43 +1,44 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using AutoMapper;
 using BusinessObjects;
 using BusinessObjects.Models;
-using Google.Apis.Auth;
 using Microsoft.Extensions.Configuration;
 using Repositories;
 using Services.DTOs;
 using Services.Helpers;
 
-namespace Services
+namespace Services;
+
+public class AuthService : IAuthService
 {
-    public class AuthService : IAuthService
+    private const int DefaultRefreshExpireDays = 7;
+    private readonly IUserRepository _userRepository;
+    private readonly IWhitelistRepository _whitelistRepository;
+    private readonly ISystemUserCredentialRepository _credentialRepository;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly IMapper _mapper;
+    private readonly IConfiguration _configuration;
+    private readonly HttpClient _httpClient;
+
+    public AuthService(
+        IUserRepository userRepository,
+        IWhitelistRepository whitelistRepository,
+        ISystemUserCredentialRepository credentialRepository,
+        IRefreshTokenRepository refreshTokenRepository,
+        IMapper mapper,
+        IConfiguration configuration,
+        HttpClient httpClient
+    )
     {
-        private readonly IUserRepository _userRepository;
-        private readonly IWhitelistRepository _whitelistRepository;
-        private readonly IMapper _mapper;
-        private readonly IConfiguration _configuration;
-        private readonly HttpClient _httpClient;
+        _userRepository = userRepository;
+        _whitelistRepository = whitelistRepository;
+        _credentialRepository = credentialRepository;
+        _refreshTokenRepository = refreshTokenRepository;
+        _mapper = mapper;
+        _configuration = configuration;
+        _httpClient = httpClient;
+    }
 
-        public AuthService(
-            IUserRepository userRepository,
-            IWhitelistRepository whitelistRepository,
-            IMapper mapper,
-            IConfiguration configuration,
-            HttpClient httpClient
-        )
-        {
-            _userRepository = userRepository;
-            _whitelistRepository = whitelistRepository;
-            _mapper = mapper;
-            _configuration = configuration;
-            _httpClient = httpClient;
-        }
-
-        public async Task<LoginResponseDTO> GoogleLoginAsync(LoginRequestDTO request)
+    public async Task<LoginResultDTO> GoogleLoginAsync(LoginRequestDTO request)
         {
             try
             {
@@ -178,43 +179,137 @@ namespace Services
                 }
 
                 // 5. Generate JWT Token
-                var expireConfig = _configuration["Jwt:ExpireMinutes"];
-                if (!int.TryParse(expireConfig, out int expireMinutes))
-                {
-                    Console.WriteLine(
-                        $"[AUTH DEBUG] Invalid or missing Jwt:ExpireMinutes configuration: '{expireConfig}'. Using default 60 mins."
-                    );
-                    expireMinutes = 60;
-                }
-
-                var jwtSettings = new JwtSettings
-                {
-                    Key =
-                        _configuration["Jwt:Key"]
-                        ?? throw new InvalidOperationException(
-                            "Jwt:Key is missing in configuration."
-                        ),
-                    Issuer = _configuration["Jwt:Issuer"] ?? "FCTMS",
-                    Audience = _configuration["Jwt:Audience"] ?? "FCTMS",
-                    ExpireMinutes = expireMinutes,
-                };
+                var jwtSettings = GetJwtSettings();
 
                 var isReviewer = whitelistEntry?.IsReviewer ?? false;
 
-                var token = JwtTokenGenerator.GenerateToken(user, isReviewer, jwtSettings);
+                var accessToken = JwtTokenGenerator.GenerateToken(user, isReviewer, jwtSettings);
+                var (refreshToken, refreshExpiresAt) = await CreateRefreshTokenAndSaveAsync(user.UserId);
 
-                // 6. Map to DTO and return
                 var userInfo = _mapper.Map<UserInfoDTO>(user);
                 userInfo.IsReviewer = isReviewer;
 
-                return new LoginResponseDTO { Token = token, UserInfo = userInfo };
+                return new LoginResultDTO
+                {
+                    AccessToken = accessToken,
+                    UserInfo = userInfo,
+                    RefreshToken = refreshToken,
+                    RefreshTokenExpiresAt = refreshExpiresAt
+                };
             }
             catch (Exception ex)
             {
-                // Log crucial details to Azure Log Stream
                 Console.WriteLine($"[CRITICAL AUTH ERROR] Exception in GoogleLoginAsync: {ex}");
-                throw; // Rethrow to let AuthController handle the response
+                throw;
             }
         }
+
+    public async Task<LoginResultDTO> CredentialLoginAsync(CredentialLoginRequestDTO request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+            throw new UnauthorizedAccessException("Username and password are required.");
+
+        var credential = await _credentialRepository.GetByUsernameAsync(request.Username.Trim());
+        if (credential == null || credential.User?.Role == null)
+            throw new UnauthorizedAccessException("Invalid username or password.");
+
+        var roleName = credential.User.Role.RoleName;
+        if (roleName != CampusConstants.Roles.HOD && roleName != CampusConstants.Roles.Admin)
+            throw new UnauthorizedAccessException("Credential login is only allowed for HOD and Admin.");
+
+        if (!BCrypt.Net.BCrypt.Verify(request.Password, credential.PasswordHash))
+            throw new UnauthorizedAccessException("Invalid username or password.");
+
+        var user = credential.User;
+        user.LastLogin = DateTime.UtcNow;
+        await _userRepository.UpdateAsync(user);
+
+        var jwtSettings = GetJwtSettings();
+        var accessToken = JwtTokenGenerator.GenerateToken(user, false, jwtSettings);
+        var (refreshToken, refreshExpiresAt) = await CreateRefreshTokenAndSaveAsync(user.UserId);
+
+        var userInfo = _mapper.Map<UserInfoDTO>(user);
+        return new LoginResultDTO
+        {
+            AccessToken = accessToken,
+            UserInfo = userInfo,
+            RefreshToken = refreshToken,
+            RefreshTokenExpiresAt = refreshExpiresAt
+        };
+    }
+
+    public async Task<RefreshResultDTO?> RefreshTokenAsync(string? refreshTokenFromCookie)
+    {
+        if (string.IsNullOrWhiteSpace(refreshTokenFromCookie))
+            return null;
+
+        var tokenHash = RefreshTokenHelper.ComputeHash(refreshTokenFromCookie);
+        var stored = await _refreshTokenRepository.GetValidByTokenHashAsync(tokenHash);
+        if (stored == null)
+            return null;
+
+        await _refreshTokenRepository.RevokeByIdAsync(stored.Id);
+        var user = await _userRepository.GetByIdAsync(stored.UserId);
+        if (user == null || user.Role == null)
+            return null;
+
+        var jwtSettings = GetJwtSettings();
+        var accessToken = JwtTokenGenerator.GenerateToken(user, user.Role.RoleName == CampusConstants.Roles.Lecturer && false, jwtSettings);
+        var (newRefreshToken, newRefreshExpiresAt) = await CreateRefreshTokenAndSaveAsync(user.UserId);
+
+        return new RefreshResultDTO
+        {
+            AccessToken = accessToken,
+            RefreshToken = newRefreshToken,
+            RefreshTokenExpiresAt = newRefreshExpiresAt
+        };
+    }
+
+    public async Task RevokeRefreshTokenAsync(string? refreshTokenFromCookie)
+    {
+        if (string.IsNullOrWhiteSpace(refreshTokenFromCookie))
+            return;
+        var tokenHash = RefreshTokenHelper.ComputeHash(refreshTokenFromCookie);
+        var stored = await _refreshTokenRepository.GetValidByTokenHashAsync(tokenHash);
+        if (stored != null)
+            await _refreshTokenRepository.RevokeByIdAsync(stored.Id);
+    }
+
+    private async Task<(string Token, DateTime ExpiresAt)> CreateRefreshTokenAndSaveAsync(int userId)
+    {
+        var refreshExpireDays = DefaultRefreshExpireDays;
+        if (int.TryParse(_configuration["Jwt:RefreshExpireDays"], out var days) && days > 0)
+        {
+            refreshExpireDays = days;
+        }
+
+        var expiresAt = DateTime.UtcNow.AddDays(refreshExpireDays);
+        var (token, tokenHash) = RefreshTokenHelper.GenerateTokenAndHash();
+
+        await _refreshTokenRepository.AddAsync(new RefreshToken
+        {
+            UserId = userId,
+            TokenHash = tokenHash,
+            ExpiresAt = expiresAt
+        });
+        return (token, expiresAt);
+    }
+
+    private JwtSettings GetJwtSettings()
+    {
+        var expireMinutes = 60;
+        var expireConfig = _configuration["Jwt:ExpireMinutes"];
+        if (!string.IsNullOrWhiteSpace(expireConfig) && int.TryParse(expireConfig, out var parsed) && parsed > 0)
+        {
+            expireMinutes = parsed;
+        }
+
+        return new JwtSettings
+        {
+            Key = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is missing."),
+            Issuer = _configuration["Jwt:Issuer"] ?? "FCTMS",
+            Audience = _configuration["Jwt:Audience"] ?? "FCTMS",
+            ExpireMinutes = expireMinutes
+        };
     }
 }
