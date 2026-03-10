@@ -91,11 +91,12 @@ namespace DataAccess
 
         // ─── Phase 02: New Methods ───────────────────────────────────────────────
 
-        public async Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null)
+        public async Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false)
         {
             var query = _context.Theses
                 .AsNoTracking()
                 .Include(t => t.User)
+                    .ThenInclude(u => u.Role)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(status))
@@ -106,6 +107,12 @@ namespace DataAccess
 
             if (semesterId.HasValue)
                 query = query.Where(t => t.SemesterId == semesterId.Value);
+
+            if (isLocked.HasValue)
+                query = query.Where(t => t.IsLocked == isLocked.Value);
+
+            if (lecturerOnly)
+                query = query.Where(t => t.User.Role != null && t.User.Role.RoleName == "Lecturer");
 
             return await query.OrderByDescending(t => t.UpdateDate).ToListAsync();
         }

@@ -68,7 +68,9 @@ namespace Services
                 ShortDescription = req.ShortDescription,
                 UserId = user.UserId,
                 FileUrl = fileUrl,
-                Status = "On Mentor Inviting",
+                Status = user.Role?.RoleName == CampusConstants.Roles.Lecturer
+                ? "Reviewing"
+                : "On Mentor Inviting",
                 SemesterId = currentSemester?.SemesterId,
                 UpDate = DateTime.UtcNow,
                 UpdateDate = DateTime.UtcNow
@@ -279,15 +281,42 @@ namespace Services
         /// <summary>
         /// Get filtered list of theses. All filters are optional.
         /// </summary>
-        public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null, int? semesterId = null)
+        public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false)
         {
-            var theses = await _thesisRepository.GetAllThesesFilteredAsync(status, userId, semesterId);
+            var theses = await _thesisRepository.GetAllThesesFilteredAsync(status, userId, semesterId, isLocked, lecturerOnly);
             var dtos = _mapper.Map<IEnumerable<ThesisDTO>>(theses);
             if (!string.IsNullOrWhiteSpace(searchTitle))
             {
                 dtos = dtos.Where(d => d.Title != null && d.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase));
             }
             return dtos;
+        }
+        /// <summary>
+        /// Toggle the locked state of a lecturer-proposed thesis.
+        /// Only the owning Lecturer can lock/unlock their own thesis.
+        /// </summary>
+        public async Task<ThesisDTO> ToggleThesisLockAsync(string thesisId, string email)
+        {
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null)
+                throw new UnauthorizedAccessException("User not found.");
+
+            if (user.Role?.RoleName != CampusConstants.Roles.Lecturer)
+                throw new UnauthorizedAccessException("Only lecturers can lock or unlock a thesis.");
+
+            var thesis = await _thesisRepository.GetThesisByIdWithHistoriesAsync(thesisId);
+            if (thesis == null)
+                throw new KeyNotFoundException("Thesis not found.");
+
+            if (thesis.UserId != user.UserId)
+                throw new UnauthorizedAccessException("You are not authorized to lock/unlock this thesis.");
+
+            thesis.IsLocked = !thesis.IsLocked;
+            thesis.UpdateDate = DateTime.UtcNow;
+
+            await _thesisRepository.UpdateThesisAsync(thesis);
+
+            return _mapper.Map<ThesisDTO>(thesis);
         }
     }
 }

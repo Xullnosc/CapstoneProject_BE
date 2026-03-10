@@ -16,7 +16,7 @@ namespace DataAccess
         Task UpdateThesisAsync(Thesis thesis);
 
         // New methods for Phase 02
-        Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null);
+        Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false);
         Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id);
         Task AddThesisHistoryAsync(ThesisHistory history);
         Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds, int? semesterId = null);
