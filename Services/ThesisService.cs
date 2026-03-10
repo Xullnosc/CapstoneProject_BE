@@ -276,9 +276,9 @@ namespace Services
         /// <summary>
         /// Get filtered list of theses. All filters are optional.
         /// </summary>
-        public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null)
+        public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null, int? semesterId = null)
         {
-            var theses = await _thesisRepository.GetAllThesesFilteredAsync(status, userId);
+            var theses = await _thesisRepository.GetAllThesesFilteredAsync(status, userId, semesterId);
             var dtos = _mapper.Map<IEnumerable<ThesisDTO>>(theses);
             if (!string.IsNullOrWhiteSpace(searchTitle))
             {

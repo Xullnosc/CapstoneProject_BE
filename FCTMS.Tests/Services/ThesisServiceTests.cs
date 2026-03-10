@@ -142,7 +142,7 @@ namespace FCTMS.Tests.Services
             {
                 new Thesis { ThesisId = "1", Status = "Reviewing" }
             };
-            _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync("Reviewing", null)).ReturnsAsync(theses);
+            _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync("Reviewing", null, It.IsAny<int?>())).ReturnsAsync(theses);
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
             { 
                 new ThesisDTO { ThesisId = "1", Status = "Reviewing" } 
