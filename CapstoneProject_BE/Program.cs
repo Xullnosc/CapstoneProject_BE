@@ -183,12 +183,21 @@ builder.Services.AddAuthorization(options =>
     // Reviewer policy: any user with IsReviewer=true (typically lecturers assigned as reviewer)
     options.AddPolicy("Reviewer", policy => policy.RequireClaim("IsReviewer", "true"));
 
+    // Lecturer policy: role claim equals Lecturer
+    options.AddPolicy(
+        "Lecturer",
+        policy =>
+            policy.RequireAssertion(context =>
+                context.User.HasClaim("role", BusinessObjects.CampusConstants.Roles.Lecturer)
+            )
+    );
+
     options.AddPolicy(
         "HodOrAdmin",
         policy =>
             policy.RequireAssertion(context =>
-                context.User.HasClaim("role", BusinessObjects.CampusConstants.Roles.HOD)
-                || context.User.HasClaim("role", BusinessObjects.CampusConstants.Roles.Admin)
+                context.User.IsInRole(BusinessObjects.CampusConstants.Roles.HOD)
+                || context.User.IsInRole(BusinessObjects.CampusConstants.Roles.Admin)
             )
     );
 

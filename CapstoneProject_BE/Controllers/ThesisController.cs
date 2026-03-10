@@ -177,29 +177,35 @@ namespace CapstoneProject_BE.Controllers
         /// MUST be declared before PUT "{id}" so that /review is matched correctly.
         /// </summary>
         [HttpPut("{id}/review")]
-        [Authorize(Policy = "Reviewer")]
+        [Authorize] // temporarily allow any authenticated user; policy-level checks moved into service logic
         public async Task<IActionResult> SubmitReviewerDecision(string id, [FromBody] SubmitThesisDecisionDTO dto)
         {
             try
             {
                 var userId = GetUserId();
+                Console.WriteLine($"[ThesisReview] SubmitReviewerDecision START - UserId={userId}, ThesisId={id}, Decision={dto?.Decision}");
                 var status = await _thesisService.SubmitReviewerDecisionAsync(id, userId, dto);
+                Console.WriteLine($"[ThesisReview] SubmitReviewerDecision OK - UserId={userId}, ThesisId={id}, OverallStatus={status.OverallStatus}");
                 return Ok(status);
             }
             catch (UnauthorizedAccessException ex)
             {
+                Console.WriteLine($"[ThesisReview] 403 UnauthorizedAccessException - {ex.Message}");
                 return StatusCode(403, new { Message = ex.Message });
             }
             catch (ArgumentException ex)
             {
+                Console.WriteLine($"[ThesisReview] 400 ArgumentException - {ex.Message}");
                 return BadRequest(new { Message = ex.Message });
             }
             catch (KeyNotFoundException ex)
             {
+                Console.WriteLine($"[ThesisReview] 404 KeyNotFoundException - {ex.Message}");
                 return NotFound(new { Message = ex.Message });
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[ThesisReview] 400 Exception - {ex}");
                 return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
             }
         }

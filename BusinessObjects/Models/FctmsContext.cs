@@ -240,6 +240,13 @@ public partial class FctmsContext : DbContext
             entity.Property(e => e.AssignedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
+            entity.Property(e => e.ThesisId)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => Guid.Parse(v),
+                    v => v.ToString()
+                );
         });
 
         modelBuilder.Entity<ThesisReview>(entity =>
@@ -250,6 +257,13 @@ public partial class FctmsContext : DbContext
             entity.Property(e => e.ReviewedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
+            entity.Property(e => e.ThesisId)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => Guid.Parse(v),
+                    v => v.ToString()
+                );
         });
 
         modelBuilder.Entity<ThesisHodDecision>(entity =>
@@ -260,6 +274,13 @@ public partial class FctmsContext : DbContext
             entity.Property(e => e.DecidedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
+            entity.Property(e => e.ThesisId)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => Guid.Parse(v),
+                    v => v.ToString()
+                );
         });
 
         modelBuilder.Entity<Teaminvitation>(entity =>

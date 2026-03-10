@@ -19,6 +19,7 @@ namespace Services
         private readonly IUserRepository _userRepository;
         private readonly ICloudinaryHelper _cloudinaryHelper;
         private readonly ISemesterRepository _semesterRepository;
+        private readonly ITeamInvitationRepository _teamInvitationRepository;
         private readonly IMapper _mapper;
 
         public ThesisService(
@@ -28,6 +29,7 @@ namespace Services
             IUserRepository userRepository,
             ICloudinaryHelper cloudinaryHelper,
             ISemesterRepository semesterRepository,
+            ITeamInvitationRepository teamInvitationRepository,
             IMapper mapper)
         {
             _thesisRepository = thesisRepository;
@@ -36,6 +38,7 @@ namespace Services
             _userRepository = userRepository;
             _cloudinaryHelper = cloudinaryHelper;
             _semesterRepository = semesterRepository;
+            _teamInvitationRepository = teamInvitationRepository;
             _mapper = mapper;
         }
 
@@ -214,6 +217,9 @@ namespace Services
 
             if (user.Role?.RoleName == CampusConstants.Roles.Lecturer)
             {
+                // Lecturer view: see their own proposals
+                ownerIds.Add(user.UserId);
+
                 // Lecturer/Mentor view: see theses of all teams they mentor in current semester
                 var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
                 if (currentSemester != null)
@@ -225,6 +231,17 @@ namespace Services
                         .ToList();
 
                     foreach (var id in mentoredLeaderIds) ownerIds.Add(id);
+
+                    // Add theses from teams that have a Pending mentor invitation for this lecturer
+                    var pendingInvitations = await _teamInvitationRepository.GetPendingMentorInvitationsByMentorIdAsync(user.UserId);
+                    var pendingTeamIds = pendingInvitations.Select(i => i.TeamId).Distinct().ToList();
+                    
+                    var pendingLeaderIds = allTeams
+                        .Where(t => pendingTeamIds.Contains(t.TeamId) && t.Status != CampusConstants.TeamStatus.Disbanded)
+                        .Select(t => t.LeaderId)
+                        .ToList();
+
+                    foreach (var id in pendingLeaderIds) ownerIds.Add(id);
                 }
             }
             else
@@ -298,10 +315,10 @@ namespace Services
                 && string.IsNullOrWhiteSpace(dto.Note))
                 throw new ArgumentException("Fail reason is required.");
 
-            // ensure reviewer is assigned
-            var assignments = await _thesisReviewRepository.GetAssignmentsAsync(thesisId);
-            if (!assignments.Any(a => a.ReviewerId == reviewerUserId))
-                throw new UnauthorizedAccessException("You are not assigned as a reviewer for this thesis.");
+            // Reviewer is defined as one of the 2 mentors assigned to the thesis's team.
+            var mentorReviewerIds = await GetMentorReviewerIdsForThesisAsync(thesisId);
+            if (!mentorReviewerIds.Contains(reviewerUserId))
+                throw new UnauthorizedAccessException("You are not a mentor reviewer for this thesis.");
 
             await _thesisReviewRepository.UpsertReviewerReviewAsync(thesisId, reviewerUserId, decision.Equals("Pass", StringComparison.OrdinalIgnoreCase) ? "Pass" : "Fail", dto.Note?.Trim());
 
@@ -368,6 +385,29 @@ namespace Services
 
             thesis.UpdateDate = DateTime.UtcNow;
             await _thesisRepository.UpdateThesisAsync(thesis);
+        }
+
+        private async Task<HashSet<int>> GetMentorReviewerIdsForThesisAsync(string thesisId)
+        {
+            var thesis = await _thesisRepository.GetThesisByIdAsync(thesisId);
+            if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
+
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester == null) throw new InvalidOperationException("Current semester not found.");
+
+            // Find the team that owns this thesis via leader (thesis.UserId).
+            // Leader is included in team members, so we can resolve by studentId.
+            var team = await _teamRepository.GetTeamByStudentIdAsync(thesis.UserId, currentSemester.SemesterId);
+            if (team == null) throw new InvalidOperationException("Team not found for this thesis in current semester.");
+
+            var ids = new HashSet<int>();
+            if (team.MentorId.HasValue) ids.Add(team.MentorId.Value);
+            if (team.MentorId2.HasValue) ids.Add(team.MentorId2.Value);
+
+            if (ids.Count < 2)
+                throw new InvalidOperationException("This thesis team does not have 2 mentors assigned yet.");
+
+            return ids;
         }
 
         /// <summary>

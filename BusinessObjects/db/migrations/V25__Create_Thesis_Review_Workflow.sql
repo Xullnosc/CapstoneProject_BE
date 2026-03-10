@@ -1,20 +1,4 @@
--- Thesis multi-reviewer workflow (2+ reviewers) + optional final HOD decision
-
-CREATE TABLE IF NOT EXISTS `thesis_reviewer_assignments` (
-  `Id` BIGINT NOT NULL AUTO_INCREMENT,
-  `ThesisId` CHAR(36) NOT NULL,
-  `ReviewerId` INT NOT NULL,
-  `AssignedBy` INT NULL,
-  `AssignedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`Id`),
-  UNIQUE KEY `UQ_Thesis_Reviewer` (`ThesisId`, `ReviewerId`),
-  KEY `IX_Assignments_ThesisId` (`ThesisId`),
-  KEY `IX_Assignments_ReviewerId` (`ReviewerId`),
-  CONSTRAINT `FK_Assignments_Thesis` FOREIGN KEY (`ThesisId`) REFERENCES `thesis` (`ThesisId`) ON DELETE CASCADE,
-  CONSTRAINT `FK_Assignments_Reviewer` FOREIGN KEY (`ReviewerId`) REFERENCES `users` (`UserID`) ON DELETE CASCADE,
-  CONSTRAINT `FK_Assignments_AssignedBy` FOREIGN KEY (`AssignedBy`) REFERENCES `users` (`UserID`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
+-- Thesis review workflow using team mentors (MentorId / MentorId2) as reviewers.
 CREATE TABLE IF NOT EXISTS `thesis_reviews` (
   `Id` BIGINT NOT NULL AUTO_INCREMENT,
   `ThesisId` CHAR(36) NOT NULL,

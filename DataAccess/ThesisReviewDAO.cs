@@ -19,41 +19,15 @@ public class ThesisReviewDAO : IThesisReviewDAO
 
     public async Task<List<ThesisReviewerAssignment>> ReplaceAssignmentsAsync(string thesisId, IEnumerable<int> reviewerIds, int? assignedBy)
     {
-        var ids = reviewerIds.Distinct().ToList();
-
-        var existing = await _context.ThesisReviewerAssignments
-            .Where(a => a.ThesisId == thesisId)
-            .ToListAsync();
-
-        if (existing.Count > 0)
-        {
-            _context.ThesisReviewerAssignments.RemoveRange(existing);
-        }
-
-        var now = DateTime.UtcNow;
-        var newAssignments = ids.Select(id => new ThesisReviewerAssignment
-        {
-            ThesisId = thesisId,
-            ReviewerId = id,
-            AssignedBy = assignedBy,
-            AssignedAt = now
-        }).ToList();
-
-        if (newAssignments.Count > 0)
-        {
-            _context.ThesisReviewerAssignments.AddRange(newAssignments);
-        }
-
-        await _context.SaveChangesAsync();
-        return newAssignments;
+        // Reviewer assignment is derived from Team.MentorId/MentorId2 now.
+        // Keep method for backward compatibility; no-op.
+        return new List<ThesisReviewerAssignment>();
     }
 
     public Task<List<ThesisReviewerAssignment>> GetAssignmentsAsync(string thesisId)
-        => _context.ThesisReviewerAssignments
-            .AsNoTracking()
-            .Where(a => a.ThesisId == thesisId)
-            .OrderBy(a => a.Id)
-            .ToListAsync();
+        // Reviewer assignment is derived from Team.MentorId/MentorId2 now.
+        // Keep method for backward compatibility; return empty.
+        => Task.FromResult(new List<ThesisReviewerAssignment>());
 
     public async Task<ThesisReview> UpsertReviewerReviewAsync(string thesisId, int reviewerId, string decision, string? note)
     {
@@ -127,9 +101,25 @@ public class ThesisReviewDAO : IThesisReviewDAO
         var thesis = await _context.Theses.AsNoTracking().FirstOrDefaultAsync(t => t.ThesisId == thesisId);
         if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
 
-        var assignments = await _context.ThesisReviewerAssignments.AsNoTracking()
-            .Where(a => a.ThesisId == thesisId)
-            .ToListAsync();
+        // Resolve 2 reviewers from Team.MentorId and Team.MentorId2 (mentors of thesis owner's team)
+        var activeSemester = await _context.Semesters.AsNoTracking().FirstOrDefaultAsync(s => s.IsActive);
+        var now = DateTime.UtcNow;
+        var currentSemester = activeSemester
+            ?? await _context.Semesters.AsNoTracking().FirstOrDefaultAsync(s => s.StartDate <= now && s.EndDate >= now);
+
+        if (currentSemester == null)
+            throw new InvalidOperationException("Current semester not found.");
+
+        var team = await _context.Teams
+            .AsNoTracking()
+            .Include(t => t.Teammembers)
+            .Where(t => t.SemesterId == currentSemester.SemesterId && t.Status != "Disbanded")
+            .FirstOrDefaultAsync(t => t.Teammembers.Any(tm => tm.StudentId == thesis.UserId));
+
+        var reviewerIds = new List<int>();
+        if (team?.MentorId != null) reviewerIds.Add(team.MentorId.Value);
+        if (team?.MentorId2 != null) reviewerIds.Add(team.MentorId2.Value);
+        reviewerIds = reviewerIds.Distinct().ToList();
 
         var reviews = await _context.ThesisReviews.AsNoTracking()
             .Where(r => r.ThesisId == thesisId)
@@ -138,7 +128,6 @@ public class ThesisReviewDAO : IThesisReviewDAO
         var hod = await _context.ThesisHodDecisions.AsNoTracking()
             .FirstOrDefaultAsync(d => d.ThesisId == thesisId);
 
-        var reviewerIds = assignments.Select(a => a.ReviewerId).Distinct().ToList();
         var users = await _context.Users.AsNoTracking()
             .Where(u => reviewerIds.Contains(u.UserId) || (hod != null && u.UserId == hod.HodId))
             .Select(u => new { u.UserId, u.Email, u.FullName })
