@@ -1,6 +1,7 @@
 using System.IO;
 using System.Globalization;
 using System.Net.Mail;
+using System.Text;
 using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
@@ -39,16 +40,40 @@ namespace Services.Helpers
             }
 
             var headerMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var headerAliasMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [NormalizeHeaderKey(CampusConstants.WhitelistImportColumns.Email)] = CampusConstants.WhitelistImportColumns.Email,
+                [NormalizeHeaderKey("E-mail")] = CampusConstants.WhitelistImportColumns.Email,
+                [NormalizeHeaderKey(CampusConstants.WhitelistImportColumns.StudentCode)] = CampusConstants.WhitelistImportColumns.StudentCode,
+                [NormalizeHeaderKey("Student Code")] = CampusConstants.WhitelistImportColumns.StudentCode,
+                [NormalizeHeaderKey(CampusConstants.WhitelistImportColumns.FullName)] = CampusConstants.WhitelistImportColumns.FullName,
+                [NormalizeHeaderKey("Full Name")] = CampusConstants.WhitelistImportColumns.FullName,
+                [NormalizeHeaderKey(CampusConstants.WhitelistImportColumns.SemesterCode)] = CampusConstants.WhitelistImportColumns.SemesterCode,
+                [NormalizeHeaderKey("Semester Code")] = CampusConstants.WhitelistImportColumns.SemesterCode,
+                [NormalizeHeaderKey("Semester")] = CampusConstants.WhitelistImportColumns.SemesterCode,
+                [NormalizeHeaderKey(CampusConstants.WhitelistImportColumns.Campus)] = CampusConstants.WhitelistImportColumns.Campus,
+            };
 
             const int headerRow = 3;
             const int dataStartRow = 4;
 
             for (int col = 2; col <= worksheet.Dimension.End.Column; col++)
             {
-                var header = worksheet.Cells[headerRow, col].Text.Trim();
-                if (!string.IsNullOrEmpty(header) && !headerMap.ContainsKey(header))
+                var rawHeader = worksheet.Cells[headerRow, col].Text;
+                if (string.IsNullOrWhiteSpace(rawHeader))
                 {
-                    headerMap[header] = col;
+                    rawHeader = worksheet.Cells[headerRow, col].Value?.ToString();
+                }
+
+                var normalizedHeaderKey = NormalizeHeaderKey(rawHeader);
+                if (string.IsNullOrWhiteSpace(normalizedHeaderKey))
+                {
+                    continue;
+                }
+
+                if (headerAliasMap.TryGetValue(normalizedHeaderKey, out var canonicalHeader) && !headerMap.ContainsKey(canonicalHeader))
+                {
+                    headerMap[canonicalHeader] = col;
                 }
             }
 
@@ -143,6 +168,26 @@ namespace Services.Helpers
             }
 
             return result;
+        }
+
+        private static string NormalizeHeaderKey(string? header)
+        {
+            if (string.IsNullOrWhiteSpace(header))
+            {
+                return string.Empty;
+            }
+
+            var normalized = header.Normalize(NormalizationForm.FormKC).Trim();
+            var sb = new StringBuilder(normalized.Length);
+            foreach (var ch in normalized)
+            {
+                if (char.IsLetterOrDigit(ch))
+                {
+                    sb.Append(char.ToLowerInvariant(ch));
+                }
+            }
+
+            return sb.ToString();
         }
     }
 }
