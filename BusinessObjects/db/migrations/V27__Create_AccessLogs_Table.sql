@@ -1,0 +1,11 @@
+CREATE TABLE access_logs (
+    Id CHAR(36) NOT NULL PRIMARY KEY,
+    UserId INT NULL,
+    UserEmail VARCHAR(255) NOT NULL,
+    IpAddress VARCHAR(45) NULL,
+    Action VARCHAR(100) NOT NULL,
+    IsSuccess TINYINT(1) NOT NULL DEFAULT 1,
+    Description TEXT NULL,
+    CreatedAt DATETIME(6) NOT NULL,
+    CONSTRAINT FK_AccessLogs_Users_UserId FOREIGN KEY (UserId) REFERENCES users(UserID) ON DELETE CASCADE
+);
