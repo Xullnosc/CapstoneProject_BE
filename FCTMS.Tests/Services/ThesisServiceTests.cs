@@ -431,8 +431,15 @@ namespace FCTMS.Tests.Services
         {
             // Arrange
             string email = "student@fpt.edu.vn";
-            var user = new User { UserId = 10, Email = email, Role = new Role { RoleName = "Student" } };
+            int userId = 10;
+            var user = new User { UserId = userId, Email = email, Role = new Role { RoleName = "Student" } };
             var currentSemester = new Semester { SemesterId = 1 };
+            var team = new Team
+            {
+                TeamId = 1,
+                LeaderId = userId,
+                Teammembers = new List<Teammember> { new(), new(), new(), new() } // exactly 4
+            };
 
             var mockFile = new Mock<IFormFile>();
             mockFile.Setup(f => f.FileName).Returns("thesis.docx");
@@ -441,6 +448,7 @@ namespace FCTMS.Tests.Services
 
             _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
             _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(user.UserId)).ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync(team);
             _mockCloudinaryHelper.Setup(x => x.UploadFileAsync(mockFile.Object)).ReturnsAsync("https://cloudinary.com/file.docx");
             _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
 
