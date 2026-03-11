@@ -75,7 +75,7 @@ public class AuthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error during login");
-            return StatusCode(500, new { message = ex.ToString() });
+            return StatusCode(500, new { message = "Lỗi hệ thống trong quá trình đăng nhập. Vui lòng liên hệ quản trị viên." });
         }
     }
 
@@ -114,7 +114,7 @@ public class AuthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during credential login");
-            return StatusCode(500, new { message = ex.Message });
+            return StatusCode(500, new { message = "Lỗi hệ thống trong quá trình đăng nhập. Vui lòng liên hệ quản trị viên." });
         }
     }
 

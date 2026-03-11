@@ -83,6 +83,7 @@ namespace BusinessObjects
             public const string RoleId = "RoleId";
             public const string Campus = "Campus";
             public const string SemesterId = "SemesterId";
+            public const string SemesterCode = "SemesterCode";
         }
     }
 }

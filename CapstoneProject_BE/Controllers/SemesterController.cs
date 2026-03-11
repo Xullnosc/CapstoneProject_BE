@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using BusinessObjects;
 using BusinessObjects.DTOs;
@@ -156,7 +157,12 @@ namespace CapstoneProject_BE.Controllers
 
         [HttpPost("{id}/whitelist/import")]
         [Authorize(Roles = CampusConstants.Roles.HOD)]
-        public async Task<IActionResult> ImportWhitelist(int id, [FromForm] IFormFile file, [FromForm] string? commit = "false")
+        public async Task<IActionResult> ImportWhitelist(
+            int id,
+            [FromForm] IFormFile file,
+            [FromForm] string? commit = "false",
+            [FromForm] List<int>? excludedRowNumbers = null,
+            [FromForm] string? rowOverridesJson = null)
         {
             if (file == null || file.Length == 0)
             {
@@ -181,7 +187,37 @@ namespace CapstoneProject_BE.Controllers
             try
             {
                 using var stream = file.OpenReadStream();
-                var importResult = await _importService.ImportWhitelistFromExcel(stream);
+                var uploaderEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? User.FindFirst("email")?.Value;
+                if (string.IsNullOrWhiteSpace(uploaderEmail))
+                {
+                    return Unauthorized(new { message = "Unable to resolve uploader identity." });
+                }
+
+                // Deserialise optional row-level overrides supplied by the HOD to fix conflicts.
+                List<WhitelistRowOverrideDTO>? rowOverrides = null;
+                if (!string.IsNullOrWhiteSpace(rowOverridesJson))
+                {
+                    try
+                    {
+                        rowOverrides = System.Text.Json.JsonSerializer.Deserialize<List<WhitelistRowOverrideDTO>>(
+                            rowOverridesJson,
+                            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    }
+                    catch
+                    {
+                        return BadRequest(new { message = "rowOverridesJson is not valid JSON." });
+                    }
+                }
+
+                var importResult = await _importService.ImportWhitelistFromExcel(stream, uploaderEmail, rowOverrides);
+
+                if (excludedRowNumbers != null && excludedRowNumbers.Count > 0)
+                {
+                    var excludedSet = excludedRowNumbers.ToHashSet();
+                    importResult.Items = importResult.Items
+                        .Where(item => !excludedSet.Contains(item.RowNumber))
+                        .ToList();
+                }
 
                 var commitFlag = false;
                 if (!string.IsNullOrWhiteSpace(commit))
@@ -191,12 +227,10 @@ namespace CapstoneProject_BE.Controllers
 
                 if (commitFlag)
                 {
-                    // Persist parsed items (implementation in ImportService)
-                    var uploadedBy = User?.Identity?.Name;
-                    await _importService.SaveWhitelistBatchAsync(importResult, file.FileName, uploadedBy);
+                    await _importService.SaveWhitelistBatchAsync(importResult, file.FileName, uploaderEmail);
+                    return Ok(importResult);
                 }
 
-                // Return both parsed items and any validation errors so caller can decide next steps
                 return Ok(importResult);
             }
             catch (ArgumentException ex)
