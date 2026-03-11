@@ -1,0 +1,11 @@
+using BusinessObjects.Models;
+
+namespace DataAccess;
+
+public interface ISystemUserCredentialDAO
+{
+    Task<SystemUserCredential?> GetByUsernameAsync(string username);
+    Task<SystemUserCredential?> GetByUserIdAsync(int userId);
+    Task<SystemUserCredential> AddAsync(SystemUserCredential credential);
+    Task UpdateAsync(SystemUserCredential credential);
+}

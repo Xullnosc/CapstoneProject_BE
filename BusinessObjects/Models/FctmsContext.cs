@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,6 +41,8 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<ThesisFormHistory> ThesisFormHistories { get; set; }
     public virtual DbSet<Lecturer> Lecturers { get; set; }
+    public virtual DbSet<SystemUserCredential> SystemUserCredentials { get; set; }
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -372,6 +374,9 @@ public partial class FctmsContext : DbContext
             entity.Property(e => e.Status)
                 .HasDefaultValueSql("'On Mentor Inviting'")
                 .HasColumnType("enum('Published','Updated','Need Update','Reviewing','Rejected','Registered','Cancelled','On Mentor Inviting')");
+            entity.Property(e => e.IsLocked)
+                .HasDefaultValue(false)
+                .HasColumnName("IsLocked");
             entity.Property(e => e.Title).HasMaxLength(255);
             entity.Property(e => e.UpDate)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
@@ -457,6 +462,36 @@ public partial class FctmsContext : DbContext
                 .ValueGeneratedOnAddOrUpdate()
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<SystemUserCredential>(entity =>
+        {
+            entity.HasKey(e => e.UserId).HasName("PRIMARY");
+            entity.ToTable("system_user_credentials");
+            entity.HasIndex(e => e.Username, "UQ_SystemUserCredentials_Username").IsUnique();
+            entity.Property(e => e.Username).HasMaxLength(100);
+            entity.Property(e => e.PasswordHash).HasMaxLength(255);
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_SystemUserCredentials_Users");
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("refresh_tokens");
+            entity.HasIndex(e => new { e.UserId, e.ExpiresAt }, "IX_RefreshTokens_UserId_Expires");
+            entity.Property(e => e.TokenHash).HasMaxLength(255);
+            entity.Property(e => e.ExpiresAt).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.RevokedAt).HasColumnType("datetime");
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_RefreshTokens_Users");
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -14,7 +14,7 @@ namespace Repositories
         Task<Semester?> GetSemesterByCodeAsync(string code);
         Task<int> GetStudentRoleIdAsync();
         Task<List<Role>> GetAllRolesAsync();
-        Task<bool> IsOverlapAsync(DateTime start, DateTime end, int? excludeId);
+        Task<Semester?> IsOverlapAsync(DateTime start, DateTime end, int? excludeId);
         Task<bool> SemesterExistsAsync(int semesterId);
     }
 }

@@ -99,15 +99,15 @@ namespace CapstoneProject_BE.Controllers
         }
 
         /// <summary>
-        /// GET /api/thesis?status=Reviewing&amp;userId=5&amp;searchTitle=...
+        /// GET /api/thesis?status=Reviewing&amp;userId=5&amp;searchTitle=...&amp;isLocked=false&amp;lecturerOnly=true
         /// Returns filtered list of all theses. All query params are optional.
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetAllTheses([FromQuery] string? status, [FromQuery] int? userId, [FromQuery] string? searchTitle)
+        public async Task<IActionResult> GetAllTheses([FromQuery] string? status, [FromQuery] int? userId, [FromQuery] string? searchTitle, [FromQuery] int? semesterId, [FromQuery] bool? isLocked, [FromQuery] bool lecturerOnly = false)
         {
             try
             {
-                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle);
+                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle, semesterId, isLocked, lecturerOnly);
                 return Ok(theses);
             }
             catch (Exception ex)
@@ -135,6 +135,38 @@ namespace CapstoneProject_BE.Controllers
                 return Ok(new { Message = "Thesis evaluation updated.", Status = dto.Status });
             }
             catch (Exception ex) when (ex.Message?.Contains("not found") == true)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// PUT /api/thesis/{id}/lock
+        /// Lecturer only: toggle the locked/unlocked state of their own thesis.
+        /// MUST be declared before PUT "{id}" to avoid route conflict.
+        /// </summary>
+        [HttpPut("{id}/lock")]
+        public async Task<IActionResult> ToggleLockThesis(string id)
+        {
+            try
+            {
+                var emailClaim = User.FindFirst(ClaimTypes.Email) ?? User.FindFirst("email");
+                if (emailClaim == null)
+                    return Unauthorized(new { Message = "Email claim not found in token." });
+
+                var updated = await _thesisService.ToggleThesisLockAsync(id, emailClaim.Value);
+                var lockState = updated.IsLocked ? "locked" : "unlocked";
+                return Ok(new { Message = $"Thesis {lockState} successfully.", Data = updated });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
             {
                 return NotFound(new { Message = ex.Message });
             }

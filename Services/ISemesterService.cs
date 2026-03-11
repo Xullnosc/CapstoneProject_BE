@@ -12,5 +12,6 @@ namespace Services
         Task UpdateSemesterAsync(SemesterCreateDTO semesterCreateDTO);
         Task StartSemesterAsync(int id);
         Task EndSemesterAsync(int id);
+        Task InvalidateSemesterCacheAsync(int? id = null);
     }
 }
