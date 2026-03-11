@@ -135,25 +135,29 @@ namespace FCTMS.Tests.Services
         }
 
         [Fact]
-        public async Task GetFilteredThesesAsync_ShouldReturnMappedDtos()
+        public async Task GetFilteredThesesAsync_ShouldReturnMappedDtos_AndPassNewParameters()
         {
             // Arrange
             var theses = new List<Thesis>
             {
-                new Thesis { ThesisId = "1", Status = "Reviewing" }
+                new Thesis { ThesisId = "1", Status = "Published", IsLocked = false }
             };
             _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync(It.IsAny<string?>(), It.IsAny<int?>())).ReturnsAsync(theses);
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
             { 
-                new ThesisDTO { ThesisId = "1", Status = "Reviewing" } 
+                new ThesisDTO { ThesisId = "1", Status = "Published", IsLocked = false } 
             });
 
             // Act
-            var result = await _thesisService.GetFilteredThesesAsync("Reviewing", null);
+            var result = await _thesisService.GetFilteredThesesAsync("Published", null, null, null, false, true);
 
             // Assert
             result.Should().HaveCount(1);
-            result.First().Status.Should().Be("Reviewing");
+            result.First().Status.Should().Be("Published");
+            result.First().IsLocked.Should().BeFalse();
+            
+            // Verify the repository was called with the exact parameters
+            _mockThesisRepository.Verify(x => x.GetAllThesesFilteredAsync("Published", null, null, false, true), Times.Once);
         }
 
         [Fact]
@@ -423,11 +427,11 @@ namespace FCTMS.Tests.Services
         }
 
         [Fact]
-        public async Task ProposeThesisAsync_ShouldSetStatus_OnMentorInviting()
+        public async Task ProposeThesisAsync_ShouldSetStatus_OnMentorInviting_WhenStudent()
         {
             // Arrange
-            string email = "lecturer@fpt.edu.vn";
-            var user = new User { UserId = 10, Email = email, Role = new Role { RoleName = "Lecturer" } };
+            string email = "student@fpt.edu.vn";
+            var user = new User { UserId = 10, Email = email, Role = new Role { RoleName = "Student" } };
             var currentSemester = new Semester { SemesterId = 1 };
 
             var mockFile = new Mock<IFormFile>();
@@ -452,6 +456,38 @@ namespace FCTMS.Tests.Services
             // Assert
             capturedThesis.Should().NotBeNull();
             capturedThesis!.Status.Should().Be("On Mentor Inviting");
+        }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldSetStatus_Reviewing_WhenLecturer()
+        {
+            // Arrange
+            string email = "lecturer@fpt.edu.vn";
+            var user = new User { UserId = 20, Email = email, Role = new Role { RoleName = "Lecturer" } };
+            var currentSemester = new Semester { SemesterId = 1 };
+
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.FileName).Returns("thesis.docx");
+
+            var req = new ProposeThesisDTO { Title = "Lecturer Thesis", File = mockFile.Object };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(user.UserId)).ReturnsAsync(new List<Thesis>());
+            _mockCloudinaryHelper.Setup(x => x.UploadFileAsync(mockFile.Object)).ReturnsAsync("https://cloudinary.com/file.docx");
+            _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
+
+            Thesis? capturedThesis = null;
+            _mockThesisRepository
+                .Setup(x => x.CreateThesisAsync(It.IsAny<Thesis>()))
+                .Callback<Thesis>(t => capturedThesis = t)
+                .ReturnsAsync((Thesis t) => t);
+
+            // Act
+            var result = await _thesisService.ProposeThesisAsync(req, email);
+
+            // Assert
+            capturedThesis.Should().NotBeNull();
+            capturedThesis!.Status.Should().Be("Reviewing");
         }
 
         [Fact]

@@ -62,10 +62,11 @@ namespace BusinessObjects
 
         public static class TeamStatus
         {
-            public const string Pending = "Pending";
+            public const string Pending = "Pending"; // Matches DB enum
+            public const string PendingApproval = "Pending"; // Map both to DB "Pending"
             public const string Insufficient = "Insufficient";
             public const string Disbanded = "Disbanded";
-            public const string Active = "Active"; // Assuming 'Active' exists or will be used
+            public const string Active = "Qualified"; // Match DB enum "Qualified"
         }
 
         public static class TeamRole

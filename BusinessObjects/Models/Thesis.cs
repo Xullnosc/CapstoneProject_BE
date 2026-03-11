@@ -23,6 +23,8 @@ public partial class Thesis
 
     public string? Status { get; set; }
 
+    public bool IsLocked { get; set; }
+
     public virtual User User { get; set; } = null!;
 
     public virtual Semester? Semester { get; set; }

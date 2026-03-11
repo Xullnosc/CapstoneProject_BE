@@ -47,5 +47,10 @@ namespace Repositories
         {
             await _lecturerDAO.DeleteAsync(lecturer);
         }
+
+        public async Task<IEnumerable<Lecturer>> SearchAsync(string term)
+        {
+            return await _lecturerDAO.SearchAsync(term);
+        }
     }
 }

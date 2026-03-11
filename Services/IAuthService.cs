@@ -1,14 +1,11 @@
-﻿using Services.DTOs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Services.DTOs;
 
-namespace Services
+namespace Services;
+
+public interface IAuthService
 {
-    public interface IAuthService
-    {
-        Task<LoginResponseDTO> GoogleLoginAsync(LoginRequestDTO request);
-    }
+    Task<LoginResultDTO> GoogleLoginAsync(LoginRequestDTO request);
+    Task<LoginResultDTO> CredentialLoginAsync(CredentialLoginRequestDTO request);
+    Task<RefreshResultDTO?> RefreshTokenAsync(string? refreshTokenFromCookie);
+    Task RevokeRefreshTokenAsync(string? refreshTokenFromCookie);
 }
