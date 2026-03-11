@@ -5,14 +5,16 @@ namespace FCTMS.Tests.Controllers;
 public class AdminControllerTests
 {
     private readonly Mock<IAdminService> _mockAdminService;
+    private readonly Mock<IAccessLogService> _mockAccessLogService;
     private readonly Mock<ILogger<AdminController>> _mockLogger;
     private readonly AdminController _controller;
 
     public AdminControllerTests()
     {
         _mockAdminService = new Mock<IAdminService>();
+        _mockAccessLogService = new Mock<IAccessLogService>();
         _mockLogger = new Mock<ILogger<AdminController>>();
-        _controller = new AdminController(_mockAdminService.Object, _mockLogger.Object);
+        _controller = new AdminController(_mockAdminService.Object, _mockAccessLogService.Object, _mockLogger.Object);
     }
 
     // --- GetHodAccounts (GET /api/Admin/hod) ---
