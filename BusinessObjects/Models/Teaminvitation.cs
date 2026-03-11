@@ -13,13 +13,13 @@ public partial class Teaminvitation
 
     public int InvitedBy { get; set; }
 
-    public string Type { get; set; } = "Member";
-
     public string? Status { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
     public DateTime? RespondedAt { get; set; }
+
+    public string Type { get; set; } = null!;
 
     public virtual User InvitedByNavigation { get; set; } = null!;
 

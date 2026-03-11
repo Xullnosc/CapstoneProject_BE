@@ -5,15 +5,13 @@ namespace BusinessObjects.Models;
 
 public partial class Thesis
 {
-    public string ThesisId { get; set; } = null!;
+    public Guid ThesisId { get; set; }
 
     public string Title { get; set; } = null!;
 
     public string? ShortDescription { get; set; }
 
     public int UserId { get; set; }
-
-    public int? SemesterId { get; set; }
 
     public DateTime? UpDate { get; set; }
 
@@ -23,9 +21,11 @@ public partial class Thesis
 
     public string? Status { get; set; }
 
-    public virtual User User { get; set; } = null!;
+    public int? SemesterId { get; set; }
 
     public virtual Semester? Semester { get; set; }
 
     public virtual ICollection<ThesisHistory> ThesisHistories { get; set; } = new List<ThesisHistory>();
+
+    public virtual User User { get; set; } = null!;
 }

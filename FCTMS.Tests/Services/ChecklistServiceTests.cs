@@ -1,14 +1,5 @@
 using AutoMapper;
 using BusinessObjects.DTOs;
-using BusinessObjects.Models;
-using FluentAssertions;
-using Moq;
-using Repositories;
-using Services;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Xunit;
 
 namespace FCTMS.Tests.Services
 {

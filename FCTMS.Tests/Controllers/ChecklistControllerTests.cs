@@ -1,17 +1,6 @@
 using BusinessObjects.DTOs;
-using BusinessObjects.Models;
-using CapstoneProject_BE.Controllers;
-using FluentAssertions;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Moq;
-using Services;
-using System;
-using System.Collections.Generic;
 using System.Security.Claims;
-using System.Threading.Tasks;
-using Xunit;
-
 namespace FCTMS.Tests.Controllers
 {
     public class ChecklistControllerTests

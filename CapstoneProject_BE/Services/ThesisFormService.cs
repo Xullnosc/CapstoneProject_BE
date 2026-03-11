@@ -103,7 +103,7 @@ namespace Services
                 FileUrl = form.FileUrl,
                 VersionNumber = form.VersionNumber,
                 UploadedBy = form.UploadedBy,
-                UploaderName = form.Uploader?.FullName,
+                UploaderName = form.UploadedByNavigation?.FullName,
                 UpdatedAt = form.UpdatedAt
             };
         }
@@ -118,7 +118,7 @@ namespace Services
                 FileUrl = h.FileUrl,
                 VersionNumber = h.VersionNumber,
                 UploadedBy = h.UploadedBy,
-                UploaderName = h.Uploader?.FullName,
+                UploaderName = h.UploadedByNavigation?.FullName,
                 CreatedAt = h.CreatedAt
             });
         }

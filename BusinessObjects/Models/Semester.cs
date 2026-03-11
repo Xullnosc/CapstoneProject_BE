@@ -7,8 +7,6 @@ public partial class Semester
 {
     public int SemesterId { get; set; }
 
-    public string SemesterCode { get; set; } = null!;
-
     public string SemesterName { get; set; } = null!;
 
     public DateTime StartDate { get; set; }
@@ -17,7 +15,11 @@ public partial class Semester
 
     public bool IsActive { get; set; }
 
+    public string SemesterCode { get; set; } = null!;
+
     public virtual ICollection<Team> Teams { get; set; } = new List<Team>();
+
+    public virtual ICollection<Thesis> Theses { get; set; } = new List<Thesis>();
 
     public virtual ICollection<Whitelist> Whitelists { get; set; } = new List<Whitelist>();
 }

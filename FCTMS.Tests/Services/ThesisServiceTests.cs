@@ -54,8 +54,8 @@ namespace FCTMS.Tests.Services
             var user = new User { UserId = userId, Email = email };
             var theses = new List<Thesis>
             {
-                new Thesis { ThesisId = "1", Title = "Thesis 1", UserId = userId },
-                new Thesis { ThesisId = "2", Title = "Thesis 2", UserId = userId }
+                new Thesis { ThesisId = Guid.NewGuid(), Title = "Thesis 1", UserId = userId },
+                new Thesis { ThesisId = Guid.NewGuid(), Title = "Thesis 2", UserId = userId }
             };
 
             var currentSemester = new Semester { SemesterId = 1 };
@@ -108,10 +108,10 @@ namespace FCTMS.Tests.Services
         public async Task GetThesisDetailAsync_ShouldReturnDto_WhenFound()
         {
             // Arrange
-            string thesisId = "valid_id";
+            string thesisId = Guid.NewGuid().ToString();
             var thesis = new Thesis
             {
-                ThesisId = thesisId,
+                ThesisId = Guid.Parse(thesisId),
                 Title = "Test Thesis",
                 ThesisHistories = new List<ThesisHistory>
                 {
@@ -140,7 +140,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             var theses = new List<Thesis>
             {
-                new Thesis { ThesisId = "1", Status = "Reviewing" }
+                new Thesis { ThesisId = Guid.NewGuid(), Status = "Reviewing" }
             };
             _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync("Reviewing", null)).ReturnsAsync(theses);
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
@@ -163,7 +163,7 @@ namespace FCTMS.Tests.Services
             var req = new UpdateThesisDTO { Title = "New Title" };
             var reqEmail = "other@fpt.edu.vn";
             var dbUser = new User { UserId = 2, Email = reqEmail };
-            var dbThesis = new Thesis { ThesisId = "1", UserId = 1 }; // Owned by user 1
+            var dbThesis = new Thesis { ThesisId = Guid.NewGuid(), UserId = 1 }; // Owned by user 1
 
             _mockUserRepository.Setup(x => x.GetByEmailAsync(reqEmail)).ReturnsAsync(dbUser);
             _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync("1")).ReturnsAsync(dbThesis);
@@ -179,13 +179,13 @@ namespace FCTMS.Tests.Services
         public async Task UpdateThesisAsync_ShouldUpdateTitleAndDescription_WhenNoFileProvided()
         {
             // Arrange
-            string thesisId = "1";
+            string thesisId = Guid.NewGuid().ToString();
             string email = "owner@fpt.edu.vn";
             int ownerId = 1;
             var req = new UpdateThesisDTO { Title = "Updated Title" };
             
             var user = new User { UserId = ownerId, Email = email };
-            var thesis = new Thesis { ThesisId = thesisId, UserId = ownerId, Title = "Old Title", ThesisHistories = new List<ThesisHistory>() };
+            var thesis = new Thesis { ThesisId = Guid.Parse(thesisId), UserId = ownerId, Title = "Old Title", ThesisHistories = new List<ThesisHistory>() };
 
             _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
             _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId)).ReturnsAsync(thesis);
@@ -206,7 +206,7 @@ namespace FCTMS.Tests.Services
         public async Task UpdateThesisAsync_ShouldUploadFileAndCreateHistory_WhenFileProvided()
         {
             // Arrange
-            string thesisId = "1";
+            string thesisId = Guid.NewGuid().ToString();
             string email = "owner@fpt.edu.vn";
             int ownerId = 1;
 
@@ -217,7 +217,7 @@ namespace FCTMS.Tests.Services
             // Simulate thesis already having 1 history
             var thesis = new Thesis 
             { 
-                ThesisId = thesisId, 
+                ThesisId = Guid.Parse(thesisId),
                 UserId = ownerId, 
                 FileUrl = "old_url",
                 ThesisHistories = new List<ThesisHistory> 
@@ -239,7 +239,7 @@ namespace FCTMS.Tests.Services
             _mockCloudinaryHelper.Verify(x => x.UploadFileAsync(mockFile.Object), Times.Once);
             
             _mockThesisRepository.Verify(x => x.AddThesisHistoryAsync(It.Is<ThesisHistory>(h => 
-                h.ThesisId == thesisId &&
+                h.ThesisId == Guid.Parse(thesisId) &&
                 h.FileUrl == "new_secure_url" &&
                 h.VersionNumber == 2 && // Max(1) + 1
                 h.Note == "Version 2" &&
@@ -253,9 +253,9 @@ namespace FCTMS.Tests.Services
         public async Task UpdateThesisStatusAsync_ShouldUpdateStatus_WhenThesisExists()
         {
             // Arrange
-            string thesisId = "guid-123";
+            string thesisId = Guid.NewGuid().ToString();
             string newStatus = "Published";
-            var thesis = new Thesis { ThesisId = thesisId, Status = "Reviewing", UpdateDate = null };
+            var thesis = new Thesis { ThesisId = Guid.Parse(thesisId), Status = "Reviewing", UpdateDate = null };
 
             _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(thesisId)).ReturnsAsync(thesis);
 
@@ -294,8 +294,8 @@ namespace FCTMS.Tests.Services
             
             var theses = new List<Thesis>
             {
-                new Thesis { ThesisId = "T1", Title = "Leader Thesis", UserId = leaderId },
-                new Thesis { ThesisId = "T2", Title = "Member Thesis", UserId = studentId }
+                new Thesis { ThesisId = Guid.NewGuid(), Title = "Leader Thesis", UserId = leaderId },
+                new Thesis { ThesisId = Guid.NewGuid(), Title = "Member Thesis", UserId = studentId }
             };
 
             var currentSemester = new Semester { SemesterId = 1 };
@@ -329,7 +329,7 @@ namespace FCTMS.Tests.Services
         public async Task UpdateThesisAsync_ShouldSyncTitleWithFileName_WhenFileProvidedAndNoTitle()
         {
             // Arrange
-            string thesisId = "1";
+            string thesisId = Guid.NewGuid().ToString();
             string email = "owner@fpt.edu.vn";
             int ownerId = 1;
             
@@ -340,7 +340,7 @@ namespace FCTMS.Tests.Services
             var req = new UpdateThesisDTO { File = mockFile.Object, Title = "" }; // Empty title
             
             var user = new User { UserId = ownerId, Email = email };
-            var thesis = new Thesis { ThesisId = thesisId, UserId = ownerId, Title = "Old Title", ThesisHistories = new List<ThesisHistory>() };
+            var thesis = new Thesis { ThesisId = Guid.Parse(thesisId), UserId = ownerId, Title = "Old Title", ThesisHistories = new List<ThesisHistory>() };
 
             _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
             _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId)).ReturnsAsync(thesis);
@@ -359,12 +359,12 @@ namespace FCTMS.Tests.Services
         public async Task CancelThesisAsync_ShouldUpdateStatusToCancelled_WhenValid()
         {
             // Arrange
-            string thesisId = "1";
+            string thesisId = Guid.NewGuid().ToString();
             string email = "owner@fpt.edu.vn";
             int ownerId = 1;
             
             var user = new User { UserId = ownerId, Email = email };
-            var thesis = new Thesis { ThesisId = thesisId, UserId = ownerId, Status = "Reviewing" };
+            var thesis = new Thesis { ThesisId = Guid.Parse(thesisId), UserId = ownerId, Status = "Reviewing" };
 
             _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
             _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId)).ReturnsAsync(thesis);
@@ -386,10 +386,10 @@ namespace FCTMS.Tests.Services
         public async Task CancelThesisAsync_ShouldThrowUnauthorized_WhenUserIsNotOwner()
         {
             // Arrange
-            string thesisId = "1";
+            string thesisId = Guid.NewGuid().ToString();
             string reqEmail = "other@fpt.edu.vn";
             var dbUser = new User { UserId = 2, Email = reqEmail };
-            var dbThesis = new Thesis { ThesisId = thesisId, UserId = 1 }; // Owned by user 1
+            var dbThesis = new Thesis { ThesisId = Guid.Parse(thesisId), UserId = 1 }; // Owned by user 1
 
             _mockUserRepository.Setup(x => x.GetByEmailAsync(reqEmail)).ReturnsAsync(dbUser);
             _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId)).ReturnsAsync(dbThesis);
@@ -405,12 +405,12 @@ namespace FCTMS.Tests.Services
         public async Task CancelThesisAsync_ShouldThrowInvalidOperation_WhenStatusIsPublished()
         {
             // Arrange
-            string thesisId = "1";
+            string thesisId = Guid.NewGuid().ToString();
             string email = "owner@fpt.edu.vn";
             int ownerId = 1;
             
             var user = new User { UserId = ownerId, Email = email };
-            var thesis = new Thesis { ThesisId = thesisId, UserId = ownerId, Status = "Published" };
+            var thesis = new Thesis { ThesisId = Guid.Parse(thesisId), UserId = ownerId, Status = "Published" };
 
             _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
             _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId)).ReturnsAsync(thesis);
@@ -458,12 +458,12 @@ namespace FCTMS.Tests.Services
         public async Task CancelThesisAsync_ShouldSucceed_WhenStatusIsOnMentorInviting()
         {
             // Arrange
-            string thesisId = "1";
+            string thesisId = Guid.NewGuid().ToString();
             string email = "owner@fpt.edu.vn";
             int ownerId = 1;
 
             var user = new User { UserId = ownerId, Email = email };
-            var thesis = new Thesis { ThesisId = thesisId, UserId = ownerId, Status = "On Mentor Inviting" };
+            var thesis = new Thesis { ThesisId = Guid.Parse(thesisId), UserId = ownerId, Status = "On Mentor Inviting" };
 
             _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
             _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId)).ReturnsAsync(thesis);

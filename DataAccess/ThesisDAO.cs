@@ -50,10 +50,15 @@ namespace DataAccess
 
         public async Task<Thesis?> GetThesisByIdAsync(string id)
         {
+            if (!Guid.TryParse(id, out var thesisId))
+            {
+                return null;
+            }
+
             return await _context.Theses
                 .AsNoTracking()
                 .Include(t => t.User)
-                .FirstOrDefaultAsync(t => t.ThesisId == id);
+                .FirstOrDefaultAsync(t => t.ThesisId == thesisId);
         }
 
         public async Task<IEnumerable<Thesis>> GetThesesByUserIdAsync(int userId)
@@ -109,13 +114,16 @@ namespace DataAccess
 
         public async Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id)
         {
-            if (string.IsNullOrEmpty(id)) return null;
+            if (!Guid.TryParse(id, out var thesisId))
+            {
+                return null;
+            }
 
             var thesis = await _context.Theses
                 .AsNoTracking()
                 .Include(t => t.User)
                 .Include(t => t.ThesisHistories) // Explicitly included
-                .FirstOrDefaultAsync(t => t.ThesisId == id);
+                .FirstOrDefaultAsync(t => t.ThesisId == thesisId);
 
             if (thesis != null && thesis.ThesisHistories != null)
             {

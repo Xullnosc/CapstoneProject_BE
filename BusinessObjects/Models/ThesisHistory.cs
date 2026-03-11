@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace BusinessObjects.Models;
@@ -7,7 +7,7 @@ public partial class ThesisHistory
 {
     public int Id { get; set; }
 
-    public string ThesisId { get; set; } = null!;
+    public Guid ThesisId { get; set; }
 
     public string FileUrl { get; set; } = null!;
 
@@ -21,5 +21,5 @@ public partial class ThesisHistory
 
     public virtual Thesis Thesis { get; set; } = null!;
 
-    public virtual User UploadedByUser { get; set; } = null!;
+    public virtual User UploadedByNavigation { get; set; } = null!;
 }

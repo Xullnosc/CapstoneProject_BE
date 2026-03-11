@@ -37,8 +37,8 @@ public class RedisService : IRedisService
         }
         catch (Exception ex) when (IsRedisException(ex))
         {
-            _logger.LogError(ex, "Redis SET failed for key {Key}", key);
-            throw;
+            _logger.LogWarning(ex, "Redis unavailable. Skipping SET for key {Key}", key);
+            return false;
         }
     }
 
@@ -59,8 +59,8 @@ public class RedisService : IRedisService
         }
         catch (Exception ex) when (IsRedisException(ex))
         {
-            _logger.LogError(ex, "Redis GET failed for key {Key}", key);
-            throw;
+            _logger.LogWarning(ex, "Redis unavailable. Treating GET as cache miss for key {Key}", key);
+            return null;
         }
     }
 
@@ -76,8 +76,8 @@ public class RedisService : IRedisService
         }
         catch (Exception ex) when (IsRedisException(ex))
         {
-            _logger.LogError(ex, "Redis DELETE failed for key {Key}", key);
-            throw;
+            _logger.LogWarning(ex, "Redis unavailable. Skipping DELETE for key {Key}", key);
+            return false;
         }
     }
 
@@ -111,8 +111,8 @@ public class RedisService : IRedisService
         }
         catch (Exception ex) when (IsRedisException(ex))
         {
-            _logger.LogError(ex, "Redis SADD failed for key {Key}", key);
-            throw;
+            _logger.LogWarning(ex, "Redis unavailable. Skipping SADD for key {Key}", key);
+            return false;
         }
     }
 
@@ -127,8 +127,8 @@ public class RedisService : IRedisService
         }
         catch (Exception ex) when (IsRedisException(ex))
         {
-            _logger.LogError(ex, "Redis SADD failed for key {Key}", key);
-            throw;
+            _logger.LogWarning(ex, "Redis unavailable. Skipping SADD for key {Key}", key);
+            return 0;
         }
     }
 
@@ -143,14 +143,17 @@ public class RedisService : IRedisService
                 return Array.Empty<string>();
             }
 
-            var result = members.Select(m => (string)m).ToArray();
+            var result = members
+                .Where(m => m.HasValue)
+                .Select(m => m.ToString())
+                .ToArray();
             _logger.LogDebug("Redis SMEMBERS HIT {Key} Count: {Count}", key, result.Length);
             return result;
         }
         catch (Exception ex) when (IsRedisException(ex))
         {
-            _logger.LogError(ex, "Redis SMEMBERS failed for key {Key}", key);
-            throw;
+            _logger.LogWarning(ex, "Redis unavailable. Treating SMEMBERS as empty for key {Key}", key);
+            return Array.Empty<string>();
         }
     }
 
@@ -164,8 +167,8 @@ public class RedisService : IRedisService
         }
         catch (Exception ex) when (IsRedisException(ex))
         {
-            _logger.LogError(ex, "Redis SREM failed for key {Key}", key);
-            throw;
+            _logger.LogWarning(ex, "Redis unavailable. Skipping SREM for key {Key}", key);
+            return false;
         }
     }
 
@@ -180,8 +183,8 @@ public class RedisService : IRedisService
         }
         catch (Exception ex) when (IsRedisException(ex))
         {
-            _logger.LogError(ex, "Redis SREM failed for key {Key}", key);
-            throw;
+            _logger.LogWarning(ex, "Redis unavailable. Skipping SREM for key {Key}", key);
+            return 0;
         }
     }
 
@@ -195,8 +198,8 @@ public class RedisService : IRedisService
         }
         catch (Exception ex) when (IsRedisException(ex))
         {
-            _logger.LogError(ex, "Redis EXPIRE failed for key {Key}", key);
-            throw;
+            _logger.LogWarning(ex, "Redis unavailable. Skipping EXPIRE for key {Key}", key);
+            return false;
         }
     }
 
@@ -218,8 +221,7 @@ public class RedisService : IRedisService
         }
         catch (Exception ex) when (IsRedisException(ex))
         {
-            _logger.LogError(ex, "Redis DELETE BY PREFIX failed for prefix {Prefix}", prefix);
-            throw;
+            _logger.LogWarning(ex, "Redis unavailable. Skipping DELETE BY PREFIX for prefix {Prefix}", prefix);
         }
     }
 

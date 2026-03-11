@@ -19,8 +19,8 @@ namespace DataAccess
         {
             return await _context.ThesisForms
                 .AsNoTracking()
-                .Include(tf => tf.Histories)
-                .Include(tf => tf.Uploader)
+                .Include(tf => tf.ThesisFormHistories)
+                .Include(tf => tf.UploadedByNavigation)
                 .FirstOrDefaultAsync();
         }
 
@@ -47,7 +47,7 @@ namespace DataAccess
         {
             return await _context.ThesisFormHistories
                 .AsNoTracking()
-                .Include(h => h.Uploader)
+                .Include(h => h.UploadedByNavigation)
                 .OrderByDescending(h => h.VersionNumber)
                 .ToListAsync();
         }

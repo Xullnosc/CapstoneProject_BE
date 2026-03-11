@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Repositories;
 
@@ -20,6 +21,8 @@ namespace Services
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
+    private readonly INotificationService _notificationService;
+    private readonly ILogger<TeamInvitationService> _logger;
 
         public TeamInvitationService(
             ITeamInvitationRepository invitationRepository,
@@ -29,7 +32,9 @@ namespace Services
             IUserRepository userRepository,
             IWhitelistRepository whitelistRepository,
             IEmailService emailService,
-            IConfiguration configuration
+            IConfiguration configuration,
+            INotificationService notificationService,
+            ILogger<TeamInvitationService> logger
         )
         {
             _invitationRepository = invitationRepository;
@@ -40,6 +45,8 @@ namespace Services
             _whitelistRepository = whitelistRepository;
             _emailService = emailService;
             _configuration = configuration;
+                    _notificationService = notificationService;
+                    _logger = logger;
         }
 
         public async Task<List<TeamInvitationDTO>> GetMyInvitationsAsync(int studentId)
@@ -212,6 +219,25 @@ namespace Services
             catch (Exception ex)
             {
                 Console.WriteLine($"[TeamInvitationService] Failed to send email: {ex.Message}");
+
+                        // Create notification for invited student
+                        try
+                        {
+                            await _notificationService.CreateNotificationAsync(
+                                student.UserId,
+                                "TeamInvitation",
+                                $"Team Invitation: {team.TeamName}",
+                                $"You have been invited to join team {team.TeamName}. Please check your invitations to accept or decline.",
+                                "Team",
+                                team.TeamId,
+                                sendEmail: false // Email already sent above
+                            );
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.LogError(e, "Failed to create team invitation notification. StudentId: {StudentId}, TeamId: {TeamId}", 
+                                student.UserId, team.TeamId);
+                        }
             }
 
             // Reload to get navigation props for DTO

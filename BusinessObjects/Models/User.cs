@@ -25,7 +25,15 @@ public partial class User
 
     public DateTime? CreatedAt { get; set; }
 
+    public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+
     public virtual Role? Role { get; set; }
+
+    public virtual ICollection<Team> TeamLeaders { get; set; } = new List<Team>();
+
+    public virtual ICollection<Team> TeamMentorId2Navigations { get; set; } = new List<Team>();
+
+    public virtual ICollection<Team> TeamMentors { get; set; } = new List<Team>();
 
     public virtual ICollection<Teaminvitation> TeaminvitationInvitedByNavigations { get; set; } = new List<Teaminvitation>();
 
@@ -33,7 +41,11 @@ public partial class User
 
     public virtual ICollection<Teammember> Teammembers { get; set; } = new List<Teammember>();
 
-    public virtual ICollection<Team> Teams { get; set; } = new List<Team>();
-
     public virtual ICollection<Thesis> Theses { get; set; } = new List<Thesis>();
+
+    public virtual ICollection<ThesisFormHistory> ThesisFormHistories { get; set; } = new List<ThesisFormHistory>();
+
+    public virtual ICollection<ThesisForm> ThesisForms { get; set; } = new List<ThesisForm>();
+
+    public virtual ICollection<ThesisHistory> ThesisHistories { get; set; } = new List<ThesisHistory>();
 }

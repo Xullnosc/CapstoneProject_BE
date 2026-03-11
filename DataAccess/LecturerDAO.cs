@@ -32,7 +32,7 @@ namespace DataAccess
 
         public async Task<IEnumerable<Lecturer>> GetActiveLecturersAsync()
         {
-            return await _context.Lecturers.Where(l => l.IsActive).ToListAsync();
+            return await _context.Lecturers.Where(l => l.IsActive == true).ToListAsync();
         }
 
         public async Task AddAsync(Lecturer lecturer)

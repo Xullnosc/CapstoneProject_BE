@@ -1,33 +1,23 @@
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+﻿using System;
+using System.Collections.Generic;
 
-namespace BusinessObjects.Models
+namespace BusinessObjects.Models;
+
+public partial class ThesisFormHistory
 {
-    [Table("thesis_form_histories")]
-    public class ThesisFormHistory
-    {
-        [Key]
-        public int Id { get; set; }
+    public int Id { get; set; }
 
-        [Required]
-        public int ThesisFormId { get; set; }
+    public int ThesisFormId { get; set; }
 
-        [Required]
-        [MaxLength(500)]
-        public string FileUrl { get; set; } = string.Empty;
+    public string FileUrl { get; set; } = null!;
 
-        [Required]
-        public int VersionNumber { get; set; }
+    public int VersionNumber { get; set; }
 
-        [Required]
-        public int UploadedBy { get; set; }
+    public int UploadedBy { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
-        [ForeignKey("ThesisFormId")]
-        public virtual ThesisForm? ThesisForm { get; set; }
+    public virtual ThesisForm ThesisForm { get; set; } = null!;
 
-        [ForeignKey("UploadedBy")]
-        public virtual User? Uploader { get; set; }
-    }
+    public virtual User UploadedByNavigation { get; set; } = null!;
 }

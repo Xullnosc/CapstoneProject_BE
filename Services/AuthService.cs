@@ -199,7 +199,7 @@ namespace Services
                     ExpireMinutes = expireMinutes,
                 };
 
-                var isReviewer = whitelistEntry?.IsReviewer ?? false;
+                var isReviewer = (whitelistEntry?.IsReviewer ?? 0UL) == 1UL;
 
                 var token = JwtTokenGenerator.GenerateToken(user, isReviewer, jwtSettings);
 

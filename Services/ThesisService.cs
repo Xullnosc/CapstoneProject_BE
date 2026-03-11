@@ -61,7 +61,7 @@ namespace Services
 
             var thesis = new Thesis
             {
-                ThesisId = Guid.NewGuid().ToString(),
+                ThesisId = Guid.NewGuid(),
                 Title = string.IsNullOrWhiteSpace(req.Title) 
                     ? System.IO.Path.GetFileNameWithoutExtension(req.File.FileName) 
                     : req.Title.Trim(),

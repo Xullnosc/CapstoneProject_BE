@@ -101,11 +101,14 @@ namespace Services.Mappings
 
             // ThesisHistory → ThesisHistoryDTO
             CreateMap<ThesisHistory, ThesisHistoryDTO>()
-                .ForMember(dest => dest.UploaderName, opt => opt.MapFrom(src => src.UploadedByUser != null ? src.UploadedByUser.FullName : null));
+                .ForMember(dest => dest.UploaderName, opt => opt.MapFrom(src => src.UploadedByNavigation != null ? src.UploadedByNavigation.FullName : null));
 
             // Checklist
             CreateMap<Checklist, ChecklistDTO>();
             CreateMap<ChecklistCreateDTO, Checklist>();
+
+                    // Notification -> NotificationDTO
+                    CreateMap<Notification, NotificationDTO>();
         }
     }
 }

@@ -216,9 +216,9 @@ namespace Services
                 MentorEmail = team.Mentor?.Email ?? string.Empty,
                 MentorAvatar = team.Mentor?.Avatar ?? string.Empty,
                 MentorId2 = team.MentorId2,
-                Mentor2Name = team.Mentor2?.FullName ?? (team.MentorId2 != null ? "Assigned Mentor" : string.Empty),
-                Mentor2Email = team.Mentor2?.Email ?? string.Empty,
-                Mentor2Avatar = team.Mentor2?.Avatar ?? string.Empty
+                Mentor2Name = team.MentorId2Navigation?.FullName ?? (team.MentorId2 != null ? "Assigned Mentor" : string.Empty),
+                Mentor2Email = team.MentorId2Navigation?.Email ?? string.Empty,
+                Mentor2Avatar = team.MentorId2Navigation?.Avatar ?? string.Empty
             };
         }
 

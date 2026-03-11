@@ -19,23 +19,23 @@ public partial class Team
 
     public int LeaderId { get; set; }
 
-    public int? MentorId { get; set; }
-    
-    public int? MentorId2 { get; set; }
-    
     public string? Status { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
 
+    public int? MentorId { get; set; }
+
+    public int? MentorId2 { get; set; }
+
     public virtual User Leader { get; set; } = null!;
 
-    public virtual Semester Semester { get; set; } = null!;
-
     public virtual User? Mentor { get; set; }
-    
-    public virtual User? Mentor2 { get; set; }
+
+    public virtual User? MentorId2Navigation { get; set; }
+
+    public virtual Semester Semester { get; set; } = null!;
 
     public virtual ICollection<Teaminvitation> Teaminvitations { get; set; } = new List<Teaminvitation>();
 

@@ -29,7 +29,7 @@ namespace Services
                 throw new KeyNotFoundException($"Whitelist entry with ID {whitelistId} not found.");
             }
 
-            whitelist.IsReviewer = isReviewer;
+            whitelist.IsReviewer = isReviewer ? 1UL : 0UL;
             await _whitelistRepository.UpdateAsync(whitelist);
 
             await InvalidateCache(whitelist.SemesterId);

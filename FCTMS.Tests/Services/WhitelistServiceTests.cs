@@ -35,7 +35,7 @@ namespace FCTMS.Tests.Services
             {
                 WhitelistId = whitelistId,
                 Email = "test@example.com",
-                IsReviewer = false
+                IsReviewer = 0UL
             };
 
             _mockWhitelistRepository.Setup(x => x.GetByIdAsync(whitelistId))
@@ -45,7 +45,7 @@ namespace FCTMS.Tests.Services
             await _whitelistService.UpdateReviewerStatusAsync(whitelistId, true);
 
             // Assert
-            whitelistEntry.IsReviewer.Should().BeTrue();
+            whitelistEntry.IsReviewer.Should().Be(1UL);
             _mockWhitelistRepository.Verify(x => x.UpdateAsync(whitelistEntry), Times.Once);
         }
 
@@ -58,7 +58,7 @@ namespace FCTMS.Tests.Services
             {
                 WhitelistId = whitelistId,
                 Email = "test@example.com",
-                IsReviewer = true
+                IsReviewer = 1UL
             };
 
             _mockWhitelistRepository.Setup(x => x.GetByIdAsync(whitelistId))
@@ -68,7 +68,7 @@ namespace FCTMS.Tests.Services
             await _whitelistService.UpdateReviewerStatusAsync(whitelistId, false);
 
             // Assert
-            whitelistEntry.IsReviewer.Should().BeFalse();
+            whitelistEntry.IsReviewer.Should().Be(0UL);
             _mockWhitelistRepository.Verify(x => x.UpdateAsync(whitelistEntry), Times.Once);
         }
 

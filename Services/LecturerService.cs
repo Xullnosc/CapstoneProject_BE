@@ -72,7 +72,7 @@ namespace Services
             lecturer.UpdatedAt = DateTime.UtcNow;
             
             await _lecturerRepository.AddAsync(lecturer);
-            if (lecturer.IsActive)
+            if (lecturer.IsActive == true)
             {
                 await SyncLecturerWithWhitelists(lecturer, true);
             }
@@ -101,9 +101,9 @@ namespace Services
 
             await _lecturerRepository.UpdateAsync(existing);
 
-            if (statusChanged || (existing.IsActive && infoChanged))
+            if (statusChanged || (existing.IsActive == true && infoChanged))
             {
-                await SyncLecturerWithWhitelists(existing, existing.IsActive);
+                await SyncLecturerWithWhitelists(existing, existing.IsActive == true);
             }
         }
 
