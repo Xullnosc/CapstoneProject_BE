@@ -1,4 +1,5 @@
 using BusinessObjects.Models;
+using BusinessObjects.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Services;
 using System.Collections.Generic;
@@ -18,9 +19,31 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Lecturer>>> GetAll()
+        public async Task<ActionResult<BusinessObjects.DTOs.PagedResult<Lecturer>>> GetAll(int page = 1, int pageSize = 10, string? search = null)
         {
-            var result = await _lecturerService.GetAllLecturersAsync();
+            var result = await _lecturerService.GetLecturersPaginatedAsync(page, pageSize, search);
+            return Ok(result);
+        }
+
+        [HttpGet("campus/{campus}")]
+        public async Task<ActionResult<PagedResult<Lecturer>>> GetByCampus(string campus, [FromQuery] int pageIndex = 1, [FromQuery] int pageSize = 20)
+        {
+            if (string.IsNullOrWhiteSpace(campus))
+            {
+                return BadRequest("Campus is required.");
+            }
+
+            if (pageIndex <= 0)
+            {
+                return BadRequest("pageIndex must be greater than 0.");
+            }
+
+            if (pageSize <= 0 || pageSize > 100)
+            {
+                return BadRequest("pageSize must be between 1 and 100.");
+            }
+
+            var result = await _lecturerService.GetLecturersByCampusAsync(campus, pageIndex, pageSize);
             return Ok(result);
         }
 

@@ -1,6 +1,9 @@
+using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using FluentAssertions;
+using DataAccess;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Repositories;
@@ -9,6 +12,7 @@ using Services.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -16,48 +20,88 @@ namespace FCTMS.Tests.Services
 {
     public class ImportServiceTests
     {
-        private readonly Mock<IWhitelistRepository> _mockWhitelistRepository;
         private readonly Mock<ISemesterRepository> _mockSemesterRepository;
         private readonly Mock<ILogger<ImportService>> _mockLogger;
         private readonly Mock<IRedisService> _mockRedisService;
-        private readonly ImportService _importService;
 
         public ImportServiceTests()
         {
-            _mockWhitelistRepository = new Mock<IWhitelistRepository>();
             _mockSemesterRepository = new Mock<ISemesterRepository>();
             _mockLogger = new Mock<ILogger<ImportService>>();
             _mockRedisService = new Mock<IRedisService>();
             _mockRedisService.Setup(x => x.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
-            _importService = new ImportService(_mockWhitelistRepository.Object, _mockSemesterRepository.Object, _mockLogger.Object, _mockRedisService.Object);
         }
 
-        #region SaveWhitelistBatchAsync - Happy Path
+        private ImportService CreateService(FctmsContext context)
+        {
+            IImportRepository importRepository = new ImportRepository(new ImportDAO(context));
+            return new ImportService(importRepository, _mockSemesterRepository.Object, _mockLogger.Object, _mockRedisService.Object);
+        }
+
+        private static FctmsContext CreateContext()
+        {
+            var options = new DbContextOptionsBuilder<FctmsContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                .Options;
+
+            var context = new FctmsContext(options);
+            context.Database.EnsureCreated();
+            return context;
+        }
+
+        private static void SeedUploader(FctmsContext context, string email = "hod@example.com", string campus = CampusConstants.HoaLac)
+        {
+            context.Users.Add(new User
+            {
+                Email = email,
+                Campus = campus,
+                RoleId = 1,
+                IsAuthorized = true,
+                CreatedAt = DateTime.UtcNow,
+            });
+            context.SaveChanges();
+        }
+
+        private void SetupSemester(string semesterCode, int semesterId)
+        {
+            _mockSemesterRepository.Setup(x => x.GetStudentRoleIdAsync()).ReturnsAsync(3);
+            _mockSemesterRepository.Setup(x => x.GetSemesterByCodeAsync(semesterCode)).ReturnsAsync(new Semester
+            {
+                SemesterId = semesterId,
+                SemesterCode = semesterCode,
+            });
+        }
 
         [Fact]
-        public async Task SaveWhitelistBatchAsync_ValidInput_SavesSuccessfully()
+        public async Task SaveWhitelistBatchAsync_ValidInput_UpsertsWhitelistAndUser()
         {
-            // Arrange
+            using var context = CreateContext();
+            SeedUploader(context);
+            SetupSemester("SP25", 1);
+            var service = CreateService(context);
+
             var importResult = new ImportResult<WhitelistImportDTO>
             {
                 Items = new List<WhitelistImportDTO>
                 {
-                    new WhitelistImportDTO { Email = "test@example.com", FullName = "Test User", RoleId = 3, Campus = "Hanoi", SemesterId = 1, StudentCode = "ST001" }
+                    new WhitelistImportDTO
+                    {
+                        RowNumber = 4,
+                        Email = "student@example.com",
+                        FullName = "Test User",
+                        StudentCode = "ST001",
+                        SemesterCode = "SP25"
+                    }
                 },
                 Errors = new List<ImportError>()
             };
 
-            _mockSemesterRepository.Setup(x => x.SemesterExistsAsync(1)).ReturnsAsync(true);
-            _mockSemesterRepository.Setup(x => x.GetStudentRoleIdAsync()).ReturnsAsync(3);
-            _mockWhitelistRepository.Setup(x => x.ReplaceStudentsBySemesterAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<IEnumerable<Whitelist>>())).Returns(Task.CompletedTask);
+            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
 
-            // Act
-            await _importService.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "testuser");
-
-            // Assert
-            _mockWhitelistRepository.Verify(x => x.ReplaceStudentsBySemesterAsync(1, 3, It.IsAny<IEnumerable<Whitelist>>()), Times.Once);
-            _mockLogger.Verify(x => x.Log(LogLevel.Information, It.IsAny<EventId>(), It.IsAny<It.IsAnyType>(), It.IsAny<Exception?>(), It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.AtLeast(2)); // At least success log
-            // Verify cache invalidation
+            context.Whitelists.Should().ContainSingle();
+            context.Users.Should().ContainSingle(user => user.Email == "student@example.com" && user.RoleId == 3 && user.Campus == CampusConstants.HoaLac);
+            context.Whitelists.Single().SemesterId.Should().Be(1);
+            context.Whitelists.Single().Campus.Should().Be(CampusConstants.HoaLac);
             _mockRedisService.Verify(x => x.DeleteValueAsync("fctms:semester:all", It.IsAny<CancellationToken>()), Times.Once);
             _mockRedisService.Verify(x => x.DeleteValueAsync("fctms:semester:id:1", It.IsAny<CancellationToken>()), Times.Once);
         }
@@ -65,130 +109,284 @@ namespace FCTMS.Tests.Services
         [Fact]
         public async Task SaveWhitelistBatchAsync_NoItems_ReturnsEarlyWithoutInvalidatingCache()
         {
-            // Arrange
+            using var context = CreateContext();
+            SeedUploader(context);
+            var service = CreateService(context);
+
             var importResult = new ImportResult<WhitelistImportDTO>
             {
                 Items = new List<WhitelistImportDTO>(),
                 Errors = new List<ImportError>()
             };
 
-            // Act
-            await _importService.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "testuser");
+            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
 
-            // Assert
-            _mockWhitelistRepository.Verify(x => x.ReplaceStudentsBySemesterAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<IEnumerable<Whitelist>>()), Times.Never);
-            // Cache should NOT be invalidated since nothing was imported
             _mockRedisService.Verify(x => x.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Fact]
-        public async Task SaveWhitelistBatchAsync_MultipleSemesters_CallsReplaceForEachSemester()
+        public async Task SaveWhitelistBatchAsync_MarkedConflict_ThrowsAndDoesNotSave()
         {
-            // Arrange
+            using var context = CreateContext();
+            SeedUploader(context);
+            SetupSemester("SP25", 1);
+            context.Users.Add(new User
+            {
+                Email = "lecturer@example.com",
+                FullName = "Existing Lecturer",
+                RoleId = 2,
+                Campus = CampusConstants.HoaLac,
+                IsAuthorized = true,
+                CreatedAt = DateTime.UtcNow,
+            });
+            context.SaveChanges();
+
+            var service = CreateService(context);
             var importResult = new ImportResult<WhitelistImportDTO>
             {
                 Items = new List<WhitelistImportDTO>
                 {
-                    new WhitelistImportDTO { Email = "test1@example.com", FullName = "User 1", RoleId = 3, Campus = "Hanoi", SemesterId = 1, StudentCode = "ST001" },
-                    new WhitelistImportDTO { Email = "test2@example.com", FullName = "User 2", RoleId = 3, Campus = "HCMC", SemesterId = 2, StudentCode = "ST002" }
+                    new WhitelistImportDTO
+                    {
+                        RowNumber = 4,
+                        Email = "lecturer@example.com",
+                        FullName = "Conflict User",
+                        StudentCode = "ST099",
+                        SemesterCode = "SP25"
+                    }
                 },
                 Errors = new List<ImportError>()
             };
 
-            _mockSemesterRepository.Setup(x => x.SemesterExistsAsync(It.IsAny<int>())).ReturnsAsync(true);
-            _mockSemesterRepository.Setup(x => x.GetStudentRoleIdAsync()).ReturnsAsync(3);
-            _mockWhitelistRepository.Setup(x => x.ReplaceStudentsBySemesterAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<IEnumerable<Whitelist>>())).Returns(Task.CompletedTask);
+            Func<Task> act = async () => await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
 
-            // Act
-            await _importService.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "testuser");
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*marked with conflicting non-student roles*");
 
-            // Assert
-            _mockWhitelistRepository.Verify(x => x.ReplaceStudentsBySemesterAsync(1, 3, It.IsAny<IEnumerable<Whitelist>>()), Times.Once);
-            _mockWhitelistRepository.Verify(x => x.ReplaceStudentsBySemesterAsync(2, 3, It.IsAny<IEnumerable<Whitelist>>()), Times.Once);
-            // Verify cache invalidation for both semesters
-            _mockRedisService.Verify(x => x.DeleteValueAsync("fctms:semester:all", It.IsAny<CancellationToken>()), Times.Once);
-            _mockRedisService.Verify(x => x.DeleteValueAsync("fctms:semester:id:1", It.IsAny<CancellationToken>()), Times.Once);
-            _mockRedisService.Verify(x => x.DeleteValueAsync("fctms:semester:id:2", It.IsAny<CancellationToken>()), Times.Once);
-        }
-
-        #endregion
-
-        #region SaveWhitelistBatchAsync - Error Cases
-
-        [Fact]
-        public async Task SaveWhitelistBatchAsync_NullImportResult_ThrowsArgumentNullException()
-        {
-            // Act
-            Func<Task> act = async () => await _importService.SaveWhitelistBatchAsync((ImportResult<WhitelistImportDTO>)null!, "test-file.xlsx", "testuser");
-
-            // Assert
-            await act.Should().ThrowAsync<ArgumentNullException>().WithMessage("*importResult*");
+            context.Whitelists.Should().BeEmpty();
+            context.Users.Count(user => user.Email == "lecturer@example.com").Should().Be(1);
         }
 
         [Fact]
-        public async Task SaveWhitelistBatchAsync_NullFileUrl_ThrowsArgumentException()
+        public async Task SaveWhitelistBatchAsync_ExistingStudentMatchedByEmail_UpdatesStudentCode()
         {
-            // Arrange
-            var importResult = new ImportResult<WhitelistImportDTO> { Items = new List<WhitelistImportDTO>() };
+            using var context = CreateContext();
+            SeedUploader(context);
+            SetupSemester("SP25", 1);
+            context.Users.Add(new User
+            {
+                Email = "student@example.com",
+                FullName = "Old Name",
+                StudentCode = "OLD001",
+                RoleId = 3,
+                Campus = CampusConstants.DaNang,
+                IsAuthorized = true,
+                CreatedAt = DateTime.UtcNow,
+            });
+            context.Whitelists.Add(new Whitelist
+            {
+                Email = "student@example.com",
+                FullName = "Old Name",
+                StudentCode = "OLD001",
+                RoleId = 3,
+                Campus = CampusConstants.DaNang,
+                SemesterId = 1,
+                AddedDate = DateTime.UtcNow,
+            });
+            context.SaveChanges();
 
-            // Act
-            Func<Task> act = async () => await _importService.SaveWhitelistBatchAsync(importResult, null!, "testuser");
-
-            // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage("*fileUrl*");
-        }
-
-        [Fact]
-        public async Task SaveWhitelistBatchAsync_InvalidSemesterId_ThrowsArgumentException()
-        {
-            // Arrange
+            var service = CreateService(context);
             var importResult = new ImportResult<WhitelistImportDTO>
             {
                 Items = new List<WhitelistImportDTO>
                 {
-                    new WhitelistImportDTO { Email = "test@example.com", FullName = "Test User", RoleId = 3, Campus = "Hanoi", SemesterId = 999 }
-                },
-                Errors = new List<ImportError>()
+                    new WhitelistImportDTO
+                    {
+                        RowNumber = 4,
+                        Email = "student@example.com",
+                        FullName = "Updated Name",
+                        StudentCode = "NEW001",
+                        SemesterCode = "SP25"
+                    }
+                }
             };
 
-            _mockSemesterRepository.Setup(x => x.SemesterExistsAsync(999)).ReturnsAsync(false);
+            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
 
-            // Act
-            Func<Task> act = async () => await _importService.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "testuser");
-
-            // Assert
-            await act.Should().ThrowAsync<ArgumentException>().WithMessage("*SemesterId 999*");
+            context.Users.Should().ContainSingle(user => user.Email == "student@example.com" && user.StudentCode == "NEW001" && user.FullName == "Updated Name");
+            context.Whitelists.Should().ContainSingle(whitelist => whitelist.Email == "student@example.com" && whitelist.StudentCode == "NEW001");
         }
 
         [Fact]
-        public async Task SaveWhitelistBatchAsync_ReplaceFailsForSemester_ThrowsAndLogsError()
+        public async Task SaveWhitelistBatchAsync_RemovesStudentsNotPresentInImport()
         {
-            // Arrange
+            using var context = CreateContext();
+            SeedUploader(context);
+            SetupSemester("SP25", 1);
+
+            context.Users.AddRange(
+                new User
+                {
+                    Email = "keep@example.com",
+                    FullName = "Keep User",
+                    StudentCode = "ST001",
+                    RoleId = 3,
+                    Campus = CampusConstants.HoaLac,
+                    IsAuthorized = true,
+                    CreatedAt = DateTime.UtcNow,
+                },
+                new User
+                {
+                    Email = "remove@example.com",
+                    FullName = "Remove User",
+                    StudentCode = "ST002",
+                    RoleId = 3,
+                    Campus = CampusConstants.HoaLac,
+                    IsAuthorized = true,
+                    CreatedAt = DateTime.UtcNow,
+                });
+
+            context.Whitelists.AddRange(
+                new Whitelist
+                {
+                    Email = "keep@example.com",
+                    FullName = "Keep User",
+                    StudentCode = "ST001",
+                    RoleId = 3,
+                    Campus = CampusConstants.HoaLac,
+                    SemesterId = 1,
+                    AddedDate = DateTime.UtcNow,
+                },
+                new Whitelist
+                {
+                    Email = "remove@example.com",
+                    FullName = "Remove User",
+                    StudentCode = "ST002",
+                    RoleId = 3,
+                    Campus = CampusConstants.HoaLac,
+                    SemesterId = 1,
+                    AddedDate = DateTime.UtcNow,
+                });
+            context.SaveChanges();
+
+            var service = CreateService(context);
             var importResult = new ImportResult<WhitelistImportDTO>
             {
                 Items = new List<WhitelistImportDTO>
                 {
-                    new WhitelistImportDTO { Email = "test@example.com", FullName = "Test User", RoleId = 3, Campus = "Hanoi", SemesterId = 1 }
+                    new WhitelistImportDTO
+                    {
+                        RowNumber = 4,
+                        Email = "keep@example.com",
+                        FullName = "Keep User",
+                        StudentCode = "ST001",
+                        SemesterCode = "SP25"
+                    }
+                }
+            };
+
+            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
+
+            context.Users.Should().ContainSingle(user => user.Email == "keep@example.com");
+            context.Whitelists.Should().ContainSingle(whitelist => whitelist.Email == "keep@example.com");
+        }
+
+        [Fact]
+        public async Task SaveWhitelistBatchAsync_DuplicateEmailInImport_SkipsDuplicateAndAddsError()
+        {
+            using var context = CreateContext();
+            SeedUploader(context);
+            SetupSemester("SP25", 1);
+            var service = CreateService(context);
+
+            var importResult = new ImportResult<WhitelistImportDTO>
+            {
+                Items = new List<WhitelistImportDTO>
+                {
+                    new WhitelistImportDTO
+                    {
+                        RowNumber = 4,
+                        Email = "duplicate@example.com",
+                        FullName = "First Student",
+                        StudentCode = "ST001",
+                        SemesterCode = "SP25"
+                    },
+                    new WhitelistImportDTO
+                    {
+                        RowNumber = 5,
+                        Email = "duplicate@example.com",
+                        FullName = "Second Student",
+                        StudentCode = "ST002",
+                        SemesterCode = "SP25"
+                    }
                 },
                 Errors = new List<ImportError>()
             };
 
-            _mockSemesterRepository.Setup(x => x.SemesterExistsAsync(1)).ReturnsAsync(true);
-            _mockSemesterRepository.Setup(x => x.GetStudentRoleIdAsync()).ReturnsAsync(3);
-            
-            var dbException = new InvalidOperationException("Database error: unique constraint violation");
-            _mockWhitelistRepository.Setup(x => x.ReplaceStudentsBySemesterAsync(1, 3, It.IsAny<IEnumerable<Whitelist>>())).ThrowsAsync(dbException);
+            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
 
-            // Act
-            Func<Task> act = async () => await _importService.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "testuser");
-
-            // Assert
-            await act.Should().ThrowAsync<InvalidOperationException>();
-            // Verify error was logged
-            _mockLogger.Verify(x => x.Log(LogLevel.Error, It.IsAny<EventId>(), It.IsAny<It.IsAnyType>(), It.IsAny<Exception?>(), It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.AtLeastOnce);
+            context.Whitelists.Should().ContainSingle(w => w.Email == "duplicate@example.com");
+            context.Users.Should().ContainSingle(u => u.Email == "duplicate@example.com");
+            importResult.Errors.Should().ContainSingle(e =>
+                e.Row == 5 &&
+                e.Column == CampusConstants.WhitelistImportColumns.Email &&
+                e.Message.Contains("Duplicate email in import file"));
         }
 
-        #endregion
+        [Fact]
+        public async Task SaveWhitelistBatchAsync_ExistingStudentInAnotherSemester_ReusesWhitelistRow()
+        {
+            using var context = CreateContext();
+            SeedUploader(context);
+            SetupSemester("SP25", 1);
+
+            context.Users.Add(new User
+            {
+                Email = "student@example.com",
+                FullName = "Existing Student",
+                StudentCode = "ST001",
+                RoleId = 3,
+                Campus = CampusConstants.HoaLac,
+                IsAuthorized = true,
+                CreatedAt = DateTime.UtcNow,
+            });
+
+            context.Whitelists.Add(new Whitelist
+            {
+                Email = "student@example.com",
+                FullName = "Existing Student",
+                StudentCode = "ST001",
+                RoleId = 3,
+                Campus = CampusConstants.HoaLac,
+                SemesterId = 2,
+                AddedDate = DateTime.UtcNow,
+            });
+            context.SaveChanges();
+
+            var service = CreateService(context);
+            var importResult = new ImportResult<WhitelistImportDTO>
+            {
+                Items = new List<WhitelistImportDTO>
+                {
+                    new WhitelistImportDTO
+                    {
+                        RowNumber = 4,
+                        Email = "student@example.com",
+                        FullName = "Imported Student",
+                        StudentCode = "ST001",
+                        SemesterCode = "SP25"
+                    }
+                },
+                Errors = new List<ImportError>()
+            };
+
+            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
+
+            context.Whitelists.Count(w => w.Email == "student@example.com").Should().Be(1);
+            context.Whitelists.Single(w => w.Email == "student@example.com").SemesterId.Should().Be(1);
+            context.Whitelists.Single(w => w.Email == "student@example.com").FullName.Should().Be("Imported Student");
+        }
+
 
         #region SaveWhitelistBatchAsync - Logging Verification
 
@@ -196,21 +394,29 @@ namespace FCTMS.Tests.Services
         public async Task SaveWhitelistBatchAsync_LogsStartAndCompletion()
         {
             // Arrange
+            using var context = CreateContext();
+            SeedUploader(context);
+            SetupSemester("SP25", 1);
+            var service = CreateService(context);
+
             var importResult = new ImportResult<WhitelistImportDTO>
             {
                 Items = new List<WhitelistImportDTO>
                 {
-                    new WhitelistImportDTO { Email = "test@example.com", FullName = "Test User", RoleId = 3, Campus = "Hanoi", SemesterId = 1 }
+                    new WhitelistImportDTO
+                    {
+                        RowNumber = 4,
+                        Email = "test@example.com",
+                        FullName = "Test User",
+                        StudentCode = "ST001",
+                        SemesterCode = "SP25"
+                    }
                 },
                 Errors = new List<ImportError>()
             };
 
-            _mockSemesterRepository.Setup(x => x.SemesterExistsAsync(1)).ReturnsAsync(true);
-            _mockSemesterRepository.Setup(x => x.GetStudentRoleIdAsync()).ReturnsAsync(3);
-            _mockWhitelistRepository.Setup(x => x.ReplaceStudentsBySemesterAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<IEnumerable<Whitelist>>())).Returns(Task.CompletedTask);
-
             // Act
-            await _importService.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "john.doe");
+            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
 
             // Assert - verify logging occurred at start and end
             _mockLogger.Verify(
@@ -223,16 +429,147 @@ namespace FCTMS.Tests.Services
 
         #region ImportWhitelistFromExcel
 
-        [Fact]
-        public async Task ImportWhitelistFromExcel_ValidStream_ReturnsImportResult()
+        /// <summary>
+        /// Creates an in-memory Excel stream containing the required headers (row 3)
+        /// and optional data rows. The <paramref name="configureRows"/> callback receives
+        /// the worksheet and can populate every data row starting at row 4.
+        /// </summary>
+        private static byte[] CreateMinimalExcelBytes(Action<OfficeOpenXml.ExcelWorksheet> configureRows)
         {
-            // Arrange - Create a minimal valid Excel stream
-            // Note: This would require creating an actual Excel file or using a library like EPPlus
-            // For now, we'll test the happy path with mocking or skip if stream creation is complex
-            // In a real scenario, you'd use a test fixture with sample Excel files
-            
-            // This test is limited without a proper Excel file factory
-            // Recommend: Create test fixtures with sample Excel files
+            OfficeOpenXml.ExcelPackage.License.SetNonCommercialOrganization("Capstone Project");
+
+            using var package = new OfficeOpenXml.ExcelPackage();
+            var ws = package.Workbook.Worksheets.Add("Import");
+
+            // Row 3 = headers (ImportHelper starts reading headers from column 2)
+            ws.Cells[3, 2].Value = CampusConstants.WhitelistImportColumns.Email;
+            ws.Cells[3, 3].Value = CampusConstants.WhitelistImportColumns.StudentCode;
+            ws.Cells[3, 4].Value = CampusConstants.WhitelistImportColumns.FullName;
+            ws.Cells[3, 5].Value = CampusConstants.WhitelistImportColumns.SemesterCode;
+
+            configureRows(ws);
+
+            return package.GetAsByteArray();
+        }
+
+        [Fact]
+        public async Task ImportWhitelistFromExcel_ConflictingRow_IsMarked()
+        {
+            using var context = CreateContext();
+            SeedUploader(context);
+            SetupSemester("SP25", 1);
+
+            // Existing non-student user whose email will be in the Excel (triggers the conflict).
+            context.Users.Add(new User
+            {
+                Email = "lecturer@example.com",
+                FullName = "Lecturer Name",
+                RoleId = 2,
+                Campus = CampusConstants.HoaLac,
+                IsAuthorized = true,
+                CreatedAt = DateTime.UtcNow,
+            });
+            context.SaveChanges();
+
+            var service = CreateService(context);
+
+            var excelBytes = CreateMinimalExcelBytes(ws =>
+            {
+                ws.Cells[4, 2].Value = "lecturer@example.com";
+                ws.Cells[4, 3].Value = "ST001";
+                ws.Cells[4, 4].Value = "Conflict Student";
+                ws.Cells[4, 5].Value = "SP25";
+            });
+
+            using var stream = new MemoryStream(excelBytes);
+            var result = await service.ImportWhitelistFromExcel(stream, "hod@example.com");
+
+            result.Items.Should().ContainSingle(item => item.Email == "lecturer@example.com" && item.IsMarked == true);
+        }
+
+        [Fact]
+        public async Task ImportWhitelistFromExcel_WithRowOverrideThatResolvesConflict_RowIsNotMarked()
+        {
+            using var context = CreateContext();
+            SeedUploader(context);
+            SetupSemester("SP25", 1);
+
+            // Existing non-student user whose email will be in the Excel.
+            context.Users.Add(new User
+            {
+                Email = "lecturer@example.com",
+                FullName = "Lecturer Name",
+                RoleId = 2,
+                Campus = CampusConstants.HoaLac,
+                IsAuthorized = true,
+                CreatedAt = DateTime.UtcNow,
+            });
+            context.SaveChanges();
+
+            var service = CreateService(context);
+
+            var excelBytes = CreateMinimalExcelBytes(ws =>
+            {
+                ws.Cells[4, 2].Value = "lecturer@example.com";
+                ws.Cells[4, 3].Value = "ST001";
+                ws.Cells[4, 4].Value = "Conflict Student";
+                ws.Cells[4, 5].Value = "SP25";
+            });
+
+            // Override row 4 to use a different email that does not conflict.
+            var overrides = new List<WhitelistRowOverrideDTO>
+            {
+                new WhitelistRowOverrideDTO
+                {
+                    RowNumber = 4,
+                    Email = "newstudent@example.com",
+                    FullName = "Resolved Student",
+                }
+            };
+
+            using var stream = new MemoryStream(excelBytes);
+            var result = await service.ImportWhitelistFromExcel(stream, "hod@example.com", overrides);
+
+            result.Items.Should().ContainSingle();
+            result.Items.Single().IsMarked.Should().BeFalse("the override replaced the conflicting email");
+            result.Items.Single().Email.Should().Be("newstudent@example.com");
+            result.Items.Single().FullName.Should().Be("Resolved Student");
+        }
+
+        [Fact]
+        public async Task ImportWhitelistFromExcel_OverrideDoesNotResolveConflict_RowRemainsMarked()
+        {
+            using var context = CreateContext();
+            SeedUploader(context);
+            SetupSemester("SP25", 1);
+
+            // Two existing non-student users.
+            context.Users.AddRange(
+                new User { Email = "lecturer1@example.com", FullName = "Lecturer 1", RoleId = 2, Campus = CampusConstants.HoaLac, IsAuthorized = true, CreatedAt = DateTime.UtcNow },
+                new User { Email = "lecturer2@example.com", FullName = "Lecturer 2", RoleId = 2, Campus = CampusConstants.HoaLac, IsAuthorized = true, CreatedAt = DateTime.UtcNow }
+            );
+            context.SaveChanges();
+
+            var service = CreateService(context);
+
+            var excelBytes = CreateMinimalExcelBytes(ws =>
+            {
+                ws.Cells[4, 2].Value = "lecturer1@example.com";
+                ws.Cells[4, 3].Value = "ST001";
+                ws.Cells[4, 4].Value = "Conflict Student";
+                ws.Cells[4, 5].Value = "SP25";
+            });
+
+            // Override still provides another conflicting email (also a non-student).
+            var overrides = new List<WhitelistRowOverrideDTO>
+            {
+                new WhitelistRowOverrideDTO { RowNumber = 4, Email = "lecturer2@example.com" }
+            };
+
+            using var stream = new MemoryStream(excelBytes);
+            var result = await service.ImportWhitelistFromExcel(stream, "hod@example.com", overrides);
+
+            result.Items.Single().IsMarked.Should().BeTrue("the override email still belongs to a non-student role");
         }
 
         #endregion

@@ -19,28 +19,34 @@ namespace FCTMS.Tests.Services
     public class ThesisServiceTests
     {
         private readonly Mock<IThesisRepository> _mockThesisRepository;
+        private readonly Mock<IThesisReviewRepository> _mockThesisReviewRepository;
         private readonly Mock<ITeamRepository> _mockTeamRepository;
         private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<ICloudinaryHelper> _mockCloudinaryHelper;
         private readonly Mock<ISemesterRepository> _mockSemesterRepository;
+        private readonly Mock<ITeamInvitationRepository> _mockTeamInvitationRepository;
         private readonly Mock<IMapper> _mockMapper;
         private readonly ThesisService _thesisService;
 
         public ThesisServiceTests()
         {
             _mockThesisRepository = new Mock<IThesisRepository>();
+            _mockThesisReviewRepository = new Mock<IThesisReviewRepository>();
             _mockTeamRepository = new Mock<ITeamRepository>();
             _mockUserRepository = new Mock<IUserRepository>();
             _mockCloudinaryHelper = new Mock<ICloudinaryHelper>();
             _mockSemesterRepository = new Mock<ISemesterRepository>();
+            _mockTeamInvitationRepository = new Mock<ITeamInvitationRepository>();
             _mockMapper = new Mock<IMapper>();
 
             _thesisService = new ThesisService(
                 _mockThesisRepository.Object,
+                _mockThesisReviewRepository.Object,
                 _mockTeamRepository.Object,
                 _mockUserRepository.Object,
                 _mockCloudinaryHelper.Object,
                 _mockSemesterRepository.Object,
+                _mockTeamInvitationRepository.Object,
                 _mockMapper.Object
             );
         }
@@ -62,7 +68,7 @@ namespace FCTMS.Tests.Services
             _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
             _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
             _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync((Team?)null);
-            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.IsAny<IEnumerable<int>>(), currentSemester.SemesterId)).ReturnsAsync(theses);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.IsAny<IEnumerable<int>>(), It.Is<int?>(id => id == currentSemester.SemesterId))).ReturnsAsync(theses);
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
             { 
                 new ThesisDTO { Title = "Thesis 1" }, 
@@ -135,25 +141,29 @@ namespace FCTMS.Tests.Services
         }
 
         [Fact]
-        public async Task GetFilteredThesesAsync_ShouldReturnMappedDtos()
+        public async Task GetFilteredThesesAsync_ShouldReturnMappedDtos_AndPassNewParameters()
         {
             // Arrange
             var theses = new List<Thesis>
             {
                 new Thesis { ThesisId = Guid.NewGuid(), Status = "Reviewing" }
             };
-            _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync("Reviewing", null)).ReturnsAsync(theses);
+            _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync(It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<bool?>(), It.IsAny<bool>())).ReturnsAsync(theses);
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
             { 
-                new ThesisDTO { ThesisId = "1", Status = "Reviewing" } 
+                new ThesisDTO { ThesisId = "1", Status = "Published", IsLocked = false } 
             });
 
             // Act
-            var result = await _thesisService.GetFilteredThesesAsync("Reviewing", null);
+            var result = await _thesisService.GetFilteredThesesAsync("Published", null, null, null, false, true);
 
             // Assert
             result.Should().HaveCount(1);
-            result.First().Status.Should().Be("Reviewing");
+            result.First().Status.Should().Be("Published");
+            result.First().IsLocked.Should().BeFalse();
+            
+            // Verify the repository was called with the exact parameters
+            _mockThesisRepository.Verify(x => x.GetAllThesesFilteredAsync("Published", null, null, false, true), Times.Once);
         }
 
         [Fact]
@@ -304,7 +314,7 @@ namespace FCTMS.Tests.Services
             _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(studentId)).ReturnsAsync(team);
             
             // Should call GetThesesByUserIdsAsync with [2, 1] and semesterId 1
-            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.Is<IEnumerable<int>>(ids => ids.Contains(studentId) && ids.Contains(leaderId)), currentSemester.SemesterId))
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdsAsync(It.Is<IEnumerable<int>>(ids => ids.Contains(studentId) && ids.Contains(leaderId)), It.Is<int?>(id => id == currentSemester.SemesterId)))
                 .ReturnsAsync(theses);
 
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(It.IsAny<IEnumerable<Thesis>>())).Returns(new List<ThesisDTO> 
@@ -423,17 +433,57 @@ namespace FCTMS.Tests.Services
         }
 
         [Fact]
-        public async Task ProposeThesisAsync_ShouldSetStatus_OnMentorInviting()
+        public async Task ProposeThesisAsync_ShouldSetStatus_OnMentorInviting_WhenStudent()
         {
             // Arrange
-            string email = "lecturer@fpt.edu.vn";
-            var user = new User { UserId = 10, Email = email, Role = new Role { RoleName = "Lecturer" } };
+            string email = "student@fpt.edu.vn";
+            int userId = 10;
+            var user = new User { UserId = userId, Email = email, Role = new Role { RoleName = "Student" } };
             var currentSemester = new Semester { SemesterId = 1 };
+            var team = new Team
+            {
+                TeamId = 1,
+                LeaderId = userId,
+                Teammembers = new List<Teammember> { new(), new(), new(), new() } // exactly 4
+            };
 
             var mockFile = new Mock<IFormFile>();
             mockFile.Setup(f => f.FileName).Returns("thesis.docx");
 
             var req = new ProposeThesisDTO { Title = "My Thesis", File = mockFile.Object };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(user.UserId)).ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync(team);
+            _mockCloudinaryHelper.Setup(x => x.UploadFileAsync(mockFile.Object)).ReturnsAsync("https://cloudinary.com/file.docx");
+            _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
+
+            Thesis? capturedThesis = null;
+            _mockThesisRepository
+                .Setup(x => x.CreateThesisAsync(It.IsAny<Thesis>()))
+                .Callback<Thesis>(t => capturedThesis = t)
+                .ReturnsAsync((Thesis t) => t);
+
+            // Act
+            var result = await _thesisService.ProposeThesisAsync(req, email);
+
+            // Assert
+            capturedThesis.Should().NotBeNull();
+            capturedThesis!.Status.Should().Be("On Mentor Inviting");
+        }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldSetStatus_Reviewing_WhenLecturer()
+        {
+            // Arrange
+            string email = "lecturer@fpt.edu.vn";
+            var user = new User { UserId = 20, Email = email, Role = new Role { RoleName = "Lecturer" } };
+            var currentSemester = new Semester { SemesterId = 1 };
+
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.FileName).Returns("thesis.docx");
+
+            var req = new ProposeThesisDTO { Title = "Lecturer Thesis", File = mockFile.Object };
 
             _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
             _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(user.UserId)).ReturnsAsync(new List<Thesis>());
@@ -451,7 +501,7 @@ namespace FCTMS.Tests.Services
 
             // Assert
             capturedThesis.Should().NotBeNull();
-            capturedThesis!.Status.Should().Be("On Mentor Inviting");
+            capturedThesis!.Status.Should().Be("Reviewing");
         }
 
         [Fact]
@@ -479,6 +529,120 @@ namespace FCTMS.Tests.Services
             thesis.UpdateDate.Should().NotBeNull();
             _mockThesisRepository.Verify(x => x.UpdateThesisAsync(thesis), Times.Once);
             result.Status.Should().Be("Cancelled");
+        }
+
+        // ─── ProposeThesisAsync – Team Validation Tests ─────────────────────────
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldThrow_WhenStudentHasNoActiveTeam()
+        {
+            // Arrange
+            string email = "student@fpt.edu.vn";
+            var user = new User { UserId = 5, Email = email, Role = new Role { RoleName = "Student" } };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(user.UserId)).ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(user.UserId)).ReturnsAsync((Team?)null);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.ProposeThesisAsync(
+                new ProposeThesisDTO { Title = "T", File = new Mock<IFormFile>().Object }, email);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("You must be in an active team to propose a thesis.");
+        }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldThrow_WhenStudentIsNotTeamLeader()
+        {
+            // Arrange
+            string email = "member@fpt.edu.vn";
+            int userId = 5;
+            var user = new User { UserId = userId, Email = email, Role = new Role { RoleName = "Student" } };
+            // LeaderId is different from userId → user is NOT the leader
+            var team = new Team { TeamId = 1, LeaderId = 99, Teammembers = new List<Teammember> { new(), new(), new(), new() } };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(userId)).ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync(team);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.ProposeThesisAsync(
+                new ProposeThesisDTO { Title = "T", File = new Mock<IFormFile>().Object }, email);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("Only the team leader can propose a thesis.");
+        }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldThrow_WhenTeamHasFewerThan4Members()
+        {
+            // Arrange
+            string email = "leader@fpt.edu.vn";
+            int userId = 5;
+            var user = new User { UserId = userId, Email = email, Role = new Role { RoleName = "Student" } };
+            // Leader but only 3 members
+            var team = new Team
+            {
+                TeamId = 1,
+                LeaderId = userId,
+                Teammembers = new List<Teammember> { new(), new(), new() } // 3 members
+            };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(userId)).ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync(team);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.ProposeThesisAsync(
+                new ProposeThesisDTO { Title = "T", File = new Mock<IFormFile>().Object }, email);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("Your team must have at least 4 members to propose a thesis. Current members: 3.");
+        }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldSucceed_WhenStudentLeaderWithFourMembers()
+        {
+            // Arrange
+            string email = "leader@fpt.edu.vn";
+            int userId = 5;
+            var user = new User { UserId = userId, Email = email, Role = new Role { RoleName = "Student" } };
+            var team = new Team
+            {
+                TeamId = 1,
+                LeaderId = userId,
+                Teammembers = new List<Teammember> { new(), new(), new(), new() } // exactly 4
+            };
+            var currentSemester = new Semester { SemesterId = 1 };
+
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.FileName).Returns("thesis.docx");
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(userId)).ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync(team);
+            _mockCloudinaryHelper.Setup(x => x.UploadFileAsync(mockFile.Object)).ReturnsAsync("https://cloudinary.com/file.docx");
+            _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
+
+            Thesis? capturedThesis = null;
+            _mockThesisRepository
+                .Setup(x => x.CreateThesisAsync(It.IsAny<Thesis>()))
+                .Callback<Thesis>(t => capturedThesis = t)
+                .ReturnsAsync((Thesis t) => t);
+
+            // Act
+            var result = await _thesisService.ProposeThesisAsync(
+                new ProposeThesisDTO { Title = "My Thesis", File = mockFile.Object }, email);
+
+            // Assert
+            capturedThesis.Should().NotBeNull();
+            capturedThesis!.Status.Should().Be("On Mentor Inviting");
+            capturedThesis.UserId.Should().Be(userId);
+            _mockThesisRepository.Verify(x => x.CreateThesisAsync(It.IsAny<Thesis>()), Times.Once);
         }
     }
 }

@@ -83,18 +83,21 @@ namespace Services
                 foreach (var dto in semesterDTOs)
                 {
                     // Add Active Count (assumed mapped) + Archived Count for Teams
-                    int activeTeamCount = dto.Teams?.Count ?? 0;
+                    int liveTeamTotal = dto.Teams?.Count ?? 0;
+                    int liveActiveTeams = dto.Teams?
+                        .Count(t => string.Equals(t.Status, CampusConstants.TeamStatus.Active, StringComparison.OrdinalIgnoreCase)) ?? 0;
                     int archivedTeamCount = 0;
                     if (archivedTeamsBySemester.TryGetValue(dto.SemesterId, out var archivedTeamsList))
                     {
                         archivedTeamCount = archivedTeamsList.Count;
                     }
 
-                    dto.TeamCount = activeTeamCount + archivedTeamCount;
+                    dto.TeamCount = liveTeamTotal + archivedTeamCount;
+                    dto.ActiveTeamCount = liveActiveTeams; // Only teams with Status = Active
 
                     // Student Count Logic:
-                    // Live/Upcoming -> Count Whitelist (Role = Student)
-                    // Ended -> Count ArchivedWhitelist (Role = Student)
+                    // Status != Ended -> Count Whitelist (Role = Student)
+                    // Status == Ended -> Count ArchivedWhitelist (Role = Student)
                     
                     int liveStudentCount = dto.Whitelists?
                         .Count(w => w.RoleId == studentRoleId) ?? 0;
@@ -106,9 +109,6 @@ namespace Services
                     }
 
                     dto.WhitelistCount = liveStudentCount + archivedStudentCount;
-                    
-                    // Set IsArchived flag if any archived data exists
-                    dto.IsArchived = archivedTeamCount > 0 || archivedStudentCount > 0;
                     
                     // CRITICAL OPTIMIZATION: Clear the Teams and Whitelists lists for the Dashboard view.
                     dto.Teams = new List<TeamSimpleDTO>(); 
@@ -188,9 +188,9 @@ namespace Services
                     dto.Whitelists.AddRange(archivedWlDTOs);
                 }
 
-                // 2.5 Merge Global Lecturers (SemesterId is null)
+                // 2. Add Global Lecturers
                 var allDbRoles = await _semesterRepository.GetAllRolesAsync();
-                var lecturerRole = allDbRoles.FirstOrDefault(r => r.RoleName == "Lecturer");
+                var lecturerRole = allDbRoles.FirstOrDefault(r => string.Equals(r.RoleName, CampusConstants.Roles.Lecturer, StringComparison.OrdinalIgnoreCase));
                 if (lecturerRole != null)
                 {
                     // Using WhitelistRepository to get all whitelists with Lecturer role
@@ -255,13 +255,13 @@ namespace Services
 
                 // 3. Calculate Counts (Total = Live + Archived)
                 int liveTeamCount = semester.Teams?.Count ?? 0;
+                int liveActiveTeams = semester.Teams?
+                    .Count(t => string.Equals(t.Status, CampusConstants.TeamStatus.Active, StringComparison.OrdinalIgnoreCase)) ?? 0;
                 int liveStudentCount = semester.Whitelists?.Count(w => w.RoleId == studentRoleId) ?? 0;
 
                 dto.TeamCount = liveTeamCount + archivedTeamCount;
+                dto.ActiveTeamCount = liveActiveTeams; // Only count Qualified teams
                 dto.WhitelistCount = liveStudentCount + archivedStudentCount;
-                
-                // 4. Set IsArchived flag
-                dto.IsArchived = archivedTeamCount > 0 || archivedStudentCount > 0;
 
                 var ttlStr = _configuration["RedisSettings:SemesterTTLMinutes"];
                 int ttlMinutes2;
@@ -288,30 +288,9 @@ namespace Services
             }
 
             var semester = _mapper.Map<Semester>(semesterCreateDTO);
-            // Force IsActive to false on create. Must be started manually.
+            // Force Status to Upcoming. Must be started manually.
+            semester.Status = "Upcoming";
             var createdSemester = await _semesterRepository.CreateSemesterAsync(semester);
-
-            // Automatically add all active lecturers to the whitelist
-            var activeLecturers = await _lecturerRepository.GetActiveLecturersAsync();
-            var roles = await _semesterRepository.GetAllRolesAsync();
-            var lecturerRole = roles.FirstOrDefault(r => r.RoleName == "Lecturer");
-            
-            if (lecturerRole != null)
-            {
-                foreach (var lecturer in activeLecturers)
-                {
-                    await _whitelistRepository.AddAsync(new Whitelist
-                    {
-                        Email = lecturer.Email,
-                        FullName = lecturer.FullName,
-                        Avatar = lecturer.Avatar,
-                        Campus = CampusConstants.MapCodeToFullName(lecturer.Campus),
-                        RoleId = lecturerRole.RoleId,
-                        SemesterId = createdSemester.SemesterId,
-                        AddedDate = DateTime.UtcNow
-                    });
-                }
-            }
 
             await InvalidateSemesterCacheAsync();
             return _mapper.Map<SemesterDTO>(createdSemester);
@@ -351,11 +330,11 @@ namespace Services
             if (prefix == "SU" && !name.Contains("summer")) throw new ArgumentException("Code 'SU' (Summer) requires 'Summer' in Semester Name.");
             if (prefix == "FA" && !name.Contains("fall")) throw new ArgumentException("Code 'FA' (Fall) requires 'Fall' in Semester Name.");
 
-            // 3. Check Date Overlap (Optimized to use Database AnyAsync)
-            bool isOverlap = await _semesterRepository.IsOverlapAsync(dto.StartDate, dto.EndDate, dto.SemesterId > 0 ? dto.SemesterId : null);
-            if (isOverlap)
+            // 3. Check Date Overlap (Optimized to use Database FirstOrDefaultAsync)
+            var overlapSemester = await _semesterRepository.IsOverlapAsync(dto.StartDate, dto.EndDate, dto.SemesterId > 0 ? dto.SemesterId : null);
+            if (overlapSemester != null)
             {
-                throw new InvalidOperationException($"Semester dates overlap with another existing semester.");
+                throw new InvalidOperationException($"Semester dates overlap with another existing semester: '{overlapSemester.SemesterName}' ({overlapSemester.SemesterCode}).");
             }
         }
 
@@ -382,7 +361,7 @@ namespace Services
 
                 // 1. Deactivate all other active semesters
                 var allSemesters = await _semesterRepository.GetAllSemestersAsync();
-                var currentActiveIds = allSemesters.Where(s => s.IsActive).Select(s => s.SemesterId).ToList();
+                var currentActiveIds = allSemesters.Where(s => s.Status == "Active").Select(s => s.SemesterId).ToList();
 
                 foreach (var activeId in currentActiveIds)
                 {
@@ -396,9 +375,9 @@ namespace Services
                 // 2. Activate target semester
                 // CRITICAL FIX: Reload fresh entity to ensure tracking state is clean before Update
                 var semesterToActivate = await _semesterRepository.GetSemesterByIdAsync(id);
-                if (semesterToActivate != null && !semesterToActivate.IsActive)
+                if (semesterToActivate != null && semesterToActivate.Status != "Active")
                 {
-                    semesterToActivate.IsActive = true;
+                    semesterToActivate.Status = "Active";
                     // Detach navigation properties to prevent EF tracking conflicts
                     semesterToActivate.Teams = null!;
                     semesterToActivate.Whitelists = null!;
@@ -439,15 +418,23 @@ namespace Services
                     throw new KeyNotFoundException($"Semester with ID {id} not found.");
                 }
 
-                // 1. Mark as Inactive
-                semester.IsActive = false;
+                // 1. Mark as Ended (Always succeed)
+                semester.Status = "Ended";
                 // Detach navigation properties to prevent EF tracking conflicts
                 semester.Teams = null!;
                 semester.Whitelists = null!;
                 await _semesterRepository.UpdateSemesterAsync(semester);
 
-                // 2. Archive Data
-                await _archivingService.ArchiveSemesterAsync(id);
+                // 2. Archive Data (Best effort - not blocking the status change)
+                try 
+                {
+                    await _archivingService.ArchiveSemesterAsync(id);
+                }
+                catch (Exception)
+                {
+                    // Log warning but don't fail the transaction
+                    // In a real app we'd log this: _logger.LogWarning("Archiving failed for semester {id}", id);
+                }
 
                 transaction.Complete();
                 await InvalidateSemesterCacheAsync(id);
@@ -459,7 +446,118 @@ namespace Services
             }
         }
 
-        private async Task InvalidateSemesterCacheAsync(int? id = null)
+        public async Task<PagedResult<WhitelistDTO>> GetWhitelistsPaginatedAsync(int semesterId, int page, int pageSize, string? role = null, string? search = null)
+        {
+            var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
+            if (semester == null) throw new KeyNotFoundException($"Semester {semesterId} not found");
+
+            // 1. Collect all potential whitelists
+            var allWhitelists = new List<WhitelistDTO>();
+
+            // Live whitelists
+            if (semester.Whitelists != null && semester.Whitelists.Any())
+            {
+                allWhitelists.AddRange(_mapper.Map<List<WhitelistDTO>>(semester.Whitelists));
+            }
+
+            // Archived whitelists
+            var archivedWhitelists = await _archivingService.GetArchivedWhitelistsBySemesterIdsAsync(new List<int> { semesterId });
+            if (archivedWhitelists != null && archivedWhitelists.Any())
+            {
+                var archivedDTOs = _mapper.Map<List<WhitelistDTO>>(archivedWhitelists);
+                
+                // Map RoleName for archived entries
+                var roles = await _semesterRepository.GetAllRolesAsync();
+                var roleDict = roles.ToDictionary(r => r.RoleId, r => r.RoleName);
+                foreach (var wlDto in archivedDTOs)
+                {
+                    if (wlDto.RoleId.HasValue && roleDict.TryGetValue(wlDto.RoleId.Value, out var roleName))
+                    {
+                        wlDto.RoleName = roleName;
+                    }
+                }
+                allWhitelists.AddRange(archivedDTOs);
+            }
+
+            // Global Lecturers (SemesterId is null)
+            var allDbRoles = await _semesterRepository.GetAllRolesAsync();
+            var lecturerRole = allDbRoles.FirstOrDefault(r => string.Equals(r.RoleName, CampusConstants.Roles.Lecturer, StringComparison.OrdinalIgnoreCase));
+            if (lecturerRole != null)
+            {
+                var globalWhitelists = await _whitelistRepository.GetByRoleAsync(lecturerRole.RoleId);
+                var globalLecturers = globalWhitelists.Where(w => w.SemesterId == null).ToList();
+                var globalLecturerDTOs = _mapper.Map<List<WhitelistDTO>>(globalLecturers);
+                foreach (var gl in globalLecturerDTOs)
+                {
+                    if (!allWhitelists.Any(w => string.Equals(w.Email, gl.Email, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        gl.RoleName = lecturerRole.RoleName;
+                        allWhitelists.Add(gl);
+                    }
+                }
+            }
+
+            // 2. Fetch Avatars for all collected whitelists (Directly from database)
+            var emails = allWhitelists
+                .Where(w => !string.IsNullOrWhiteSpace(w.Email))
+                .Select(w => w.Email.Trim())
+                .Distinct()
+                .ToList();
+
+            if (emails.Any())
+            {
+                var users = await _userRepository.GetUsersByEmailsAsync(emails);
+                // Case-insensitive dictionary to match avatars safely
+                var avatarDict = users
+                    .Where(u => !string.IsNullOrEmpty(u.Email))
+                    .GroupBy(u => u.Email!.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First().Avatar, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var wl in allWhitelists)
+                {
+                    if (!string.IsNullOrWhiteSpace(wl.Email) && avatarDict.TryGetValue(wl.Email.Trim(), out var avatar))
+                    {
+                        wl.Avatar = avatar;
+                    }
+                }
+            }
+
+            // Campus mapping is now handled in MappingProfile, but for manual merges we ensure consistency
+            foreach (var wl in allWhitelists)
+            {
+                wl.Campus = CampusConstants.MapCodeToFullName(wl.Campus);
+            }
+
+            // 3. Filter
+            var filtered = allWhitelists.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                filtered = filtered.Where(w => string.Equals(w.RoleName, role, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim().ToLower();
+                filtered = filtered.Where(w => 
+                    (w.Email != null && w.Email.ToLower().Contains(s)) || 
+                    (w.FullName != null && w.FullName.ToLower().Contains(s)) ||
+                    (w.StudentCode != null && w.StudentCode.ToLower().Contains(s))
+                );
+            }
+
+            // 4. Paginate
+            var list = filtered.OrderBy(w => w.FullName ?? w.Email).ToList();
+            int total = list.Count;
+            var items = list
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return new PagedResult<WhitelistDTO>(items, total, page, pageSize);
+        }
+
+        public async Task InvalidateSemesterCacheAsync(int? id = null)
         {
             await _redisService.DeleteValueAsync("fctms:semester:all");
             if (id.HasValue)

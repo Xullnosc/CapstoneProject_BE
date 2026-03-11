@@ -2,8 +2,9 @@
 -- This event deletes notifications older than 90 days, running daily at 2 AM
 -- Batch deletion (LIMIT 10000) prevents long-running locks
 
--- Ensure event scheduler is enabled (requires SUPER privilege or EVENT privilege)
-SET GLOBAL event_scheduler = ON;
+-- NOTE: The MySQL event scheduler must be enabled at the server level by a DBA:
+--   SET GLOBAL event_scheduler = ON;
+-- or in my.cnf: event_scheduler=ON
 
 -- Drop existing event if it exists (for idempotency)
 DROP EVENT IF EXISTS cleanup_old_notifications;
@@ -31,6 +32,3 @@ BEGIN
     -- INSERT INTO cleanup_logs (EventName, RowsDeleted, ExecutedAt) 
     -- VALUES ('cleanup_old_notifications', rows_deleted, NOW());
 END;
-
--- Verify event was created
-SHOW EVENTS LIKE 'cleanup_old_notifications';

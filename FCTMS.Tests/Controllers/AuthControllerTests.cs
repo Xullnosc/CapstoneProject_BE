@@ -1,4 +1,8 @@
+using System.Net;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Services.DTOs;
 
 namespace FCTMS.Tests.Controllers
 {
@@ -6,13 +10,27 @@ namespace FCTMS.Tests.Controllers
     {
         private readonly Mock<IAuthService> _mockAuthService;
         private readonly Mock<ILogger<AuthController>> _mockLogger;
+        private readonly Mock<IWebHostEnvironment> _mockEnv;
+        private readonly Mock<Repositories.IAccessLogRepository> _mockAccessLogRepository;
         private readonly AuthController _controller;
 
         public AuthControllerTests()
         {
             _mockAuthService = new Mock<IAuthService>();
             _mockLogger = new Mock<ILogger<AuthController>>();
-            _controller = new AuthController(_mockAuthService.Object, _mockLogger.Object);
+            _mockEnv = new Mock<IWebHostEnvironment>();
+            _mockAccessLogRepository = new Mock<Repositories.IAccessLogRepository>();
+            _mockEnv.Setup(e => e.EnvironmentName).Returns("Development");
+            _controller = new AuthController(
+                _mockAuthService.Object, 
+                _mockLogger.Object, 
+                _mockEnv.Object, 
+                _mockAccessLogRepository.Object);
+            // Ensure Response.Cookies is available so SetRefreshTokenCookie does not throw (Login/LoginWithCredentials return Ok)
+            _controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            };
         }
 
         // --- Normal Cases (Happy Path) ---
@@ -22,14 +40,16 @@ namespace FCTMS.Tests.Controllers
         {
             // Arrange
             var request = new LoginRequestDTO { IdToken = "valid-token", Campus = "Hanoi" };
-            var responseDto = new LoginResponseDTO 
-            { 
-                Token = "jwt-token", 
-                UserInfo = new UserInfoDTO { Email = "test@example.com", FullName = "Test User" } 
+            var loginResult = new LoginResultDTO
+            {
+                AccessToken = "jwt-token",
+                UserInfo = new UserInfoDTO { Email = "test@example.com", FullName = "Test User" },
+                RefreshToken = "rt",
+                RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7)
             };
 
             _mockAuthService.Setup(x => x.GoogleLoginAsync(request))
-                .ReturnsAsync(responseDto);
+                .ReturnsAsync(loginResult);
 
             // Act
             var result = await _controller.Login(request);
@@ -38,6 +58,8 @@ namespace FCTMS.Tests.Controllers
             var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
             var returnValue = okResult.Value.Should().BeAssignableTo<LoginResponseDTO>().Subject;
             returnValue.Token.Should().Be("jwt-token");
+            returnValue.AccessToken.Should().Be("jwt-token");
+            returnValue.UserInfo.Email.Should().Be("test@example.com");
         }
 
         // --- Abnormal Cases (Abnormal & Edge Cases) ---
@@ -150,16 +172,160 @@ namespace FCTMS.Tests.Controllers
             // Arrange
             LoginRequestDTO? request = null;
 
-            // Note: In a real controller, [FromBody] handles nulls or invalid model state.
-            // Since we are unit testing the controller method directly, we might need to simulate ModelState error
-            // OR checks if the controller code explicitly checks for null.
-            // Looking at AuthController.cs, it has `if (request == null || string.IsNullOrEmpty(request.IdToken))`.
-
             // Act
-            var result = await _controller.Login(request!); // Force null
+            var result = await _controller.Login(request!);
 
             // Assert
             result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        // --- LoginWithCredentials ---
+
+        [Fact]
+        public async Task LoginWithCredentials_ValidRequest_ReturnsOk()
+        {
+            // Arrange
+            var request = new CredentialLoginRequestDTO { Username = "admin", Password = "pass" };
+            var loginResult = new LoginResultDTO
+            {
+                AccessToken = "jwt-token",
+                UserInfo = new UserInfoDTO { Email = "admin@fpt.edu.vn", FullName = "Admin" },
+                RefreshToken = "rt",
+                RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7)
+            };
+            _mockAuthService.Setup(x => x.CredentialLoginAsync(request))
+                .ReturnsAsync(loginResult);
+
+            // Act
+            var result = await _controller.LoginWithCredentials(request);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            var returnValue = okResult.Value.Should().BeAssignableTo<LoginResponseDTO>().Subject;
+            returnValue.Token.Should().Be("jwt-token");
+            returnValue.UserInfo.FullName.Should().Be("Admin");
+        }
+
+        [Fact]
+        public async Task LoginWithCredentials_NullBody_ReturnsBadRequest()
+        {
+            // Act
+            var result = await _controller.LoginWithCredentials(null!);
+
+            // Assert
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task LoginWithCredentials_InvalidCredentials_ReturnsUnauthorized()
+        {
+            // Arrange
+            var request = new CredentialLoginRequestDTO { Username = "x", Password = "y" };
+            _mockAuthService.Setup(x => x.CredentialLoginAsync(request))
+                .ThrowsAsync(new UnauthorizedAccessException("Invalid username or password."));
+
+            // Act
+            var result = await _controller.LoginWithCredentials(request);
+
+            // Assert
+            var unauthorizedResult = result.Should().BeOfType<UnauthorizedObjectResult>().Subject;
+            unauthorizedResult.Value.Should().BeEquivalentTo(new { message = "Invalid username or password." });
+        }
+
+        // --- Refresh ---
+
+        [Fact]
+        public async Task Refresh_ValidCookie_ReturnsOk()
+        {
+            // Arrange
+            var context = new DefaultHttpContext();
+            context.Request.Headers["Cookie"] = "refreshToken=valid-refresh-token";
+            _controller.ControllerContext = new ControllerContext { HttpContext = context };
+
+            var refreshResult = new RefreshResultDTO
+            {
+                AccessToken = "new-access-token",
+                RefreshToken = "new-rt",
+                RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7)
+            };
+            _mockAuthService.Setup(x => x.RefreshTokenAsync("valid-refresh-token"))
+                .ReturnsAsync(refreshResult);
+
+            // Act
+            var result = await _controller.Refresh();
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            var returnValue = okResult.Value.Should().BeAssignableTo<RefreshResponseDTO>().Subject;
+            returnValue.AccessToken.Should().Be("new-access-token");
+        }
+
+        [Fact]
+        public async Task Refresh_NoOrInvalidCookie_ReturnsUnauthorized()
+        {
+            // Arrange: no cookie set
+            var context = new DefaultHttpContext();
+            _controller.ControllerContext = new ControllerContext { HttpContext = context };
+            _mockAuthService.Setup(x => x.RefreshTokenAsync(null))
+                .ReturnsAsync((RefreshResultDTO?)null);
+
+            // Act
+            var result = await _controller.Refresh();
+
+            // Assert
+            var unauthorizedResult = result.Should().BeOfType<UnauthorizedObjectResult>().Subject;
+            unauthorizedResult.Value.Should().BeEquivalentTo(new { message = "Invalid or expired refresh token" });
+        }
+
+        [Fact]
+        public async Task Refresh_ServiceReturnsNull_ReturnsUnauthorized()
+        {
+            // Arrange
+            var context = new DefaultHttpContext();
+            context.Request.Headers["Cookie"] = "refreshToken=expired-token";
+            _controller.ControllerContext = new ControllerContext { HttpContext = context };
+            _mockAuthService.Setup(x => x.RefreshTokenAsync("expired-token"))
+                .ReturnsAsync((RefreshResultDTO?)null);
+
+            // Act
+            var result = await _controller.Refresh();
+
+            // Assert
+            result.Should().BeOfType<UnauthorizedObjectResult>();
+        }
+
+        // --- Logout ---
+
+        [Fact]
+        public async Task Logout_Always_ReturnsOk()
+        {
+            // Arrange
+            var context = new DefaultHttpContext();
+            context.Request.Headers["Cookie"] = "refreshToken=any";
+            _controller.ControllerContext = new ControllerContext { HttpContext = context };
+
+            // Act
+            var result = await _controller.Logout();
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.Should().BeEquivalentTo(new { message = "Logged out" });
+            _mockAuthService.Verify(x => x.RevokeRefreshTokenAsync(It.IsAny<string>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task Logout_NoCookie_ReturnsOk()
+        {
+            // Arrange
+            var context = new DefaultHttpContext();
+            _controller.ControllerContext = new ControllerContext { HttpContext = context };
+
+            // Act
+            var result = await _controller.Logout();
+
+            // Assert
+            result.Should().BeOfType<OkObjectResult>();
+            _mockAuthService.Verify(x => x.RevokeRefreshTokenAsync(null), Times.Once);
         }
     }
 }

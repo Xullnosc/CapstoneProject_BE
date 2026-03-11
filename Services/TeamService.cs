@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Repositories;
@@ -18,6 +19,7 @@ namespace Services
         private readonly IArchivingService _archivingService;
         private readonly ITeamMemberRepository _teamMemberRepository;
         private readonly IThesisRepository _thesisRepository;
+        private readonly ISemesterService _semesterService;
 
         public TeamService(
             ITeamRepository teamRepository, 
@@ -26,7 +28,8 @@ namespace Services
             ICloudinaryHelper cloudinaryHelper, 
             IArchivingService archivingService, 
             ITeamMemberRepository teamMemberRepository,
-            IThesisRepository thesisRepository)
+            IThesisRepository thesisRepository,
+            ISemesterService semesterService)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
@@ -35,6 +38,7 @@ namespace Services
             _archivingService = archivingService;
             _teamMemberRepository = teamMemberRepository;
             _thesisRepository = thesisRepository;
+            _semesterService = semesterService;
         }
 
         public async Task<TeamDTO> CreateTeamAsync(int leaderId, CreateTeamDTO createTeamDto)
@@ -289,7 +293,28 @@ namespace Services
 
         public async Task<bool> RemoveMemberAsync(int teamId, int studentId)
         {
-            return await _teamMemberRepository.RemoveMemberAsync(teamId, studentId);
+            var result = await _teamMemberRepository.RemoveMemberAsync(teamId, studentId);
+            if (result)
+            {
+                var team = await _teamRepository.GetByIdAsync(teamId);
+                if (team != null)
+                {
+                    int count = team.Teammembers?.Count ?? 1; // It already fetched without the removed member
+                    string newStatus = count switch
+                    {
+                        >= 4 => CampusConstants.TeamStatus.Active,
+                        3 => CampusConstants.TeamStatus.PendingApproval,
+                        _ => CampusConstants.TeamStatus.Insufficient
+                    };
+
+                    if (newStatus != team.Status)
+                    {
+                        await _teamRepository.UpdateStatusAsync(teamId, newStatus);
+                    }
+                }
+                await _semesterService.InvalidateSemesterCacheAsync();
+            }
+            return result;
         }
     }
 }

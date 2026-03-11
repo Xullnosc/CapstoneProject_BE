@@ -22,6 +22,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<IArchivingService> _mockArchivingService;
         private readonly Mock<ITeamMemberRepository> _mockTeamMemberRepository;
         private readonly Mock<IThesisRepository> _mockThesisRepository;
+        private readonly Mock<ISemesterService> _mockSemesterService;
         private readonly TeamService _teamService;
 
         public TeamServiceTests()
@@ -33,6 +34,7 @@ namespace FCTMS.Tests.Services
             _mockArchivingService = new Mock<IArchivingService>();
             _mockTeamMemberRepository = new Mock<ITeamMemberRepository>();
             _mockThesisRepository = new Mock<IThesisRepository>();
+            _mockSemesterService = new Mock<ISemesterService>();
 
             _teamService = new TeamService(
                 _mockTeamRepository.Object,
@@ -41,7 +43,8 @@ namespace FCTMS.Tests.Services
                 _mockCloudinaryHelper.Object,
                 _mockArchivingService.Object,
                 _mockTeamMemberRepository.Object,
-                _mockThesisRepository.Object
+                _mockThesisRepository.Object,
+                _mockSemesterService.Object
             );
         }
 
@@ -208,7 +211,7 @@ namespace FCTMS.Tests.Services
             var semesterName = "SP26";
 
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync())
-                .ReturnsAsync(new Semester { SemesterId = 1, SemesterCode = semesterName, SemesterName = "Spring 2026", IsActive = true });
+                .ReturnsAsync(new Semester { SemesterId = 1, SemesterCode = semesterName, SemesterName = "Spring 2026", Status = "Active" });
 
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId))
                 .ReturnsAsync(new User { UserId = userId, RoleId = 3, IsAuthorized = true });
@@ -233,7 +236,7 @@ namespace FCTMS.Tests.Services
             int userId = 2;
             var createDto = new CreateTeamDTO { TeamName = "Team 2" };
              _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync())
-                .ReturnsAsync(new Semester { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026", IsActive = true });
+                .ReturnsAsync(new Semester { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026", Status = "Active" });
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { UserId = userId, RoleId = 3, IsAuthorized = true });
              _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team?)null);
 

@@ -23,6 +23,7 @@ namespace Services
         private readonly IConfiguration _configuration;
     private readonly INotificationService _notificationService;
     private readonly ILogger<TeamInvitationService> _logger;
+        private readonly ISemesterService _semesterService;
 
         public TeamInvitationService(
             ITeamInvitationRepository invitationRepository,
@@ -34,7 +35,8 @@ namespace Services
             IEmailService emailService,
             IConfiguration configuration,
             INotificationService notificationService,
-            ILogger<TeamInvitationService> logger
+            ILogger<TeamInvitationService> logger,
+            ISemesterService semesterService
         )
         {
             _invitationRepository = invitationRepository;
@@ -47,6 +49,7 @@ namespace Services
             _configuration = configuration;
                     _notificationService = notificationService;
                     _logger = logger;
+            _semesterService = semesterService;
         }
 
         public async Task<List<TeamInvitationDTO>> GetMyInvitationsAsync(int studentId)
@@ -81,6 +84,9 @@ namespace Services
 
             // 6. Update Team Status if needed
             await UpdateTeamStatusAfterJoinAsync(team);
+
+            // 7. Invalidate Semester Cache
+            await _semesterService.InvalidateSemesterCacheAsync();
         }
 
         public async Task DeclineInvitationAsync(int invitationId, int studentId)
@@ -338,13 +344,22 @@ namespace Services
 
         private async Task UpdateTeamStatusAfterJoinAsync(Team team)
         {
-            // Re-fetch members count or use loaded count + 1
-            int newCount = team.Teammembers.Count + 1;
-            if (newCount >= 3 && team.Status == CampusConstants.TeamStatus.Insufficient)
+            // Re-fetch actual members from DB since AddMemberToTeamAsync has already committed
+            var updatedMembers = await _teamMemberRepository.GetMembersByTeamIdAsync(team.TeamId);
+            int newCount = updatedMembers?.Count() ?? 0;
+
+            string newStatus = newCount switch
+            {
+                >= 4 => CampusConstants.TeamStatus.Active,
+                3 => CampusConstants.TeamStatus.PendingApproval,
+                _ => CampusConstants.TeamStatus.Insufficient
+            };
+
+            if (newStatus != team.Status)
             {
                 await _teamRepository.UpdateStatusAsync(
                     team.TeamId,
-                    CampusConstants.TeamStatus.Pending
+                    newStatus
                 );
             }
         }

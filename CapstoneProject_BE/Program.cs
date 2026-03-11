@@ -11,6 +11,7 @@ using Services;
 using Services.Helpers;
 using Services.Mappings;
 using StackExchange.Redis;
+using CapstoneProject_BE.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -90,12 +91,14 @@ if (!string.IsNullOrEmpty(allowedOrigins))
                     .WithOrigins(allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries))
                     .AllowAnyMethod()
                     .AllowAnyHeader()
+                    .AllowCredentials()
         );
     });
 }
 
 //Services (Services Layer)
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddScoped<ISemesterService, SemesterService>();
 builder.Services.AddScoped<ITeamService, TeamService>();
@@ -112,9 +115,12 @@ builder.Services.AddScoped<IChecklistService, ChecklistService>();
 builder.Services.AddScoped<IThesisFormService, ThesisFormService>();
 builder.Services.AddScoped<ILecturerService, LecturerService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IAccessLogService, AccessLogService>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
+builder.Services.AddScoped<ISystemUserCredentialDAO, SystemUserCredentialDAO>();
+builder.Services.AddScoped<IRefreshTokenDAO, RefreshTokenDAO>();
 builder.Services.AddScoped<IWhitelistDAO, WhitelistDAO>();
 builder.Services.AddScoped<ISemesterDAO, SemesterDAO>();
 builder.Services.AddScoped<ITeamDAO, TeamDAO>();
@@ -123,13 +129,19 @@ builder.Services.AddScoped<IArchivedTeamDAO, ArchivedTeamDAO>();
 builder.Services.AddScoped<ITeamInvitationDAO, TeamInvitationDAO>();
 builder.Services.AddScoped<ITeamMemberDAO, TeamMemberDAO>();
 builder.Services.AddScoped<IThesisDAO, ThesisDAO>();
+builder.Services.AddScoped<IThesisReviewDAO, ThesisReviewDAO>();
 builder.Services.AddScoped<IChecklistDAO, ChecklistDAO>();
 builder.Services.AddScoped<IThesisFormDAO, ThesisFormDAO>();
 builder.Services.AddScoped<ILecturerDAO, LecturerDAO>();
 builder.Services.AddScoped<INotificationDAO, NotificationDAO>();
+builder.Services.AddScoped<IAccessLogDAO, AccessLogDAO>();
+builder.Services.AddScoped<IImportDAO, ImportDAO>();
+
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ISystemUserCredentialRepository, SystemUserCredentialRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IWhitelistRepository, WhitelistRepository>();
 builder.Services.AddScoped<ISemesterRepository, SemesterRepository>();
 builder.Services.AddScoped<ITeamRepository, TeamRepository>();
@@ -137,10 +149,14 @@ builder.Services.AddScoped<IArchivingRepository, ArchivingRepository>();
 builder.Services.AddScoped<ITeamInvitationRepository, TeamInvitationRepository>();
 builder.Services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
 builder.Services.AddScoped<IThesisRepository, ThesisRepository>();
+builder.Services.AddScoped<IThesisReviewRepository, ThesisReviewRepository>();
 builder.Services.AddScoped<IChecklistRepository, ChecklistRepository>();
 builder.Services.AddScoped<IThesisFormRepository, ThesisFormRepository>();
 builder.Services.AddScoped<ILecturerRepository, LecturerRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<IAccessLogRepository, AccessLogRepository>();
+builder.Services.AddScoped<IImportRepository, ImportRepository>();
+
 
 //Middleware
 // AutoMapper
@@ -176,6 +192,24 @@ builder.Services.AddAuthorization(options =>
 {
     // Reviewer policy: any user with IsReviewer=true (typically lecturers assigned as reviewer)
     options.AddPolicy("Reviewer", policy => policy.RequireClaim("IsReviewer", "true"));
+
+    // Lecturer policy: role claim equals Lecturer
+    options.AddPolicy(
+        "Lecturer",
+        policy =>
+            policy.RequireAssertion(context =>
+                context.User.HasClaim("role", BusinessObjects.CampusConstants.Roles.Lecturer)
+            )
+    );
+
+    options.AddPolicy(
+        "HodOrAdmin",
+        policy =>
+            policy.RequireAssertion(context =>
+                context.User.IsInRole(BusinessObjects.CampusConstants.Roles.HOD)
+                || context.User.IsInRole(BusinessObjects.CampusConstants.Roles.Admin)
+            )
+    );
 
     // ReviewerOrHOD: allow either HOD role OR reviewer claim
     options.AddPolicy(
@@ -247,6 +281,9 @@ app.MapGet(
         );
     }
 );
+
+// Seed default Admin account on first run (if no Admin exists)
+app.SeedDefaultAdmin();
 
 // Health endpoint for readiness checks
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy" })).WithName("Health");

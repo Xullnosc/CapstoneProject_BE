@@ -47,6 +47,16 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<Whitelist> Whitelists { get; set; }
 
+    public virtual DbSet<ThesisReviewerAssignment> ThesisReviewerAssignments { get; set; }
+
+    public virtual DbSet<ThesisReview> ThesisReviews { get; set; }
+
+    public virtual DbSet<ThesisHodDecision> ThesisHodDecisions { get; set; }
+
+    public virtual DbSet<SystemUserCredential> SystemUserCredentials { get; set; }
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+    public virtual DbSet<AccessLog> AccessLogs { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -93,23 +103,6 @@ public partial class FctmsContext : DbContext
                 .HasDefaultValueSql("b'0'")
                 .HasColumnType("bit(1)");
             entity.Property(e => e.StudentCode).HasMaxLength(50);
-        });
-
-        modelBuilder.Entity<Checklist>(entity =>
-        {
-            entity.HasKey(e => e.ChecklistId).HasName("PRIMARY");
-
-            entity.ToTable("checklists");
-
-            entity.Property(e => e.Content).HasMaxLength(500);
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-            entity.Property(e => e.Title).HasMaxLength(255);
-            entity.Property(e => e.UpdatedAt)
-                .ValueGeneratedOnAddOrUpdate()
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
         });
 
         modelBuilder.Entity<FlywaySchemaHistory>(entity =>
@@ -164,27 +157,6 @@ public partial class FctmsContext : DbContext
                 .HasColumnType("datetime");
             entity.Property(e => e.UploadedBy).HasMaxLength(256);
             entity.Property(e => e.Version).HasDefaultValueSql("'1'");
-        });
-
-        modelBuilder.Entity<Lecturer>(entity =>
-        {
-            entity.HasKey(e => e.LecturerId).HasName("PRIMARY");
-
-            entity.ToTable("lecturers");
-
-            entity.HasIndex(e => e.Email, "Email").IsUnique();
-
-            entity.Property(e => e.Avatar).HasColumnType("text");
-            entity.Property(e => e.Campus).HasMaxLength(100);
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-            entity.Property(e => e.FullName).HasMaxLength(255);
-            entity.Property(e => e.IsActive).HasDefaultValueSql("'1'");
-            entity.Property(e => e.UpdatedAt)
-                .ValueGeneratedOnAddOrUpdate()
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
         });
 
         modelBuilder.Entity<Notification>(entity =>
@@ -298,6 +270,57 @@ public partial class FctmsContext : DbContext
                 .HasConstraintName("teams_ibfk_1");
         });
 
+        modelBuilder.Entity<ThesisReviewerAssignment>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("thesis_reviewer_assignments");
+            entity.HasIndex(e => new { e.ThesisId, e.ReviewerId }, "UQ_Thesis_Reviewer").IsUnique();
+            entity.Property(e => e.AssignedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ThesisId)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => Guid.Parse(v),
+                    v => v.ToString()
+                );
+        });
+
+        modelBuilder.Entity<ThesisReview>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("thesis_reviews");
+            entity.HasIndex(e => new { e.ThesisId, e.ReviewerId }, "UQ_Review_Thesis_Reviewer").IsUnique();
+            entity.Property(e => e.ReviewedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ThesisId)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => Guid.Parse(v),
+                    v => v.ToString()
+                );
+        });
+
+        modelBuilder.Entity<ThesisHodDecision>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("thesis_hod_decisions");
+            entity.HasIndex(e => e.ThesisId, "UQ_HodDecision_Thesis").IsUnique();
+            entity.Property(e => e.DecidedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ThesisId)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => Guid.Parse(v),
+                    v => v.ToString()
+                );
+        });
+
         modelBuilder.Entity<Teaminvitation>(entity =>
         {
             entity.HasKey(e => e.InvitationId).HasName("PRIMARY");
@@ -367,40 +390,6 @@ public partial class FctmsContext : DbContext
                 .HasConstraintName("teammembers_ibfk_1");
         });
 
-        modelBuilder.Entity<Thesis>(entity =>
-        {
-            entity.HasKey(e => e.ThesisId).HasName("PRIMARY");
-
-            entity.ToTable("thesis");
-
-            entity.HasIndex(e => e.UserId, "fk_thesis_userid");
-
-            entity.HasIndex(e => e.SemesterId, "idx_thesis_semester");
-
-            entity.Property(e => e.FileUrl).HasMaxLength(500);
-            entity.Property(e => e.ShortDescription).HasColumnType("text");
-            entity.Property(e => e.Status)
-                .HasDefaultValueSql("'On Mentor Inviting'")
-                .HasColumnType("enum('Published','Updated','Need Update','Reviewing','Rejected','Registered','Cancelled','On Mentor Inviting')");
-            entity.Property(e => e.Title).HasMaxLength(255);
-            entity.Property(e => e.UpDate)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-            entity.Property(e => e.UpdateDate)
-                .ValueGeneratedOnAddOrUpdate()
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-
-            entity.HasOne(d => d.Semester).WithMany(p => p.Theses)
-                .HasForeignKey(d => d.SemesterId)
-                .OnDelete(DeleteBehavior.SetNull)
-                .HasConstraintName("fk_thesis_semester");
-
-            entity.HasOne(d => d.User).WithMany(p => p.Theses)
-                .HasForeignKey(d => d.UserId)
-                .HasConstraintName("fk_thesis_userid");
-        });
-
         modelBuilder.Entity<ThesisForm>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
@@ -449,34 +438,6 @@ public partial class FctmsContext : DbContext
                 .HasForeignKey(d => d.UploadedBy)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("thesis_form_histories_ibfk_2");
-        });
-
-        modelBuilder.Entity<ThesisHistory>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
-
-            entity.ToTable("thesis_histories");
-
-            entity.HasIndex(e => e.UploadedBy, "UploadedBy");
-
-            entity.HasIndex(e => e.ThesisId, "thesis_histories_ibfk_1");
-
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-            entity.Property(e => e.FileUrl).HasMaxLength(500);
-            entity.Property(e => e.Note).HasColumnType("text");
-            entity.Property(e => e.VersionNumber).HasDefaultValueSql("'1'");
-
-            entity.HasOne(d => d.Thesis).WithMany(p => p.ThesisHistories)
-                .HasForeignKey(d => d.ThesisId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("thesis_histories_ibfk_1");
-
-            entity.HasOne(d => d.UploadedByNavigation).WithMany(p => p.ThesisHistories)
-                .HasForeignKey(d => d.UploadedBy)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("thesis_histories_ibfk_2");
         });
 
         modelBuilder.Entity<User>(entity =>
@@ -539,6 +500,199 @@ public partial class FctmsContext : DbContext
             entity.HasOne(d => d.Semester).WithMany(p => p.Whitelists)
                 .HasForeignKey(d => d.SemesterId)
                 .HasConstraintName("FK_Whitelist_Semester");
+        });
+
+        modelBuilder.Entity<Thesis>(entity =>
+        {
+            entity.HasKey(e => e.ThesisId).HasName("PRIMARY");
+
+            entity.ToTable("thesis");
+
+            entity.HasIndex(e => e.UserId, "fk_thesis_userid");
+
+            entity.HasIndex(e => e.SemesterId, "idx_thesis_semester");
+
+            entity.Property(e => e.ThesisId)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => v.ToString(),
+                    v => Guid.Parse(v)
+                )
+                .HasDefaultValueSql("(uuid())");
+            entity.Property(e => e.FileUrl).HasMaxLength(500);
+            entity.Property(e => e.ShortDescription).HasColumnType("text");
+            entity.Property(e => e.Status)
+                .HasDefaultValueSql("'On Mentor Inviting'")
+                .HasColumnType("enum('Published','Updated','Need Update','Reviewing','Rejected','Registered','Cancelled','On Mentor Inviting')");
+            entity.Property(e => e.IsLocked)
+                .HasDefaultValue(false)
+                .HasColumnName("IsLocked");
+            entity.Property(e => e.Title).HasMaxLength(255);
+            entity.Property(e => e.UpDate)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UpdateDate)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.User).WithMany(p => p.Theses)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("fk_thesis_userid");
+
+            entity.HasOne(d => d.Semester).WithMany(p => p.Theses)
+                .HasForeignKey(d => d.SemesterId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_thesis_semester");
+
+            entity.HasOne(d => d.Team).WithMany()
+                .HasForeignKey(d => d.TeamId)
+                .HasConstraintName("FK_Thesis_Teams_TeamId");
+
+            entity.HasOne(d => d.Mentor1).WithMany()
+                .HasForeignKey(d => d.MentorId1)
+                .HasConstraintName("FK_Thesis_Lecturers_MentorId1");
+
+            entity.HasOne(d => d.Mentor2).WithMany()
+                .HasForeignKey(d => d.MentorId2)
+                .HasConstraintName("FK_Thesis_Lecturers_MentorId2");
+        });
+
+        modelBuilder.Entity<ThesisHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("thesis_histories");
+
+            entity.HasIndex(e => e.ThesisId, "FK_ThesisHistory_Thesis");
+            entity.HasIndex(e => e.UploadedBy, "FK_ThesisHistory_User");
+
+            entity.Property(e => e.Id).HasColumnName("Id");
+            entity.Property(e => e.ThesisId)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => v.ToString(),
+                    v => Guid.Parse(v)
+                );
+            entity.Property(e => e.FileUrl).HasMaxLength(500);
+            entity.Property(e => e.VersionNumber).HasDefaultValueSql("1");
+            entity.Property(e => e.Note).HasColumnType("text");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.Thesis).WithMany(p => p.ThesisHistories)
+                .HasForeignKey(d => d.ThesisId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ThesisHistory_Thesis");
+
+            entity.HasOne(d => d.UploadedByNavigation).WithMany(p => p.ThesisHistories)
+                .HasForeignKey(d => d.UploadedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ThesisHistory_User");
+        });
+
+        modelBuilder.Entity<Checklist>(entity =>
+        {
+            entity.HasKey(e => e.ChecklistId).HasName("PRIMARY");
+
+            entity.ToTable("checklists");
+
+            entity.Property(e => e.ChecklistId).HasColumnName("ChecklistId");
+            entity.Property(e => e.Content).HasMaxLength(500);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Title).HasMaxLength(255);
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<Lecturer>(entity =>
+        {
+            entity.HasKey(e => e.LecturerId).HasName("PRIMARY");
+            entity.ToTable("lecturers");
+
+            entity.HasIndex(e => e.Email, "UQ_Lecturers_Email").IsUnique();
+
+            entity.Property(e => e.Avatar).HasColumnType("text");
+            entity.Property(e => e.Email).HasMaxLength(255);
+            entity.Property(e => e.FullName).HasMaxLength(255);
+            entity.Property(e => e.Campus).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.IsActive).HasDefaultValueSql("'1'");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<SystemUserCredential>(entity =>
+        {
+            entity.HasKey(e => e.UserId).HasName("PRIMARY");
+            entity.ToTable("system_user_credentials");
+            entity.HasIndex(e => e.Username, "UQ_SystemUserCredentials_Username").IsUnique();
+            entity.Property(e => e.Username).HasMaxLength(100);
+            entity.Property(e => e.PasswordHash).HasMaxLength(255);
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_SystemUserCredentials_Users");
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("refresh_tokens");
+            entity.HasIndex(e => new { e.UserId, e.ExpiresAt }, "IX_RefreshTokens_UserId_Expires");
+            entity.Property(e => e.TokenHash).HasMaxLength(255);
+            entity.Property(e => e.ExpiresAt).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.RevokedAt).HasColumnType("datetime");
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_RefreshTokens_Users");
+        });
+
+        modelBuilder.Entity<AccessLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("access_logs");
+
+            entity.HasIndex(e => e.UserId, "fk_accesslogs_userid");
+
+            entity.Property(e => e.Id)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => Guid.Parse(v),
+                    v => v.ToString()
+                )
+                .HasDefaultValueSql("(uuid())");
+
+            entity.Property(e => e.IsSuccess)
+                .HasDefaultValue(true)
+                .HasColumnType("tinyint(1)");
+
+            entity.Property(e => e.Description).HasColumnType("text");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime(6)");
+
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_AccessLogs_Users_UserId");
         });
 
         OnModelCreatingPartial(modelBuilder);
