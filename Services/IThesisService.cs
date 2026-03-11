@@ -24,5 +24,11 @@ namespace Services
         Task<ThesisDTO> ToggleThesisLockAsync(string thesisId, string email);
 
 
+
+        // Review workflow (multi reviewer + optional HOD final decision)
+        Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId);
+        Task<ThesisReviewStatusDTO> AssignReviewersAsync(string thesisId, int[] reviewerIds, int assignedByUserId);
+        Task<ThesisReviewStatusDTO> SubmitReviewerDecisionAsync(string thesisId, int reviewerUserId, SubmitThesisDecisionDTO dto);
+        Task<ThesisReviewStatusDTO> SubmitHodDecisionAsync(string thesisId, int hodUserId, SubmitThesisDecisionDTO dto);
     }
 }
