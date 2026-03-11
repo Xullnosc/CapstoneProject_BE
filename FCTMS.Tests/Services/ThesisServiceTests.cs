@@ -142,7 +142,7 @@ namespace FCTMS.Tests.Services
             {
                 new Thesis { ThesisId = "1", Status = "Published", IsLocked = false }
             };
-            _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync(It.IsAny<string?>(), It.IsAny<int?>())).ReturnsAsync(theses);
+            _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync(It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<bool?>(), It.IsAny<bool>())).ReturnsAsync(theses);
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
             { 
                 new ThesisDTO { ThesisId = "1", Status = "Published", IsLocked = false } 
