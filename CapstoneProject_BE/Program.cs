@@ -114,6 +114,7 @@ builder.Services.AddScoped<IThesisService, ThesisService>();
 builder.Services.AddScoped<IChecklistService, ChecklistService>();
 builder.Services.AddScoped<IThesisFormService, ThesisFormService>();
 builder.Services.AddScoped<ILecturerService, LecturerService>();
+builder.Services.AddScoped<IAccessLogService, AccessLogService>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
@@ -131,6 +132,7 @@ builder.Services.AddScoped<IThesisReviewDAO, ThesisReviewDAO>();
 builder.Services.AddScoped<IChecklistDAO, ChecklistDAO>();
 builder.Services.AddScoped<IThesisFormDAO, ThesisFormDAO>();
 builder.Services.AddScoped<ILecturerDAO, LecturerDAO>();
+builder.Services.AddScoped<IAccessLogDAO, AccessLogDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -147,6 +149,7 @@ builder.Services.AddScoped<IThesisReviewRepository, ThesisReviewRepository>();
 builder.Services.AddScoped<IChecklistRepository, ChecklistRepository>();
 builder.Services.AddScoped<IThesisFormRepository, ThesisFormRepository>();
 builder.Services.AddScoped<ILecturerRepository, LecturerRepository>();
+builder.Services.AddScoped<IAccessLogRepository, AccessLogRepository>();
 
 //Middleware
 // AutoMapper

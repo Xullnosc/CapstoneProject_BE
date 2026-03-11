@@ -49,6 +49,7 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<Lecturer> Lecturers { get; set; }
     public virtual DbSet<SystemUserCredential> SystemUserCredentials { get; set; }
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+    public virtual DbSet<AccessLog> AccessLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -549,6 +550,38 @@ public partial class FctmsContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_RefreshTokens_Users");
+        });
+
+        modelBuilder.Entity<AccessLog>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("access_logs");
+
+            entity.HasIndex(e => e.UserId, "fk_accesslogs_userid");
+
+            entity.Property(e => e.Id)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(
+                    v => Guid.Parse(v),
+                    v => v.ToString()
+                )
+                .HasDefaultValueSql("(uuid())");
+
+            entity.Property(e => e.IsSuccess)
+                .HasDefaultValue(true)
+                .HasColumnType("tinyint(1)");
+
+            entity.Property(e => e.Description).HasColumnType("text");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime(6)");
+
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_AccessLogs_Users_UserId");
         });
 
         OnModelCreatingPartial(modelBuilder);

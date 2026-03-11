@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Repositories;
 using Services;
 using Services.DTOs;
 
@@ -12,12 +13,21 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly ILogger<AuthController> _logger;
     private readonly IWebHostEnvironment _env;
+    private readonly Repositories.IAccessLogRepository _accessLogRepository;
 
-    public AuthController(IAuthService authService, ILogger<AuthController> logger, IWebHostEnvironment env)
+    public AuthController(IAuthService authService, ILogger<AuthController> logger, IWebHostEnvironment env, IAccessLogRepository accessLogRepository)
     {
         _authService = authService;
         _logger = logger;
         _env = env;
+        _accessLogRepository = accessLogRepository;
+    }
+
+    private string GetIpAddress()
+    {
+        if (Request.Headers.ContainsKey("X-Forwarded-For"))
+            return Request.Headers["X-Forwarded-For"].ToString();
+        return HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
     }
 
     [HttpPost("login")]
@@ -44,6 +54,16 @@ public class AuthController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
+            var ipAddress = GetIpAddress();
+            await _accessLogRepository.CreateLogAsync(new BusinessObjects.Models.AccessLog
+            {
+                UserId = null,
+                UserEmail = request?.Campus ?? "Unknown", // Assuming campus as fallback
+                IpAddress = ipAddress,
+                Action = "Login Failed",
+                IsSuccess = false,
+                Description = ex.Message
+            });
             _logger.LogWarning(ex, "Unauthorized login attempt");
             return Unauthorized(new { message = ex.Message });
         }
@@ -78,6 +98,16 @@ public class AuthController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
+            var ipAddress = GetIpAddress();
+            await _accessLogRepository.CreateLogAsync(new BusinessObjects.Models.AccessLog
+            {
+                UserId = null,
+                UserEmail = request?.Username ?? "Unknown",
+                IpAddress = ipAddress,
+                Action = "Login Failed (Credentials)",
+                IsSuccess = false,
+                Description = ex.Message
+            });
             _logger.LogWarning(ex, "Unauthorized credential login attempt");
             return Unauthorized(new { message = ex.Message });
         }
@@ -105,6 +135,28 @@ public class AuthController : ControllerBase
         var refreshToken = Request.Cookies[RefreshTokenCookieName];
         await _authService.RevokeRefreshTokenAsync(refreshToken);
         Response.Cookies.Delete(RefreshTokenCookieName);
+        
+        // Log logout using claims
+        var userIdStr = User.Claims.FirstOrDefault(c => c.Type == "id")?.Value;
+        var userEmail = User.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
+
+        var ipAddress = GetIpAddress();
+        int? userId = null;
+        if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out int parsedId))
+        {
+            userId = parsedId;
+        }
+
+        await _accessLogRepository.CreateLogAsync(new BusinessObjects.Models.AccessLog
+        {
+            UserId = userId,
+            UserEmail = !string.IsNullOrEmpty(userEmail) ? userEmail : "Unknown (Logout)",
+            IpAddress = ipAddress,
+            Action = "Logout",
+            IsSuccess = true,
+            Description = "User logged out successfully"
+        });
+
         return Ok(new { message = "Logged out" });
     }
 

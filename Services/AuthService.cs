@@ -18,6 +18,7 @@ public class AuthService : IAuthService
     private readonly IMapper _mapper;
     private readonly IConfiguration _configuration;
     private readonly HttpClient _httpClient;
+    private readonly IAccessLogRepository _accessLogRepository;
 
     public AuthService(
         IUserRepository userRepository,
@@ -26,7 +27,8 @@ public class AuthService : IAuthService
         IRefreshTokenRepository refreshTokenRepository,
         IMapper mapper,
         IConfiguration configuration,
-        HttpClient httpClient
+        HttpClient httpClient,
+        IAccessLogRepository accessLogRepository
     )
     {
         _userRepository = userRepository;
@@ -36,6 +38,7 @@ public class AuthService : IAuthService
         _mapper = mapper;
         _configuration = configuration;
         _httpClient = httpClient;
+        _accessLogRepository = accessLogRepository;
     }
 
     public async Task<LoginResultDTO> GoogleLoginAsync(LoginRequestDTO request)
@@ -189,6 +192,16 @@ public class AuthService : IAuthService
                 var userInfo = _mapper.Map<UserInfoDTO>(user);
                 userInfo.IsReviewer = isReviewer;
 
+                await _accessLogRepository.CreateLogAsync(new AccessLog
+                {
+                    UserId = user.UserId,
+                    UserEmail = user.Email,
+                    IpAddress = "N/A", // Handled by controller if needed, or left as N/A
+                    Action = "Login (Google)",
+                    IsSuccess = true,
+                    Description = "User logged in via Google successfully"
+                });
+
                 return new LoginResultDTO
                 {
                     AccessToken = accessToken,
@@ -253,6 +266,17 @@ public class AuthService : IAuthService
         var (refreshToken, refreshExpiresAt) = await CreateRefreshTokenAndSaveAsync(user.UserId);
 
         var userInfo = _mapper.Map<UserInfoDTO>(user);
+        
+        await _accessLogRepository.CreateLogAsync(new AccessLog
+        {
+            UserId = user.UserId,
+            UserEmail = user.Email,
+            IpAddress = "N/A", // Handled by controller if needed
+            Action = "Login (Credentials)",
+            IsSuccess = true,
+            Description = "User logged in via Credentials successfully"
+        });
+
         return new LoginResultDTO
         {
             AccessToken = accessToken,
