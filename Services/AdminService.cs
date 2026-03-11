@@ -65,7 +65,8 @@ public class AdminService : IAdminService
                 HasCredential = cred != null,
                 LastLogin = u.LastLogin,
                 CreatedAt = u.CreatedAt,
-                UpdatedAt = cred?.UpdatedAt
+                UpdatedAt = cred?.UpdatedAt,
+                Campus = u.Campus
             };
         }).ToList();
     }
@@ -89,6 +90,7 @@ public class AdminService : IAdminService
                 throw new InvalidOperationException($"User with email {dto.Email} exists but is not HOD. Cannot assign HOD credentials.");
             user = existingUser;
             user.FullName = dto.FullName?.Trim() ?? user.FullName;
+            user.Campus = dto.Campus;
             await _userRepository.UpdateAsync(user);
         }
         else
@@ -99,7 +101,8 @@ public class AdminService : IAdminService
                 FullName = dto.FullName?.Trim() ?? dto.Email,
                 RoleId = hodRole.RoleId,
                 IsAuthorized = true,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                Campus = dto.Campus
             };
             user = await _userRepository.AddAsync(user);
         }

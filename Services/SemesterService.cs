@@ -188,9 +188,9 @@ namespace Services
                     dto.Whitelists.AddRange(archivedWlDTOs);
                 }
 
-                // 2.5 Merge Global Lecturers (SemesterId is null)
+                // 2. Add Global Lecturers
                 var allDbRoles = await _semesterRepository.GetAllRolesAsync();
-                var lecturerRole = allDbRoles.FirstOrDefault(r => r.RoleName == "Lecturer");
+                var lecturerRole = allDbRoles.FirstOrDefault(r => string.Equals(r.RoleName, CampusConstants.Roles.Lecturer, StringComparison.OrdinalIgnoreCase));
                 if (lecturerRole != null)
                 {
                     // Using WhitelistRepository to get all whitelists with Lecturer role
@@ -444,6 +444,117 @@ namespace Services
                 // Transaction will auto-rollback if not completed
                 throw;
             }
+        }
+
+        public async Task<PagedResult<WhitelistDTO>> GetWhitelistsPaginatedAsync(int semesterId, int page, int pageSize, string? role = null, string? search = null)
+        {
+            var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
+            if (semester == null) throw new KeyNotFoundException($"Semester {semesterId} not found");
+
+            // 1. Collect all potential whitelists
+            var allWhitelists = new List<WhitelistDTO>();
+
+            // Live whitelists
+            if (semester.Whitelists != null && semester.Whitelists.Any())
+            {
+                allWhitelists.AddRange(_mapper.Map<List<WhitelistDTO>>(semester.Whitelists));
+            }
+
+            // Archived whitelists
+            var archivedWhitelists = await _archivingService.GetArchivedWhitelistsBySemesterIdsAsync(new List<int> { semesterId });
+            if (archivedWhitelists != null && archivedWhitelists.Any())
+            {
+                var archivedDTOs = _mapper.Map<List<WhitelistDTO>>(archivedWhitelists);
+                
+                // Map RoleName for archived entries
+                var roles = await _semesterRepository.GetAllRolesAsync();
+                var roleDict = roles.ToDictionary(r => r.RoleId, r => r.RoleName);
+                foreach (var wlDto in archivedDTOs)
+                {
+                    if (wlDto.RoleId.HasValue && roleDict.TryGetValue(wlDto.RoleId.Value, out var roleName))
+                    {
+                        wlDto.RoleName = roleName;
+                    }
+                }
+                allWhitelists.AddRange(archivedDTOs);
+            }
+
+            // Global Lecturers (SemesterId is null)
+            var allDbRoles = await _semesterRepository.GetAllRolesAsync();
+            var lecturerRole = allDbRoles.FirstOrDefault(r => string.Equals(r.RoleName, CampusConstants.Roles.Lecturer, StringComparison.OrdinalIgnoreCase));
+            if (lecturerRole != null)
+            {
+                var globalWhitelists = await _whitelistRepository.GetByRoleAsync(lecturerRole.RoleId);
+                var globalLecturers = globalWhitelists.Where(w => w.SemesterId == null).ToList();
+                var globalLecturerDTOs = _mapper.Map<List<WhitelistDTO>>(globalLecturers);
+                foreach (var gl in globalLecturerDTOs)
+                {
+                    if (!allWhitelists.Any(w => string.Equals(w.Email, gl.Email, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        gl.RoleName = lecturerRole.RoleName;
+                        allWhitelists.Add(gl);
+                    }
+                }
+            }
+
+            // 2. Fetch Avatars for all collected whitelists (Directly from database)
+            var emails = allWhitelists
+                .Where(w => !string.IsNullOrWhiteSpace(w.Email))
+                .Select(w => w.Email.Trim())
+                .Distinct()
+                .ToList();
+
+            if (emails.Any())
+            {
+                var users = await _userRepository.GetUsersByEmailsAsync(emails);
+                // Case-insensitive dictionary to match avatars safely
+                var avatarDict = users
+                    .Where(u => !string.IsNullOrEmpty(u.Email))
+                    .GroupBy(u => u.Email!.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First().Avatar, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var wl in allWhitelists)
+                {
+                    if (!string.IsNullOrWhiteSpace(wl.Email) && avatarDict.TryGetValue(wl.Email.Trim(), out var avatar))
+                    {
+                        wl.Avatar = avatar;
+                    }
+                }
+            }
+
+            // Campus mapping is now handled in MappingProfile, but for manual merges we ensure consistency
+            foreach (var wl in allWhitelists)
+            {
+                wl.Campus = CampusConstants.MapCodeToFullName(wl.Campus);
+            }
+
+            // 3. Filter
+            var filtered = allWhitelists.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                filtered = filtered.Where(w => string.Equals(w.RoleName, role, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim().ToLower();
+                filtered = filtered.Where(w => 
+                    (w.Email != null && w.Email.ToLower().Contains(s)) || 
+                    (w.FullName != null && w.FullName.ToLower().Contains(s)) ||
+                    (w.StudentCode != null && w.StudentCode.ToLower().Contains(s))
+                );
+            }
+
+            // 4. Paginate
+            var list = filtered.OrderBy(w => w.FullName ?? w.Email).ToList();
+            int total = list.Count;
+            var items = list
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return new PagedResult<WhitelistDTO>(items, total, page, pageSize);
         }
 
         public async Task InvalidateSemesterCacheAsync(int? id = null)

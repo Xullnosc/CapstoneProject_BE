@@ -225,5 +225,25 @@ namespace CapstoneProject_BE.Controllers
                 );
             }
         }
+
+        [HttpGet("{id}/whitelists")]
+        public async Task<ActionResult<PagedResult<WhitelistDTO>>> GetWhitelists(
+            int id,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? role = null,
+            [FromQuery] string? search = null
+        )
+        {
+            try
+            {
+                var result = await _semesterService.GetWhitelistsPaginatedAsync(id, page, pageSize, role, search);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
     }
 }

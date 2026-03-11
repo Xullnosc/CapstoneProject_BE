@@ -9,16 +9,21 @@ namespace BusinessObjects.DTOs
         public int TotalCount { get; set; }
         public int PageIndex { get; set; }
         public int PageSize { get; set; }
-        public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
-        public bool HasNextPage => PageIndex < TotalPages;
-        public bool HasPreviousPage => PageIndex > 1;
+        public int TotalPages { get; set; }
+        public bool HasNextPage { get; set; }
+        public bool HasPreviousPage { get; set; }
+
+        public PagedResult() { }
 
         public PagedResult(List<T> items, int count, int pageIndex, int pageSize)
         {
             Items = items;
             TotalCount = count;
             PageIndex = pageIndex;
-            PageSize = pageSize;
+            PageSize = pageSize > 0 ? pageSize : 10;
+            TotalPages = (int)Math.Ceiling(TotalCount / (double)PageSize);
+            HasNextPage = PageIndex < TotalPages;
+            HasPreviousPage = PageIndex > 1;
         }
     }
 }

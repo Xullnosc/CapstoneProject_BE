@@ -233,6 +233,7 @@ namespace FCTMS.Tests.Services
             
             // This test is limited without a proper Excel file factory
             // Recommend: Create test fixtures with sample Excel files
+            await Task.CompletedTask;
         }
 
         #endregion

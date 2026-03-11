@@ -40,14 +40,14 @@ namespace Services
             var users = await _userRepository.GetUsersByEmailsAsync(emails);
             var avatarDict = users
                 .Where(u => !string.IsNullOrEmpty(u.Email))
-                .GroupBy(u => u.Email!.Trim().ToLower())
-                .ToDictionary(g => g.Key, g => g.First().Avatar);
+                .GroupBy(u => u.Email!.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().Avatar, StringComparer.OrdinalIgnoreCase);
 
             foreach (var l in lecturers)
             {
                 l.Campus = CampusConstants.MapCodeToFullName(l.Campus);
                 
-                string emailKey = l.Email.Trim().ToLower();
+                string emailKey = l.Email.Trim();
                 bool hasNoAvatar = string.IsNullOrWhiteSpace(l.Avatar) || l.Avatar == "N/A";
                 
                 if (hasNoAvatar && avatarDict.TryGetValue(emailKey, out var userAvatar) && !string.IsNullOrWhiteSpace(userAvatar))
@@ -59,6 +59,47 @@ namespace Services
             return lecturers;
         }
 
+        public async Task<BusinessObjects.DTOs.PagedResult<Lecturer>> GetLecturersPaginatedAsync(int page, int pageSize, string? search = null)
+        {
+            var all = await _lecturerRepository.GetAllAsync();
+            var query = all.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim().ToLower();
+                query = query.Where(l => 
+                    (l.Email != null && l.Email.ToLower().Contains(s)) ||
+                    (l.FullName != null && l.FullName.ToLower().Contains(s))
+                );
+            }
+
+            var list = query.OrderBy(l => l.FullName ?? l.Email).ToList();
+            int total = list.Count;
+            var items = list.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            // Populate avatars for the current page
+            var emails = items.Select(l => l.Email.Trim()).Distinct().ToList();
+            var users = await _userRepository.GetUsersByEmailsAsync(emails);
+            var avatarDict = users
+                .Where(u => !string.IsNullOrEmpty(u.Email))
+                .GroupBy(u => u.Email!.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().Avatar, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var l in items)
+            {
+                l.Campus = CampusConstants.MapCodeToFullName(l.Campus);
+                if (string.IsNullOrWhiteSpace(l.Avatar) || l.Avatar == "N/A")
+                {
+                    if (avatarDict.TryGetValue(l.Email.Trim(), out var avatar))
+                    {
+                        l.Avatar = avatar;
+                    }
+                }
+            }
+
+            return new BusinessObjects.DTOs.PagedResult<Lecturer>(items, total, page, pageSize);
+        }
+
         public async Task<Lecturer?> GetLecturerByIdAsync(int id)
         {
             return await _lecturerRepository.GetByIdAsync(id);
@@ -66,7 +107,8 @@ namespace Services
 
         public async Task AddLecturerAsync(Lecturer lecturer)
         {
-            // Normalize campus name
+            // Normalize data
+            if (lecturer.Email != null) lecturer.Email = lecturer.Email.Trim();
             lecturer.Campus = CampusConstants.MapCodeToFullName(lecturer.Campus);
             lecturer.CreatedAt = DateTime.UtcNow;
             lecturer.UpdatedAt = DateTime.UtcNow;
@@ -83,12 +125,13 @@ namespace Services
             var existing = await _lecturerRepository.GetByIdAsync(lecturer.LecturerId);
             if (existing == null) return;
 
-            // Normalize campus name
+            // Normalize data
+            if (lecturer.Email != null) lecturer.Email = lecturer.Email.Trim();
             string? mappedCampus = CampusConstants.MapCodeToFullName(lecturer.Campus);
 
             bool statusChanged = existing.IsActive != lecturer.IsActive;
-            bool infoChanged = existing.Email != lecturer.Email || 
-                               existing.FullName != lecturer.FullName || 
+            bool infoChanged = (existing.Email != null && !existing.Email.Equals(lecturer.Email, StringComparison.OrdinalIgnoreCase)) || 
+                               (existing.FullName != null && !existing.FullName.Equals(lecturer.FullName, StringComparison.OrdinalIgnoreCase)) || 
                                existing.Campus != mappedCampus;
 
             // Update existing tracked entity
@@ -130,8 +173,10 @@ namespace Services
 
         private async Task SyncLecturerWithWhitelists(Lecturer lecturer, bool shouldBePresent)
         {
+            if (string.IsNullOrWhiteSpace(lecturer.Email)) return;
+
             var roles = await _semesterRepository.GetAllRolesAsync();
-            var lecturerRole = roles.FirstOrDefault(r => r.RoleName == "Lecturer");
+            var lecturerRole = roles.FirstOrDefault(r => string.Equals(r.RoleName, CampusConstants.Roles.Lecturer, StringComparison.OrdinalIgnoreCase));
             if (lecturerRole == null) return;
 
             string? mappedCampus = CampusConstants.MapCodeToFullName(lecturer.Campus);
@@ -141,7 +186,8 @@ namespace Services
             
             // Look for an existing global entry for this email (where SemesterId is null)
             var existingEntry = globalWhitelists.FirstOrDefault(w => 
-                w.Email.Equals(lecturer.Email, StringComparison.OrdinalIgnoreCase) && 
+                !string.IsNullOrEmpty(w.Email) && 
+                w.Email.Trim().Equals(lecturer.Email.Trim(), StringComparison.OrdinalIgnoreCase) && 
                 w.SemesterId == null);
 
             bool changed = false;

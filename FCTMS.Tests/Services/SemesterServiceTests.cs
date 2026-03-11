@@ -354,7 +354,6 @@ namespace FCTMS.Tests.Services
             // Arrange
             int id = 99;
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync((Semester?)null);
-            _mockMapper.Setup(m => m.Map<SemesterDTO>((Semester?)null)).Returns((SemesterDTO?)null);
 
             // Act
             var result = await _semesterService.GetSemesterByIdAsync(id);
