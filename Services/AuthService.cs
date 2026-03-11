@@ -320,7 +320,24 @@ public class AuthService : IAuthService
         var tokenHash = RefreshTokenHelper.ComputeHash(refreshTokenFromCookie);
         var stored = await _refreshTokenRepository.GetValidByTokenHashAsync(tokenHash);
         if (stored != null)
+        {
             await _refreshTokenRepository.RevokeByIdAsync(stored.Id);
+            
+            // Log logout
+            var user = await _userRepository.GetByIdAsync(stored.UserId);
+            if (user != null)
+            {
+                await _accessLogRepository.CreateLogAsync(new AccessLog
+                {
+                    UserId = user.UserId,
+                    UserEmail = user.Email,
+                    IpAddress = "N/A",
+                    Action = "Logout",
+                    IsSuccess = true,
+                    Description = "User logged out successfully"
+                });
+            }
+        }
     }
 
     private async Task<(string Token, DateTime ExpiresAt)> CreateRefreshTokenAndSaveAsync(int userId)
