@@ -394,6 +394,18 @@ public partial class FctmsContext : DbContext
             entity.HasOne(d => d.Semester).WithMany()
                 .HasForeignKey(d => d.SemesterId)
                 .HasConstraintName("fk_thesis_semester");
+
+            entity.HasOne(d => d.Team).WithMany()
+                .HasForeignKey(d => d.TeamId)
+                .HasConstraintName("FK_Thesis_Teams_TeamId");
+
+            entity.HasOne(d => d.Mentor1).WithMany()
+                .HasForeignKey(d => d.MentorId1)
+                .HasConstraintName("FK_Thesis_Lecturers_MentorId1");
+
+            entity.HasOne(d => d.Mentor2).WithMany()
+                .HasForeignKey(d => d.MentorId2)
+                .HasConstraintName("FK_Thesis_Lecturers_MentorId2");
         });
 
         modelBuilder.Entity<ThesisHistory>(entity =>

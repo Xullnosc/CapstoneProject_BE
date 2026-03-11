@@ -25,6 +25,7 @@ namespace DataAccess
         {
             var query = _context.AccessLogs
                 .Include(l => l.User)
+                    .ThenInclude(u => u.Role)
                 .OrderByDescending(l => l.CreatedAt);
 
             var totalCount = await query.CountAsync();

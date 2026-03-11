@@ -14,6 +14,12 @@ public partial class Thesis
     public int UserId { get; set; }
 
     public int? SemesterId { get; set; }
+    
+    public int? TeamId { get; set; }
+    
+    public int? MentorId1 { get; set; }
+    
+    public int? MentorId2 { get; set; }
 
     public DateTime? UpDate { get; set; }
 
@@ -28,6 +34,12 @@ public partial class Thesis
     public virtual User User { get; set; } = null!;
 
     public virtual Semester? Semester { get; set; }
+    
+    public virtual Team? Team { get; set; }
+    
+    public virtual Lecturer? Mentor1 { get; set; }
+    
+    public virtual Lecturer? Mentor2 { get; set; }
 
     public virtual ICollection<ThesisHistory> ThesisHistories { get; set; } = new List<ThesisHistory>();
 }
