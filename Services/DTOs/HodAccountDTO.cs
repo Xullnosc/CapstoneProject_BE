@@ -27,5 +27,8 @@ public class HodAccountDTO
 
     [JsonPropertyName("updatedAt")]
     public DateTime? UpdatedAt { get; set; }
+
+    [JsonPropertyName("campus")]
+    public string? Campus { get; set; }
 }
 

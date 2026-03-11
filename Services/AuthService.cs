@@ -217,7 +217,31 @@ public class AuthService : IAuthService
         if (roleName != CampusConstants.Roles.HOD && roleName != CampusConstants.Roles.Admin)
             throw new UnauthorizedAccessException("Credential login is only allowed for HOD and Admin.");
 
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, credential.PasswordHash))
+        bool isValid = false;
+        try
+        {
+            isValid = BCrypt.Net.BCrypt.Verify(request.Password, credential.PasswordHash);
+        }
+        catch (BCrypt.Net.SaltParseException ex)
+        {
+            // FALLBACK for development: If the stored hash is actually plain text, 
+            // allow login and migrate it to a hashed version.
+            if (request.Password == credential.PasswordHash)
+            {
+                Console.WriteLine($"[AUTH INFO] Migrating plain-text credential for user '{request.Username}' to BCrypt.");
+                credential.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+                credential.UpdatedAt = DateTime.UtcNow;
+                await _credentialRepository.UpdateAsync(credential);
+                isValid = true;
+            }
+            else
+            {
+                Console.WriteLine($"[AUTH ERROR] SaltParseException: {ex.Message}. User: {request.Username}");
+                throw new UnauthorizedAccessException("Credential format is corrupted. Please contact support.");
+            }
+        }
+
+        if (!isValid)
             throw new UnauthorizedAccessException("Invalid username or password.");
 
         var user = credential.User;

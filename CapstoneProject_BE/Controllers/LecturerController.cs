@@ -18,9 +18,9 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Lecturer>>> GetAll()
+        public async Task<ActionResult<BusinessObjects.DTOs.PagedResult<Lecturer>>> GetAll(int page = 1, int pageSize = 10, string? search = null)
         {
-            var result = await _lecturerService.GetAllLecturersAsync();
+            var result = await _lecturerService.GetLecturersPaginatedAsync(page, pageSize, search);
             return Ok(result);
         }
 
