@@ -2,6 +2,7 @@ using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace DataAccess
 {
@@ -45,7 +46,15 @@ namespace DataAccess
 
         public async Task ReconcileSemesterAsync(int semesterId, List<WhitelistImportDTO> importedItems, int studentRoleId, DateTime now)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            IDbContextTransaction? transaction = null;
+            var providerName = _context.Database.ProviderName ?? string.Empty;
+            var isInMemoryProvider = providerName.Contains("InMemory", StringComparison.OrdinalIgnoreCase);
+
+            if (!isInMemoryProvider)
+            {
+                transaction = await _context.Database.BeginTransactionAsync();
+            }
+
             try
             {
                 var importedEmails = importedItems
@@ -179,12 +188,25 @@ namespace DataAccess
                 }
 
                 await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync();
+                }
             }
             catch
             {
-                await transaction.RollbackAsync();
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync();
+                }
                 throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
             }
         }
 
