@@ -572,6 +572,40 @@ namespace FCTMS.Tests.Services
             result.Items.Single().IsMarked.Should().BeTrue("the override email still belongs to a non-student role");
         }
 
+        [Fact]
+        public async Task ImportWhitelistFromExcel_HeaderAliases_ParsesSuccessfully()
+        {
+            using var context = CreateContext();
+            SeedUploader(context);
+            SetupSemester("SP25", 1);
+
+            var service = CreateService(context);
+
+            OfficeOpenXml.ExcelPackage.License.SetNonCommercialOrganization("Capstone Project");
+            using var package = new OfficeOpenXml.ExcelPackage();
+            var ws = package.Workbook.Worksheets.Add("Import");
+
+            // Use alias-style headers and omit Campus entirely.
+            ws.Cells[3, 2].Value = "E-mail";
+            ws.Cells[3, 3].Value = "Student Code";
+            ws.Cells[3, 4].Value = "Full Name";
+            ws.Cells[3, 5].Value = "Semester Code";
+
+            ws.Cells[4, 2].Value = "student1@example.com";
+            ws.Cells[4, 3].Value = "ST100";
+            ws.Cells[4, 4].Value = "Student One";
+            ws.Cells[4, 5].Value = "SP25";
+
+            using var stream = new MemoryStream(package.GetAsByteArray());
+            var result = await service.ImportWhitelistFromExcel(stream, "hod@example.com");
+
+            result.Items.Should().ContainSingle();
+            result.Items.Single().Email.Should().Be("student1@example.com");
+            result.Items.Single().StudentCode.Should().Be("ST100");
+            result.Items.Single().FullName.Should().Be("Student One");
+            result.Errors.Should().NotContain(e => e.Message.Contains("Missing required column", StringComparison.OrdinalIgnoreCase));
+        }
+
         #endregion
     }
 }
