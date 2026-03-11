@@ -57,8 +57,7 @@ namespace Services.Helpers
                 CampusConstants.WhitelistImportColumns.Email,
                 CampusConstants.WhitelistImportColumns.StudentCode,
                 CampusConstants.WhitelistImportColumns.FullName,
-                CampusConstants.WhitelistImportColumns.Campus,
-                CampusConstants.WhitelistImportColumns.SemesterId,
+                CampusConstants.WhitelistImportColumns.SemesterCode,
             };
 
             foreach (var col in requiredHeaders)
@@ -99,17 +98,25 @@ namespace Services.Helpers
                         .Text.Trim();
                     string? studentCode = string.IsNullOrEmpty(studentCodeRaw) ? null : studentCodeRaw;
 
-                    var semesterText = worksheet
-                        .Cells[row, headerMap[CampusConstants.WhitelistImportColumns.SemesterId]]
-                        .Text.Trim();
-                    if (!int.TryParse(semesterText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int semesterIdParsed) || semesterIdParsed <= 0)
+                    if (string.IsNullOrWhiteSpace(studentCode))
                     {
-                        result.Errors.Add(new ImportError { Row = row, Column = CampusConstants.WhitelistImportColumns.SemesterId, Message = "Invalid SemesterId" });
+                        result.Errors.Add(new ImportError { Row = row, Column = CampusConstants.WhitelistImportColumns.StudentCode, Message = "StudentCode cannot be empty" });
+                        continue;
+                    }
+
+                    var semesterCode = worksheet
+                        .Cells[row, headerMap[CampusConstants.WhitelistImportColumns.SemesterCode]]
+                        .Text.Trim();
+
+                    if (string.IsNullOrWhiteSpace(semesterCode))
+                    {
+                        result.Errors.Add(new ImportError { Row = row, Column = CampusConstants.WhitelistImportColumns.SemesterCode, Message = "SemesterCode cannot be empty" });
                         continue;
                     }
 
                     var whitelistDto = new WhitelistImportDTO
                     {
+                        RowNumber = row,
                         Email = email,
                         StudentCode = studentCode,
                         FullName = worksheet
@@ -117,23 +124,13 @@ namespace Services.Helpers
                             .Text.Trim(),
                         RoleId = 3,  // Always set to Student role
                         Role = "Student",
-                        Campus = worksheet
-                            .Cells[row, headerMap[CampusConstants.WhitelistImportColumns.Campus]]
-                            .Text.Trim(),
-                        SemesterId = semesterIdParsed,
+                        SemesterCode = semesterCode,
                     };
 
                     // Validate FullName is not empty
                     if (string.IsNullOrWhiteSpace(whitelistDto.FullName))
                     {
                         result.Errors.Add(new ImportError { Row = row, Column = CampusConstants.WhitelistImportColumns.FullName, Message = "FullName cannot be empty" });
-                        continue;
-                    }
-
-                    // Validate Campus is not empty
-                    if (string.IsNullOrWhiteSpace(whitelistDto.Campus))
-                    {
-                        result.Errors.Add(new ImportError { Row = row, Column = CampusConstants.WhitelistImportColumns.Campus, Message = "Campus cannot be empty" });
                         continue;
                     }
 
