@@ -35,12 +35,6 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<ThesisHistory> ThesisHistories { get; set; }
 
-    public virtual DbSet<ThesisReviewerAssignment> ThesisReviewerAssignments { get; set; }
-
-    public virtual DbSet<ThesisReview> ThesisReviews { get; set; }
-
-    public virtual DbSet<ThesisHodDecision> ThesisHodDecisions { get; set; }
-
     public virtual DbSet<Checklist> Checklists { get; set; }
 
     public virtual DbSet<ThesisForm> ThesisForms { get; set; }
@@ -232,57 +226,6 @@ public partial class FctmsContext : DbContext
             entity.HasOne(d => d.Mentor2).WithMany()
                 .HasForeignKey(d => d.MentorId2)
                 .HasConstraintName("FK_Teams_Users_MentorId2");
-        });
-
-        modelBuilder.Entity<ThesisReviewerAssignment>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
-            entity.ToTable("thesis_reviewer_assignments");
-            entity.HasIndex(e => new { e.ThesisId, e.ReviewerId }, "UQ_Thesis_Reviewer").IsUnique();
-            entity.Property(e => e.AssignedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-            entity.Property(e => e.ThesisId)
-                .HasMaxLength(36)
-                .HasColumnType("char(36)")
-                .HasConversion(
-                    v => Guid.Parse(v),
-                    v => v.ToString()
-                );
-        });
-
-        modelBuilder.Entity<ThesisReview>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
-            entity.ToTable("thesis_reviews");
-            entity.HasIndex(e => new { e.ThesisId, e.ReviewerId }, "UQ_Review_Thesis_Reviewer").IsUnique();
-            entity.Property(e => e.ReviewedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-            entity.Property(e => e.ThesisId)
-                .HasMaxLength(36)
-                .HasColumnType("char(36)")
-                .HasConversion(
-                    v => Guid.Parse(v),
-                    v => v.ToString()
-                );
-        });
-
-        modelBuilder.Entity<ThesisHodDecision>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
-            entity.ToTable("thesis_hod_decisions");
-            entity.HasIndex(e => e.ThesisId, "UQ_HodDecision_Thesis").IsUnique();
-            entity.Property(e => e.DecidedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-            entity.Property(e => e.ThesisId)
-                .HasMaxLength(36)
-                .HasColumnType("char(36)")
-                .HasConversion(
-                    v => Guid.Parse(v),
-                    v => v.ToString()
-                );
         });
 
         modelBuilder.Entity<Teaminvitation>(entity =>
