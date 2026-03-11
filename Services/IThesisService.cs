@@ -20,9 +20,8 @@ namespace Services
         Task<ThesisDTO> CancelThesisAsync(string thesisId, string email);
         Task<IEnumerable<ThesisDTO>> GetMyThesesAsync(string email, string? status = null, string? searchTitle = null);
         Task<ThesisDTO?> GetThesisDetailAsync(string id);
-        Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false);
+        Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false, int? excludeUserId = null);
         Task<ThesisDTO> ToggleThesisLockAsync(string thesisId, string email);
-
-
+        Task<ThesisDTO> SubmitReviewAsync(string id, ReviewSubmissionDTO dto, string email);
     }
 }

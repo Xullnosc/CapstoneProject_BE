@@ -107,7 +107,20 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
-                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle, semesterId, isLocked, lecturerOnly);
+                int? excludeUserId = null;
+                var roleClaim = User.FindFirst(ClaimTypes.Role) ?? User.FindFirst("role");
+                var nameIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+                
+                // If it's a lecturer/reviewer, exclude their own proposals from the list
+                if (roleClaim?.Value == BusinessObjects.CampusConstants.Roles.Lecturer && nameIdClaim != null)
+                {
+                    if (int.TryParse(nameIdClaim.Value, out int currentUserId))
+                    {
+                        excludeUserId = currentUserId;
+                    }
+                }
+
+                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle, semesterId, isLocked, lecturerOnly, excludeUserId);
                 return Ok(theses);
             }
             catch (Exception ex)
@@ -118,23 +131,34 @@ namespace CapstoneProject_BE.Controllers
 
         /// <summary>
         /// PUT /api/thesis/{id}/review
-        /// Reviewer only: set thesis evaluation (Pass → Published, Fail → Rejected, or Need Update).
-        /// MUST be declared before PUT "{id}" so that /review is matched correctly.
+        /// Reviewer only: set thesis evaluation (Approve or Reject).
+        /// Supporting file and comment can be provided.
         /// </summary>
         [HttpPut("{id}/review")]
         [Authorize(Policy = "Reviewer")]
-        public async Task<IActionResult> ReviewThesis(string id, [FromBody] ReviewThesisDTO dto)
+        public async Task<IActionResult> ReviewThesis(string id, [FromForm] ReviewSubmissionDTO dto)
         {
             try
             {
-                var allowed = new[] { "Published", "Rejected", "Need Update" };
-                if (string.IsNullOrWhiteSpace(dto?.Status) || !allowed.Contains(dto.Status, StringComparer.OrdinalIgnoreCase))
-                    return BadRequest(new { Message = "Status must be one of: Published, Rejected, Need Update." });
+                var emailClaim = User.FindFirst(ClaimTypes.Email) ?? User.FindFirst("email");
+                if (emailClaim == null)
+                    return Unauthorized(new { Message = "Email claim not found in token." });
 
-                await _thesisService.UpdateThesisStatusAsync(id, dto.Status);
-                return Ok(new { Message = "Thesis evaluation updated.", Status = dto.Status });
+                var allowed = new[] { "Approve", "Reject" };
+                if (string.IsNullOrWhiteSpace(dto?.Status) || !allowed.Contains(dto.Status, StringComparer.OrdinalIgnoreCase))
+                    return BadRequest(new { Message = "Status must be one of: Approve, Reject." });
+
+                if (dto.Status == "Reject" && string.IsNullOrWhiteSpace(dto.Comment))
+                    return BadRequest(new { Message = "Comment is required when rejecting." });
+
+                var updated = await _thesisService.SubmitReviewAsync(id, dto, emailClaim.Value);
+                return Ok(new { Message = "Thesis evaluation submitted.", Data = updated });
             }
-            catch (Exception ex) when (ex.Message?.Contains("not found") == true)
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
             {
                 return NotFound(new { Message = ex.Message });
             }

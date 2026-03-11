@@ -23,4 +23,7 @@ public class SystemUserCredentialRepository : ISystemUserCredentialRepository
 
     public Task UpdateAsync(SystemUserCredential credential) =>
         _dao.UpdateAsync(credential);
+
+    public Task DeleteAsync(SystemUserCredential credential) =>
+        _dao.DeleteAsync(credential);
 }

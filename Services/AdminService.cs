@@ -73,41 +73,68 @@ public class AdminService : IAdminService
 
     public async Task CreateOrUpdateHodAsync(CreateOrUpdateHodDTO dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Username) || string.IsNullOrWhiteSpace(dto.Password))
-            throw new ArgumentException("FullName, Email, Username and Password are required.");
+        if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Username))
+            throw new ArgumentException("Email and Username are required.");
+
+        if (dto.UserId == null && string.IsNullOrWhiteSpace(dto.Password))
+             throw new ArgumentException("Password is required for new accounts.");
 
         var roles = await _semesterRepository.GetAllRolesAsync();
         var hodRole = roles.FirstOrDefault(r => r.RoleName == CampusConstants.Roles.HOD);
         if (hodRole == null)
             throw new InvalidOperationException("HOD role not found in database.");
 
-        var existingUser = await _userRepository.GetByEmailAsync(dto.Email.Trim());
-        User user;
-
-        if (existingUser != null)
+        User? user = null;
+        if (dto.UserId.HasValue)
         {
-            if (existingUser.Role?.RoleName != CampusConstants.Roles.HOD)
-                throw new InvalidOperationException($"User with email {dto.Email} exists but is not HOD. Cannot assign HOD credentials.");
-            user = existingUser;
+            user = await _userRepository.GetByIdAsync(dto.UserId.Value);
+            if (user == null)
+                throw new KeyNotFoundException($"User with ID {dto.UserId} not found.");
+            
+            if (user.Role?.RoleName != CampusConstants.Roles.HOD)
+                throw new InvalidOperationException("User is not an HOD.");
+
+            // Check if email changed and if new email is taken
+            if (user.Email != dto.Email.Trim())
+            {
+                var existingWithEmail = await _userRepository.GetByEmailAsync(dto.Email.Trim());
+                if (existingWithEmail != null && existingWithEmail.UserId != user.UserId)
+                    throw new InvalidOperationException($"Email '{dto.Email}' is already used by another user.");
+            }
+
+            user.Email = dto.Email.Trim();
             user.FullName = dto.FullName?.Trim() ?? user.FullName;
             user.Campus = dto.Campus;
             await _userRepository.UpdateAsync(user);
         }
         else
         {
-            user = new User
+            var existingWithEmail = await _userRepository.GetByEmailAsync(dto.Email.Trim());
+            if (existingWithEmail != null)
             {
-                Email = dto.Email.Trim(),
-                FullName = dto.FullName?.Trim() ?? dto.Email,
-                RoleId = hodRole.RoleId,
-                IsAuthorized = true,
-                CreatedAt = DateTime.UtcNow,
-                Campus = dto.Campus
-            };
-            user = await _userRepository.AddAsync(user);
+                if (existingWithEmail.Role?.RoleName != CampusConstants.Roles.HOD)
+                    throw new InvalidOperationException($"User with email {dto.Email} exists but is not HOD.");
+                
+                user = existingWithEmail;
+                user.FullName = dto.FullName?.Trim() ?? user.FullName;
+                user.Campus = dto.Campus;
+                await _userRepository.UpdateAsync(user);
+            }
+            else
+            {
+                user = new User
+                {
+                    Email = dto.Email.Trim(),
+                    FullName = dto.FullName?.Trim() ?? dto.Email,
+                    RoleId = hodRole.RoleId,
+                    IsAuthorized = true,
+                    CreatedAt = DateTime.UtcNow,
+                    Campus = dto.Campus
+                };
+                user = await _userRepository.AddAsync(user);
+            }
         }
 
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, BCrypt.Net.BCrypt.GenerateSalt(12));
         var credByUser = await _credentialRepository.GetByUserIdAsync(user.UserId);
         var credByUsername = await _credentialRepository.GetByUsernameAsync(dto.Username.Trim());
 
@@ -117,7 +144,10 @@ public class AdminService : IAdminService
         if (credByUser != null)
         {
             credByUser.Username = dto.Username.Trim();
-            credByUser.PasswordHash = passwordHash;
+            if (!string.IsNullOrWhiteSpace(dto.Password))
+            {
+                credByUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, BCrypt.Net.BCrypt.GenerateSalt(12));
+            }
             credByUser.UpdatedAt = DateTime.UtcNow;
             await _credentialRepository.UpdateAsync(credByUser);
         }
@@ -127,8 +157,46 @@ public class AdminService : IAdminService
             {
                 UserId = user.UserId,
                 Username = dto.Username.Trim(),
-                PasswordHash = passwordHash
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, BCrypt.Net.BCrypt.GenerateSalt(12))
             });
         }
+    }
+
+    public async Task DeleteHodAsync(int userId)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+            throw new KeyNotFoundException("HOD user not found.");
+
+        if (user.Role?.RoleName != CampusConstants.Roles.HOD)
+            throw new InvalidOperationException("User is not an HOD.");
+
+        var cred = await _credentialRepository.GetByUserIdAsync(userId);
+        if (cred != null)
+        {
+            await _credentialRepository.DeleteAsync(cred);
+        }
+
+        await _userRepository.DeleteAsync(user);
+    }
+
+    public async Task UpdateHodEmailAsync(int userId, string newEmail)
+    {
+        if (string.IsNullOrWhiteSpace(newEmail))
+            throw new ArgumentException("New email is required.");
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null)
+            throw new KeyNotFoundException("HOD user not found.");
+
+        if (user.Role?.RoleName != CampusConstants.Roles.HOD)
+            throw new InvalidOperationException("User is not an HOD.");
+
+        var existingWithEmail = await _userRepository.GetByEmailAsync(newEmail.Trim());
+        if (existingWithEmail != null && existingWithEmail.UserId != userId)
+            throw new InvalidOperationException($"Email '{newEmail}' is already used by another user.");
+
+        user.Email = newEmail.Trim();
+        await _userRepository.UpdateAsync(user);
     }
 }

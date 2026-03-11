@@ -93,11 +93,15 @@ namespace Services.Mappings
             CreateMap<SemesterDTO, Semester>();
             CreateMap<SemesterCreateDTO, Semester>();
 
-            // Thesis → ThesisDTO
             CreateMap<Thesis, ThesisDTO>()
                 .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.User != null ? src.User.FullName : null))
                 .ForMember(dest => dest.OwnerEmail, opt => opt.MapFrom(src => src.User != null ? src.User.Email : null))
+                .ForMember(dest => dest.Reviews, opt => opt.MapFrom(src => src.ThesisReviews))
                 .ForMember(dest => dest.Histories, opt => opt.MapFrom(src => src.ThesisHistories));
+
+            // ThesisReview -> ReviewDTO
+            CreateMap<ThesisReview, ReviewDTO>()
+                .ForMember(dest => dest.ReviewerName, opt => opt.MapFrom(src => src.Reviewer != null ? src.Reviewer.FullName : null));
 
             // ThesisHistory → ThesisHistoryDTO
             CreateMap<ThesisHistory, ThesisHistoryDTO>()
