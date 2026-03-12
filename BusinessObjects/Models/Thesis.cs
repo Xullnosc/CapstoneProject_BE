@@ -31,6 +31,7 @@ public partial class Thesis
 
     public bool IsLocked { get; set; }
 
+
     public virtual User User { get; set; } = null!;
 
     public virtual Semester? Semester { get; set; }
@@ -42,4 +43,6 @@ public partial class Thesis
     public virtual Lecturer? Mentor2 { get; set; }
 
     public virtual ICollection<ThesisHistory> ThesisHistories { get; set; } = new List<ThesisHistory>();
+
+    public virtual ICollection<ThesisReview> ThesisReviews { get; set; } = new List<ThesisReview>();
 }

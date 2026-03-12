@@ -47,7 +47,8 @@ function Get-ConnectionString {
 function Run-Flyway {
     param (
         [string]$settingsPath,
-        [string]$command = "migrate"
+        [string]$command = "migrate",
+        [switch]$outOfOrder
     )
     # If settingsPath wasn't provided, try to locate one using Get-ConnectionString helper locations
     if (-not $settingsPath) {
@@ -113,6 +114,9 @@ function Run-Flyway {
     # enable baseline on migrate so Flyway will record the current state instead
     # of attempting to re-run initial migrations that would fail.
     $flywayCmd += '-baselineOnMigrate=true'
+    if ($outOfOrder) {
+        $flywayCmd += '-outOfOrder=true'
+    }
     $flywayCmd += $command
 
     Write-Host "Running flyway with: $($flywayCmd -join ' ')"

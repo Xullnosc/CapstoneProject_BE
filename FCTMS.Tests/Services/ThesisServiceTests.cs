@@ -19,28 +19,37 @@ namespace FCTMS.Tests.Services
     public class ThesisServiceTests
     {
         private readonly Mock<IThesisRepository> _mockThesisRepository;
+        private readonly Mock<IThesisReviewRepository> _mockThesisReviewRepository;
         private readonly Mock<ITeamRepository> _mockTeamRepository;
         private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<ICloudinaryHelper> _mockCloudinaryHelper;
         private readonly Mock<ISemesterRepository> _mockSemesterRepository;
+        private readonly Mock<ILecturerRepository> _mockLecturerRepository;
+        private readonly Mock<IThesisReviewRepository> _mockThesisReviewRepository;
         private readonly Mock<IMapper> _mockMapper;
         private readonly ThesisService _thesisService;
 
         public ThesisServiceTests()
         {
             _mockThesisRepository = new Mock<IThesisRepository>();
+            _mockThesisReviewRepository = new Mock<IThesisReviewRepository>();
             _mockTeamRepository = new Mock<ITeamRepository>();
             _mockUserRepository = new Mock<IUserRepository>();
             _mockCloudinaryHelper = new Mock<ICloudinaryHelper>();
             _mockSemesterRepository = new Mock<ISemesterRepository>();
+            _mockLecturerRepository = new Mock<ILecturerRepository>();
+            _mockThesisReviewRepository = new Mock<IThesisReviewRepository>();
             _mockMapper = new Mock<IMapper>();
 
             _thesisService = new ThesisService(
                 _mockThesisRepository.Object,
+                _mockThesisReviewRepository.Object,
                 _mockTeamRepository.Object,
                 _mockUserRepository.Object,
                 _mockCloudinaryHelper.Object,
                 _mockSemesterRepository.Object,
+                _mockLecturerRepository.Object,
+                _mockThesisReviewRepository.Object,
                 _mockMapper.Object
             );
         }
@@ -142,7 +151,7 @@ namespace FCTMS.Tests.Services
             {
                 new Thesis { ThesisId = "1", Status = "Published", IsLocked = false }
             };
-            _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync(It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<bool?>(), It.IsAny<bool>())).ReturnsAsync(theses);
+            _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync(It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<bool?>(), It.IsAny<bool>(), It.IsAny<int?>())).ReturnsAsync(theses);
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
             { 
                 new ThesisDTO { ThesisId = "1", Status = "Published", IsLocked = false } 
@@ -157,7 +166,7 @@ namespace FCTMS.Tests.Services
             result.First().IsLocked.Should().BeFalse();
             
             // Verify the repository was called with the exact parameters
-            _mockThesisRepository.Verify(x => x.GetAllThesesFilteredAsync("Published", null, null, false, true), Times.Once);
+            _mockThesisRepository.Verify(x => x.GetAllThesesFilteredAsync("Published", null, null, false, true, null), Times.Once);
         }
 
         [Fact]

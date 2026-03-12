@@ -26,8 +26,8 @@ namespace Repositories
 
         // ─── Phase 02: New Methods ───────────────────────────────────────────────
 
-        public Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false)
-            => _thesisDAO.GetAllThesesFilteredAsync(status, userId, semesterId, isLocked, lecturerOnly);
+        public Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false, int? excludeUserId = null)
+            => _thesisDAO.GetAllThesesFilteredAsync(status, userId, semesterId, isLocked, lecturerOnly, excludeUserId);
 
         public Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id)
             => _thesisDAO.GetThesisByIdWithHistoriesAsync(id);

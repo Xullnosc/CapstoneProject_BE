@@ -107,7 +107,20 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
-                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle, semesterId, isLocked, lecturerOnly);
+                int? excludeUserId = null;
+                var roleClaim = User.FindFirst(ClaimTypes.Role) ?? User.FindFirst("role");
+                var nameIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+                
+                // If it's a lecturer/reviewer, exclude their own proposals from the list
+                if (roleClaim?.Value == BusinessObjects.CampusConstants.Roles.Lecturer && nameIdClaim != null)
+                {
+                    if (int.TryParse(nameIdClaim.Value, out int currentUserId))
+                    {
+                        excludeUserId = currentUserId;
+                    }
+                }
+
+                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle, semesterId, isLocked, lecturerOnly, excludeUserId);
                 return Ok(theses);
             }
             catch (Exception ex)
@@ -118,23 +131,34 @@ namespace CapstoneProject_BE.Controllers
 
         /// <summary>
         /// PUT /api/thesis/{id}/review
-        /// Reviewer only: set thesis evaluation (Pass → Published, Fail → Rejected, or Need Update).
-        /// MUST be declared before PUT "{id}" so that /review is matched correctly.
+        /// Reviewer only: set thesis evaluation (Approve or Reject).
+        /// Supporting file and comment can be provided.
         /// </summary>
         [HttpPut("{id}/review")]
         [Authorize(Policy = "Reviewer")]
-        public async Task<IActionResult> ReviewThesis(string id, [FromBody] ReviewThesisDTO dto)
+        public async Task<IActionResult> ReviewThesis(string id, [FromForm] ReviewSubmissionDTO dto)
         {
             try
             {
-                var allowed = new[] { "Published", "Rejected", "Need Update" };
-                if (string.IsNullOrWhiteSpace(dto?.Status) || !allowed.Contains(dto.Status, StringComparer.OrdinalIgnoreCase))
-                    return BadRequest(new { Message = "Status must be one of: Published, Rejected, Need Update." });
+                var emailClaim = User.FindFirst(ClaimTypes.Email) ?? User.FindFirst("email");
+                if (emailClaim == null)
+                    return Unauthorized(new { Message = "Email claim not found in token." });
 
-                await _thesisService.UpdateThesisStatusAsync(id, dto.Status);
-                return Ok(new { Message = "Thesis evaluation updated.", Status = dto.Status });
+                var allowed = new[] { "Approve", "Reject" };
+                if (string.IsNullOrWhiteSpace(dto?.Status) || !allowed.Contains(dto.Status, StringComparer.OrdinalIgnoreCase))
+                    return BadRequest(new { Message = "Status must be one of: Approve, Reject." });
+
+                if (dto.Status == "Reject" && string.IsNullOrWhiteSpace(dto.Comment))
+                    return BadRequest(new { Message = "Comment is required when rejecting." });
+
+                var updated = await _thesisService.SubmitReviewAsync(id, dto, emailClaim.Value);
+                return Ok(new { Message = "Thesis evaluation submitted.", Data = updated });
             }
-            catch (Exception ex) when (ex.Message?.Contains("not found") == true)
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
             {
                 return NotFound(new { Message = ex.Message });
             }
@@ -174,6 +198,118 @@ namespace CapstoneProject_BE.Controllers
             {
                 return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
             }
+        }
+
+        /// <summary>
+        /// PUT /api/thesis/{id}/reviewers
+        /// HOD/Admin: assign reviewers for a thesis (2+ reviewers).
+        /// </summary>
+        [HttpPut("{id}/reviewers")]
+        [Authorize(Policy = "HodOrAdmin")]
+        public async Task<IActionResult> AssignReviewers(string id, [FromBody] AssignThesisReviewersDTO dto)
+        {
+            try
+            {
+                var userId = GetUserId();
+                if (dto?.ReviewerIds == null || dto.ReviewerIds.Length == 0)
+                    return BadRequest(new { Message = "ReviewerIds is required." });
+
+                var status = await _thesisService.AssignReviewersAsync(id, dto.ReviewerIds, userId);
+                return Ok(status);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// PUT /api/thesis/{id}/review
+        /// Reviewer only: submit reviewer decision (Pass/Fail). If Fail, note is required.
+        /// Auto-finalize when all reviewers agree. If split, require HOD decision.
+        /// MUST be declared before PUT "{id}" so that /review is matched correctly.
+        /// </summary>
+        [HttpPut("{id}/review")]
+        [Authorize] // temporarily allow any authenticated user; policy-level checks moved into service logic
+        public async Task<IActionResult> SubmitReviewerDecision(string id, [FromBody] SubmitThesisDecisionDTO dto)
+        {
+            try
+            {
+                var userId = GetUserId();
+                Console.WriteLine($"[ThesisReview] SubmitReviewerDecision START - UserId={userId}, ThesisId={id}, Decision={dto?.Decision}");
+                var status = await _thesisService.SubmitReviewerDecisionAsync(id, userId, dto);
+                Console.WriteLine($"[ThesisReview] SubmitReviewerDecision OK - UserId={userId}, ThesisId={id}, OverallStatus={status.OverallStatus}");
+                return Ok(status);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Console.WriteLine($"[ThesisReview] 403 UnauthorizedAccessException - {ex.Message}");
+                return StatusCode(403, new { Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine($"[ThesisReview] 400 ArgumentException - {ex.Message}");
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                Console.WriteLine($"[ThesisReview] 404 KeyNotFoundException - {ex.Message}");
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ThesisReview] 400 Exception - {ex}");
+                return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// PUT /api/thesis/{id}/hod-decision
+        /// HOD: submit final decision when reviewers are split (1 pass / 1 fail).
+        /// If Fail, note is required.
+        /// </summary>
+        [HttpPut("{id}/hod-decision")]
+        [Authorize(Policy = "HodOrAdmin")]
+        public async Task<IActionResult> SubmitHodDecision(string id, [FromBody] SubmitThesisDecisionDTO dto)
+        {
+            try
+            {
+                var userId = GetUserId();
+                var status = await _thesisService.SubmitHodDecisionAsync(id, userId, dto);
+                return Ok(status);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+
+        private int GetUserId()
+        {
+            var idClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+            if (idClaim == null || !int.TryParse(idClaim.Value, out var userId))
+                throw new UnauthorizedAccessException("User id claim not found in token.");
+            return userId;
         }
 
         /// <summary>

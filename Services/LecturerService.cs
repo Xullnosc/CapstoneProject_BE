@@ -1,5 +1,6 @@
 using BusinessObjects.Models;
 using BusinessObjects;
+using BusinessObjects.DTOs;
 using Repositories;
 using System;
 using System.Collections.Generic;
@@ -34,9 +35,14 @@ namespace Services
         {
             var result = await _lecturerRepository.GetAllAsync();
             var lecturers = result.ToList();
+
+            if (!lecturers.Any())
+            {
+                return lecturers;
+            }
             
             // Populate avatars from User table if missing
-            var emails = lecturers.Select(l => l.Email.Trim().ToLower()).Distinct().ToList();
+            var emails = lecturers.Select(l => l.Email.Trim().ToLowerInvariant()).Distinct().ToList();
             var users = await _userRepository.GetUsersByEmailsAsync(emails);
             var avatarDict = users
                 .Where(u => !string.IsNullOrEmpty(u.Email))
@@ -98,6 +104,40 @@ namespace Services
             }
 
             return new BusinessObjects.DTOs.PagedResult<Lecturer>(items, total, page, pageSize);
+        }
+        
+        public async Task<PagedResult<Lecturer>> GetLecturersByCampusAsync(string campus, int pageIndex, int pageSize)
+        {
+            var pagedResult = await _lecturerRepository.GetByCampusAsync(campus, pageIndex, pageSize);
+            var lecturers = pagedResult.Items;
+
+            if (!lecturers.Any())
+            {
+                return pagedResult;
+            }
+
+            var emails = lecturers.Select(l => l.Email.Trim().ToLowerInvariant()).Distinct().ToList();
+            var users = await _userRepository.GetUsersByEmailsAsync(emails);
+            var avatarDict = users
+                .Where(u => !string.IsNullOrEmpty(u.Email))
+                .GroupBy(u => u.Email!.Trim().ToLowerInvariant())
+                .ToDictionary(g => g.Key, g => g.First().Avatar);
+
+            foreach (var l in lecturers)
+            {
+                l.Campus = CampusConstants.MapCodeToFullName(l.Campus);
+
+                string emailKey = l.Email.Trim().ToLowerInvariant();
+                bool hasNoAvatar = string.IsNullOrWhiteSpace(l.Avatar) || l.Avatar == "N/A";
+
+                if (hasNoAvatar && avatarDict.TryGetValue(emailKey, out var userAvatar) && !string.IsNullOrWhiteSpace(userAvatar))
+                {
+                    l.Avatar = userAvatar;
+                }
+            }
+
+            pagedResult.Items = lecturers;
+            return pagedResult;
         }
 
         public async Task<Lecturer?> GetLecturerByIdAsync(int id)

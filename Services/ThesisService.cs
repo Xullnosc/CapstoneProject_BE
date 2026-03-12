@@ -14,25 +14,34 @@ namespace Services
     public class ThesisService : IThesisService
     {
         private readonly IThesisRepository _thesisRepository;
+        private readonly IThesisReviewRepository _thesisReviewRepository;
         private readonly ITeamRepository _teamRepository;
         private readonly IUserRepository _userRepository;
         private readonly ICloudinaryHelper _cloudinaryHelper;
         private readonly ISemesterRepository _semesterRepository;
+        private readonly ILecturerRepository _lecturerRepository;
+        private readonly IThesisReviewRepository _thesisReviewRepository;
         private readonly IMapper _mapper;
 
         public ThesisService(
             IThesisRepository thesisRepository,
+            IThesisReviewRepository thesisReviewRepository,
             ITeamRepository teamRepository,
             IUserRepository userRepository,
             ICloudinaryHelper cloudinaryHelper,
             ISemesterRepository semesterRepository,
+            ILecturerRepository lecturerRepository,
+            IThesisReviewRepository thesisReviewRepository,
             IMapper mapper)
         {
             _thesisRepository = thesisRepository;
+            _thesisReviewRepository = thesisReviewRepository;
             _teamRepository = teamRepository;
             _userRepository = userRepository;
             _cloudinaryHelper = cloudinaryHelper;
             _semesterRepository = semesterRepository;
+            _lecturerRepository = lecturerRepository;
+            _thesisReviewRepository = thesisReviewRepository;
             _mapper = mapper;
         }
 
@@ -91,7 +100,52 @@ namespace Services
                 UpdateDate = DateTime.UtcNow
             };
 
-            return await _thesisRepository.CreateThesisAsync(thesis);
+            // Set TeamId or MentorId1 based on role
+            if (user.Role?.RoleName == CampusConstants.Roles.Lecturer)
+            {
+                var lecturer = await _lecturerRepository.GetByEmailAsync(user.Email);
+                if (lecturer != null)
+                {
+                    thesis.MentorId1 = lecturer.LecturerId;
+                }
+            }
+            else
+            {
+                var team = await _teamRepository.GetActiveTeamByStudentIdAsync(user.UserId);
+                if (team != null)
+                {
+                    thesis.TeamId = team.TeamId;
+                }
+            }
+
+            var createdThesis = await _thesisRepository.CreateThesisAsync(thesis);
+
+            // AUTO-APPROVE Logic: If a Lecturer proposes a thesis, they are auto-assigned as Reviewer 1 and Approve it.
+            if (user.Role?.RoleName == CampusConstants.Roles.Lecturer)
+            {
+                var lecturer = await _lecturerRepository.GetByEmailAsync(user.Email);
+                if (lecturer != null)
+                {
+                    var autoReview = new ThesisReview
+                    {
+                        ThesisId = createdThesis.ThesisId,
+                        ReviewerId = lecturer.LecturerId,
+                        Status = "Approve",
+                        Comment = "Automatically approved (Self-proposed by Lecturer)",
+                        ReviewDate = DateTime.UtcNow
+                    };
+                    await _thesisReviewRepository.AddOrUpdateReviewAsync(autoReview);
+                    
+                    // Reload and recalculate status
+                    var reloaded = await _thesisRepository.GetThesisByIdWithHistoriesAsync(createdThesis.ThesisId);
+                    if (reloaded != null)
+                    {
+                        await RecalculateThesisStatusAsync(reloaded);
+                    }
+                }
+            }
+
+            return createdThesis;
         }
 
         public async Task<IEnumerable<Thesis>> GetAllThesesAsync()
@@ -159,8 +213,12 @@ namespace Services
 
                 await _thesisRepository.AddThesisHistoryAsync(history);
 
-                // Update thesis with new file URL
+                // Update thesis with new file URL and transition status
                 thesis.FileUrl = newFileUrl;
+                if (thesis.Status == "Need Update" || thesis.Status == "Reviewing")
+                {
+                    thesis.Status = "Updated";
+                }
             }
 
             // Update optional metadata fields
@@ -203,8 +261,10 @@ namespace Services
             if (thesis.UserId != user.UserId)
                 throw new UnauthorizedAccessException("You are not authorized to cancel this thesis.");
 
-            // Only cancel if not already matched or published (can refine logic here if needed, usually just allow if it's 'Reviewing' or 'Registered')
-            if (thesis.Status != "Reviewing" && thesis.Status != "Registered" && thesis.Status != "On Mentor Inviting")
+            // Only cancel if not already matched or published
+            // UPDATED: Allow cancellation if 'Need Update'
+            var cancellable = new[] { "Reviewing", "Registered", "On Mentor Inviting", "Need Update" };
+            if (!cancellable.Contains(thesis.Status))
                 throw new InvalidOperationException($"Cannot cancel a thesis that is '{thesis.Status}'.");
 
             thesis.Status = "Cancelled";
@@ -213,6 +273,78 @@ namespace Services
             await _thesisRepository.UpdateThesisAsync(thesis);
 
             return _mapper.Map<ThesisDTO>(thesis);
+        }
+
+        public async Task<ThesisDTO> SubmitReviewAsync(string id, ReviewSubmissionDTO dto, string email)
+        {
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null) throw new UnauthorizedAccessException("User not found.");
+
+            var lecturer = await _lecturerRepository.GetByEmailAsync(email);
+            if (lecturer == null) throw new UnauthorizedAccessException("Lecturer profile not found.");
+
+            var thesis = await _thesisRepository.GetThesisByIdWithHistoriesAsync(id);
+            if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
+
+            // Upload file if provided
+            string? reviewFileUrl = null;
+            if (dto.ReviewFile != null)
+                reviewFileUrl = await _cloudinaryHelper.UploadFileAsync(dto.ReviewFile);
+
+            // Save or Update Review
+            var review = new ThesisReview
+            {
+                ThesisId = id,
+                ReviewerId = lecturer.LecturerId,
+                Status = dto.Status,
+                Comment = dto.Comment,
+                FileUrl = reviewFileUrl,
+                ReviewDate = DateTime.UtcNow
+            };
+
+            await _thesisReviewRepository.AddOrUpdateReviewAsync(review);
+            
+            // Reload and recalculate
+            var updatedThesis = await _thesisRepository.GetThesisByIdWithHistoriesAsync(id);
+            if (updatedThesis == null) throw new Exception("Failed to reload thesis after review.");
+
+            await RecalculateThesisStatusAsync(updatedThesis);
+            
+            return _mapper.Map<ThesisDTO>(updatedThesis);
+        }
+
+        private async Task RecalculateThesisStatusAsync(Thesis thesis)
+        {
+            var reviews = thesis.ThesisReviews.ToList();
+            
+            // Recalculate global status
+            // If we have at least 2 reviews
+            if (reviews.Count >= 2)
+            {
+                if (reviews.All(r => r.Status == "Approve"))
+                {
+                    thesis.Status = "Published";
+                }
+                else if (reviews.Any(r => r.Status == "Reject"))
+                {
+                    thesis.Status = "Need Update";
+                }
+            }
+            else
+            {
+                // If only 1 review so far
+                if (reviews.Any(r => r.Status == "Reject"))
+                {
+                    thesis.Status = "Need Update";
+                }
+                else if (reviews.Any(r => r.Status == "Approve"))
+                {
+                    thesis.Status = "Reviewing";
+                }
+            }
+
+            thesis.UpdateDate = DateTime.UtcNow;
+            await _thesisRepository.UpdateThesisAsync(thesis);
         }
 
         /// <summary>
@@ -228,7 +360,7 @@ namespace Services
 
             if (user.Role?.RoleName == CampusConstants.Roles.Lecturer)
             {
-                // Always add their own ID so they can see their proposed theses
+                // Lecturer view: see their own proposals
                 ownerIds.Add(user.UserId);
 
                 // Lecturer/Mentor view: see theses of all teams they mentor in current semester
@@ -242,6 +374,17 @@ namespace Services
                         .ToList();
 
                     foreach (var id in mentoredLeaderIds) ownerIds.Add(id);
+
+                    // Add theses from teams that have a Pending mentor invitation for this lecturer
+                    var pendingInvitations = await _teamInvitationRepository.GetPendingMentorInvitationsByMentorIdAsync(user.UserId);
+                    var pendingTeamIds = pendingInvitations.Select(i => i.TeamId).Distinct().ToList();
+                    
+                    var pendingLeaderIds = allTeams
+                        .Where(t => pendingTeamIds.Contains(t.TeamId) && t.Status != CampusConstants.TeamStatus.Disbanded)
+                        .Select(t => t.LeaderId)
+                        .ToList();
+
+                    foreach (var id in pendingLeaderIds) ownerIds.Add(id);
                 }
             }
             else
@@ -278,6 +421,138 @@ namespace Services
             return _mapper.Map<IEnumerable<ThesisDTO>>(theses);
         }
 
+        // ─── Review workflow ────────────────────────────────────────────────────
+
+        public Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId)
+            => _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+
+        public async Task<ThesisReviewStatusDTO> AssignReviewersAsync(string thesisId, int[] reviewerIds, int assignedByUserId)
+        {
+            if (reviewerIds == null) reviewerIds = [];
+            var distinct = reviewerIds.Distinct().ToArray();
+            if (distinct.Length < 2)
+                throw new ArgumentException("At least 2 reviewers are required.");
+
+            var thesis = await _thesisRepository.GetThesisByIdAsync(thesisId);
+            if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
+
+            await _thesisReviewRepository.ReplaceAssignmentsAsync(thesisId, distinct, assignedByUserId);
+
+            // reset status to Reviewing when (re)assigning reviewers
+            thesis.Status = "Reviewing";
+            thesis.UpdateDate = DateTime.UtcNow;
+            await _thesisRepository.UpdateThesisAsync(thesis);
+
+            return await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+        }
+
+        public async Task<ThesisReviewStatusDTO> SubmitReviewerDecisionAsync(string thesisId, int reviewerUserId, SubmitThesisDecisionDTO dto)
+        {
+            if (dto == null) throw new ArgumentNullException(nameof(dto));
+            var decision = (dto.Decision ?? "").Trim();
+            if (!string.Equals(decision, "Pass", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Decision must be Pass or Fail.");
+
+            if (string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase)
+                && string.IsNullOrWhiteSpace(dto.Note))
+                throw new ArgumentException("Fail reason is required.");
+
+            // Reviewer is defined as one of the 2 mentors assigned to the thesis's team.
+            var mentorReviewerIds = await GetMentorReviewerIdsForThesisAsync(thesisId);
+            if (!mentorReviewerIds.Contains(reviewerUserId))
+                throw new UnauthorizedAccessException("You are not a mentor reviewer for this thesis.");
+
+            await _thesisReviewRepository.UpsertReviewerReviewAsync(thesisId, reviewerUserId, decision.Equals("Pass", StringComparison.OrdinalIgnoreCase) ? "Pass" : "Fail", dto.Note?.Trim());
+
+            // apply business rules after all reviewers decided
+            var status = await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+            await ApplyDecisionToThesisStatusAsync(thesisId, status);
+            return await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+        }
+
+        public async Task<ThesisReviewStatusDTO> SubmitHodDecisionAsync(string thesisId, int hodUserId, SubmitThesisDecisionDTO dto)
+        {
+            if (dto == null) throw new ArgumentNullException(nameof(dto));
+            var decision = (dto.Decision ?? "").Trim();
+            if (!string.Equals(decision, "Pass", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Decision must be Pass or Fail.");
+
+            if (string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase)
+                && string.IsNullOrWhiteSpace(dto.Note))
+                throw new ArgumentException("Fail reason is required.");
+
+            var status = await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+            if (!status.RequiresHodDecision)
+                throw new InvalidOperationException("HOD decision is not required for this thesis.");
+
+            await _thesisReviewRepository.UpsertHodDecisionAsync(thesisId, hodUserId, decision.Equals("Pass", StringComparison.OrdinalIgnoreCase) ? "Pass" : "Fail", dto.Note?.Trim());
+
+            await ApplyDecisionToThesisStatusAsync(thesisId, await _thesisReviewRepository.GetReviewStatusAsync(thesisId));
+            return await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
+        }
+
+        private async Task ApplyDecisionToThesisStatusAsync(string thesisId, ThesisReviewStatusDTO status)
+        {
+            var thesis = await _thesisRepository.GetThesisByIdAsync(thesisId);
+            if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
+
+            // If HOD has decided, that is final for split cases
+            if (status.HodDecision != null)
+            {
+                thesis.Status = string.Equals(status.HodDecision.Decision, "Pass", StringComparison.OrdinalIgnoreCase)
+                    ? "Published"
+                    : "Rejected";
+                thesis.UpdateDate = DateTime.UtcNow;
+                await _thesisRepository.UpdateThesisAsync(thesis);
+                return;
+            }
+
+            if (string.Equals(status.OverallStatus, "Pass", StringComparison.OrdinalIgnoreCase))
+            {
+                thesis.Status = "Published";
+            }
+            else if (string.Equals(status.OverallStatus, "Fail", StringComparison.OrdinalIgnoreCase))
+            {
+                thesis.Status = "Rejected";
+            }
+            else if (string.Equals(status.OverallStatus, "Split", StringComparison.OrdinalIgnoreCase))
+            {
+                thesis.Status = "HOD Reviewing";
+            }
+            else
+            {
+                thesis.Status = "Reviewing";
+            }
+
+            thesis.UpdateDate = DateTime.UtcNow;
+            await _thesisRepository.UpdateThesisAsync(thesis);
+        }
+
+        private async Task<HashSet<int>> GetMentorReviewerIdsForThesisAsync(string thesisId)
+        {
+            var thesis = await _thesisRepository.GetThesisByIdAsync(thesisId);
+            if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
+
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester == null) throw new InvalidOperationException("Current semester not found.");
+
+            // Find the team that owns this thesis via leader (thesis.UserId).
+            // Leader is included in team members, so we can resolve by studentId.
+            var team = await _teamRepository.GetTeamByStudentIdAsync(thesis.UserId, currentSemester.SemesterId);
+            if (team == null) throw new InvalidOperationException("Team not found for this thesis in current semester.");
+
+            var ids = new HashSet<int>();
+            if (team.MentorId.HasValue) ids.Add(team.MentorId.Value);
+            if (team.MentorId2.HasValue) ids.Add(team.MentorId2.Value);
+
+            if (ids.Count < 2)
+                throw new InvalidOperationException("This thesis team does not have 2 mentors assigned yet.");
+
+            return ids;
+        }
+
         /// <summary>
         /// Get full thesis detail including version history.
         /// </summary>
@@ -296,9 +571,9 @@ namespace Services
         /// <summary>
         /// Get filtered list of theses. All filters are optional.
         /// </summary>
-        public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false)
+        public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false, int? excludeUserId = null)
         {
-            var theses = await _thesisRepository.GetAllThesesFilteredAsync(status, userId, semesterId, isLocked, lecturerOnly);
+            var theses = await _thesisRepository.GetAllThesesFilteredAsync(status, userId, semesterId, isLocked, lecturerOnly, excludeUserId);
             var dtos = _mapper.Map<IEnumerable<ThesisDTO>>(theses);
             if (!string.IsNullOrWhiteSpace(searchTitle))
             {
@@ -316,8 +591,8 @@ namespace Services
             if (user == null)
                 throw new UnauthorizedAccessException("User not found.");
 
-            if (user.Role?.RoleName != CampusConstants.Roles.Lecturer)
-                throw new UnauthorizedAccessException("Only lecturers can lock or unlock a thesis.");
+            if (user.Role?.RoleName != CampusConstants.Roles.Lecturer && user.Role?.RoleName != CampusConstants.Roles.HOD)
+                throw new UnauthorizedAccessException("Only lecturers or HODs can lock or unlock a thesis.");
 
             var thesis = await _thesisRepository.GetThesisByIdWithHistoriesAsync(thesisId);
             if (thesis == null)

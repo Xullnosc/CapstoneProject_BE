@@ -128,10 +128,12 @@ builder.Services.AddScoped<IArchivedTeamDAO, ArchivedTeamDAO>();
 builder.Services.AddScoped<ITeamInvitationDAO, TeamInvitationDAO>();
 builder.Services.AddScoped<ITeamMemberDAO, TeamMemberDAO>();
 builder.Services.AddScoped<IThesisDAO, ThesisDAO>();
+builder.Services.AddScoped<IThesisReviewDAO, ThesisReviewDAO>();
 builder.Services.AddScoped<IChecklistDAO, ChecklistDAO>();
 builder.Services.AddScoped<IThesisFormDAO, ThesisFormDAO>();
 builder.Services.AddScoped<ILecturerDAO, LecturerDAO>();
 builder.Services.AddScoped<IAccessLogDAO, AccessLogDAO>();
+builder.Services.AddScoped<IThesisReviewDAO, ThesisReviewDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -144,10 +146,12 @@ builder.Services.AddScoped<IArchivingRepository, ArchivingRepository>();
 builder.Services.AddScoped<ITeamInvitationRepository, TeamInvitationRepository>();
 builder.Services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
 builder.Services.AddScoped<IThesisRepository, ThesisRepository>();
+builder.Services.AddScoped<IThesisReviewRepository, ThesisReviewRepository>();
 builder.Services.AddScoped<IChecklistRepository, ChecklistRepository>();
 builder.Services.AddScoped<IThesisFormRepository, ThesisFormRepository>();
 builder.Services.AddScoped<ILecturerRepository, LecturerRepository>();
 builder.Services.AddScoped<IAccessLogRepository, AccessLogRepository>();
+builder.Services.AddScoped<IThesisReviewRepository, ThesisReviewRepository>();
 
 //Middleware
 // AutoMapper
@@ -183,6 +187,24 @@ builder.Services.AddAuthorization(options =>
 {
     // Reviewer policy: any user with IsReviewer=true (typically lecturers assigned as reviewer)
     options.AddPolicy("Reviewer", policy => policy.RequireClaim("IsReviewer", "true"));
+
+    // Lecturer policy: role claim equals Lecturer
+    options.AddPolicy(
+        "Lecturer",
+        policy =>
+            policy.RequireAssertion(context =>
+                context.User.HasClaim("role", BusinessObjects.CampusConstants.Roles.Lecturer)
+            )
+    );
+
+    options.AddPolicy(
+        "HodOrAdmin",
+        policy =>
+            policy.RequireAssertion(context =>
+                context.User.IsInRole(BusinessObjects.CampusConstants.Roles.HOD)
+                || context.User.IsInRole(BusinessObjects.CampusConstants.Roles.Admin)
+            )
+    );
 
     // ReviewerOrHOD: allow either HOD role OR reviewer claim
     options.AddPolicy(

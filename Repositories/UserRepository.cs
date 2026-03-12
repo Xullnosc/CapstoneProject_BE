@@ -37,6 +37,11 @@ namespace Repositories
             await _userDAO.UpdateAsync(user);
         }
 
+        public async Task DeleteAsync(User user)
+        {
+            await _userDAO.DeleteAsync(user);
+        }
+
         public async Task<List<User>> SearchUsersAsync(string term)
         {
             return await _userDAO.SearchUsersAsync(term);

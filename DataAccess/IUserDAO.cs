@@ -9,6 +9,7 @@ namespace DataAccess
         Task<User?> GetByIdAsync(int id);
         Task<User> AddAsync(User user);
         Task UpdateAsync(User user);
+        Task DeleteAsync(User user);
         Task<List<User>> SearchUsersAsync(string term);
         Task<PagedResult<User>> SearchUsersAsync(string term, int pageIndex, int pageSize);
         Task<List<User>> GetUsersByEmailsAsync(List<string> emails);
