@@ -145,12 +145,13 @@ namespace FCTMS.Tests.Controllers
         }
 
         [Fact]
-        public async Task ReviewThesis_ShouldReturnOk_WhenReviewerAndValidStatus()
+        public async Task SubmitReviewerDecision_ShouldReturnOk_WhenReviewerAndValidStatus()
         {
-            // Arrange: set up user with IsReviewer claim so [Authorize(Policy = "Reviewer")] passes
+            // Arrange: set up user with IsReviewer claim
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Email, "reviewer@fpt.edu.vn"),
+                new Claim(ClaimTypes.NameIdentifier, "2"), // reviewer userId
                 new Claim("IsReviewer", "true")
             };
             var identity = new ClaimsIdentity(claims, "TestAuthType");
@@ -164,7 +165,7 @@ namespace FCTMS.Tests.Controllers
             _mockThesisService.Setup(x => x.SubmitReviewAsync("guid-1", dto, "reviewer@fpt.edu.vn")).ReturnsAsync(returnedDto);
 
             // Act
-            var result = await _controller.ReviewThesis("guid-1", dto);
+            var result = await _controller.SubmitReviewerDecision("guid-1", dto);
 
             // Assert
             var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
@@ -172,9 +173,9 @@ namespace FCTMS.Tests.Controllers
         }
 
         [Fact]
-        public async Task ReviewThesis_ShouldReturnBadRequest_WhenInvalidStatus()
+        public async Task SubmitReviewerDecision_ShouldReturnBadRequest_WhenArgumentInvalid()
         {
-            var claims = new List<Claim> { new Claim(ClaimTypes.Email, "r@fpt.edu.vn"), new Claim("IsReviewer", "true") };
+            var claims = new List<Claim> { new Claim(ClaimTypes.Email, "r@fpt.edu.vn"), new Claim(ClaimTypes.NameIdentifier, "2") };
             _controller.ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test")) }
@@ -187,9 +188,9 @@ namespace FCTMS.Tests.Controllers
         }
 
         [Fact]
-        public async Task ReviewThesis_ShouldReturnNotFound_WhenThesisNotFound()
+        public async Task SubmitReviewerDecision_ShouldReturnNotFound_WhenThesisNotFound()
         {
-            var claims = new List<Claim> { new Claim(ClaimTypes.Email, "r@fpt.edu.vn"), new Claim("IsReviewer", "true") };
+            var claims = new List<Claim> { new Claim(ClaimTypes.Email, "r@fpt.edu.vn"), new Claim(ClaimTypes.NameIdentifier, "2") };
             _controller.ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test")) }

@@ -19,6 +19,7 @@ namespace FCTMS.Tests.Services
     public class ThesisServiceTests
     {
         private readonly Mock<IThesisRepository> _mockThesisRepository;
+        private readonly Mock<IThesisReviewRepository> _mockThesisReviewRepository;
         private readonly Mock<ITeamRepository> _mockTeamRepository;
         private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<ICloudinaryHelper> _mockCloudinaryHelper;
@@ -31,6 +32,7 @@ namespace FCTMS.Tests.Services
         public ThesisServiceTests()
         {
             _mockThesisRepository = new Mock<IThesisRepository>();
+            _mockThesisReviewRepository = new Mock<IThesisReviewRepository>();
             _mockTeamRepository = new Mock<ITeamRepository>();
             _mockUserRepository = new Mock<IUserRepository>();
             _mockCloudinaryHelper = new Mock<ICloudinaryHelper>();
@@ -41,6 +43,7 @@ namespace FCTMS.Tests.Services
 
             _thesisService = new ThesisService(
                 _mockThesisRepository.Object,
+                _mockThesisReviewRepository.Object,
                 _mockTeamRepository.Object,
                 _mockUserRepository.Object,
                 _mockCloudinaryHelper.Object,

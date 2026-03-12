@@ -5,7 +5,11 @@ namespace Services
 {
     public interface IImportService
     {
-        Task<ImportResult<WhitelistImportDTO>> ImportWhitelistFromExcel(Stream excelStream);
-        Task SaveWhitelistBatchAsync(ImportResult<WhitelistImportDTO> importResult, string fileUrl, string? uploadedBy = null);
+        Task<ImportResult<WhitelistImportDTO>> ImportWhitelistFromExcel(
+            Stream excelStream,
+            string uploaderEmail,
+            List<WhitelistRowOverrideDTO>? rowOverrides = null);
+
+        Task SaveWhitelistBatchAsync(ImportResult<WhitelistImportDTO> importResult, string fileUrl, string uploaderEmail);
     }
 }
