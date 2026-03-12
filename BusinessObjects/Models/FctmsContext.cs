@@ -50,7 +50,7 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<SystemUserCredential> SystemUserCredentials { get; set; }
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
     public virtual DbSet<AccessLog> AccessLogs { get; set; }
-    public virtual DbSet<ThesisReview> ThesisReviews { get; set; }
+    
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
