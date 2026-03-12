@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,6 +51,8 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
     public virtual DbSet<AccessLog> AccessLogs { get; set; }
     
+
+    public virtual DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -118,6 +120,37 @@ public partial class FctmsContext : DbContext
             entity.Property(e => e.Email).HasMaxLength(100);
             entity.Property(e => e.FullName).HasMaxLength(100);
             entity.Property(e => e.StudentCode).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasKey(e => e.NotificationId).HasName("PRIMARY");
+
+            entity.ToTable("Notifications");
+
+            entity.HasIndex(e => new { e.UserId, e.IsRead, e.CreatedAt }, "IX_Notifications_UserId_IsRead_CreatedAt");
+
+            entity.HasIndex(e => e.CreatedAt, "IX_Notifications_CreatedAt");
+
+            entity.Property(e => e.Type)
+                .HasColumnType("enum('TeamInvitation','ThesisUpdate','MentorChange','SemesterDeadline','ChecklistUpdate','HODAction','SystemAnnouncement','FormSubmission')");
+            entity.Property(e => e.Title).HasMaxLength(255);
+            entity.Property(e => e.Message).HasColumnType("text");
+            entity.Property(e => e.RelatedEntityType).HasMaxLength(50);
+            entity.Property(e => e.ReadAt).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.User)
+                .WithMany(p => p.Notifications)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Notifications_Users_UserId");
         });
 
         modelBuilder.Entity<FlywaySchemaHistory>(entity =>

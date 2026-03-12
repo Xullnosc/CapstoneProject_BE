@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using CapstoneProject_BE.Controllers;
@@ -6,12 +11,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Services;
-using System;
-using System.Collections.Generic;
-using System.Security.Claims;
-using System.Threading.Tasks;
 using Xunit;
-using System.Linq;
 
 namespace FCTMS.Tests.Controllers
 {
@@ -29,14 +29,14 @@ namespace FCTMS.Tests.Controllers
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Email, "student@fpt.edu.vn"),
-                new Claim(ClaimTypes.NameIdentifier, "1")
+                new Claim(ClaimTypes.NameIdentifier, "1"),
             };
             var identity = new ClaimsIdentity(claims, "TestAuthType");
             var claimsPrincipal = new ClaimsPrincipal(identity);
-            
+
             _controller.ControllerContext = new ControllerContext
             {
-                HttpContext = new DefaultHttpContext { User = claimsPrincipal }
+                HttpContext = new DefaultHttpContext { User = claimsPrincipal },
             };
         }
 
@@ -46,16 +46,21 @@ namespace FCTMS.Tests.Controllers
             // Arrange
             var dtos = new List<ThesisDTO>
             {
-                new ThesisDTO { ThesisId = "1", Title = "Test 1" }
+                new ThesisDTO { ThesisId = "1", Title = "Test 1" },
             };
-            _mockThesisService.Setup(x => x.GetMyThesesAsync("student@fpt.edu.vn", null, null)).ReturnsAsync(dtos);
+            _mockThesisService
+                .Setup(x => x.GetMyThesesAsync("student@fpt.edu.vn", null, null))
+                .ReturnsAsync(dtos);
 
             // Act
             var result = await _controller.GetMyTheses(null, null);
 
             // Assert
             var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-            var returnedData = okResult.Value.Should().BeAssignableTo<IEnumerable<ThesisDTO>>().Subject;
+            var returnedData = okResult
+                .Value.Should()
+                .BeAssignableTo<IEnumerable<ThesisDTO>>()
+                .Subject;
             returnedData.Should().HaveCount(1);
         }
 
@@ -63,7 +68,9 @@ namespace FCTMS.Tests.Controllers
         public async Task GetThesisDetail_ShouldReturnNotFound_WhenNull()
         {
             // Arrange
-            _mockThesisService.Setup(x => x.GetThesisDetailAsync("invalid")).ReturnsAsync((ThesisDTO?)null);
+            _mockThesisService
+                .Setup(x => x.GetThesisDetailAsync("invalid"))
+                .ReturnsAsync((ThesisDTO?)null);
 
             // Act
             var result = await _controller.GetThesisDetail("invalid");
@@ -71,8 +78,12 @@ namespace FCTMS.Tests.Controllers
             // Assert
             var notFound = result.Should().BeOfType<NotFoundObjectResult>().Subject;
             // value is anonymous type { Message = ... }
-            notFound.Value!.GetType().GetProperty("Message")!.GetValue(notFound.Value, null)
-                .Should().Be("Thesis with id 'invalid' not found.");
+            notFound
+                .Value!.GetType()
+                .GetProperty("Message")!
+                .GetValue(notFound.Value, null)
+                .Should()
+                .Be("Thesis with id 'invalid' not found.");
         }
 
         [Fact]
@@ -96,9 +107,13 @@ namespace FCTMS.Tests.Controllers
             // Arrange
             var dtos = new List<ThesisDTO>
             {
-                new ThesisDTO { ThesisId = "1", Status = "Reviewing" }
+                new ThesisDTO { ThesisId = "1", Status = "Reviewing" },
             };
-            _mockThesisService.Setup(x => x.GetFilteredThesesAsync("Reviewing", null, null, null, null, false, null)).ReturnsAsync(dtos);
+            _mockThesisService
+                .Setup(x =>
+                    x.GetFilteredThesesAsync("Reviewing", null, null, null, null, false, null)
+                )
+                .ReturnsAsync(dtos);
 
             // Act
             var result = await _controller.GetAllTheses("Reviewing", null, null, null, null, false);
@@ -113,7 +128,8 @@ namespace FCTMS.Tests.Controllers
         {
             // Arrange
             var req = new UpdateThesisDTO { Title = "Test" };
-            _mockThesisService.Setup(x => x.UpdateThesisAsync("1", req, "student@fpt.edu.vn"))
+            _mockThesisService
+                .Setup(x => x.UpdateThesisAsync("1", req, "student@fpt.edu.vn"))
                 .ThrowsAsync(new UnauthorizedAccessException("Not allowed"));
 
             // Act
@@ -130,8 +146,9 @@ namespace FCTMS.Tests.Controllers
             // Arrange
             var req = new UpdateThesisDTO { Title = "Test" };
             var returnedDto = new ThesisDTO { ThesisId = "1", Title = "Test" };
-            
-            _mockThesisService.Setup(x => x.UpdateThesisAsync("1", req, "student@fpt.edu.vn"))
+
+            _mockThesisService
+                .Setup(x => x.UpdateThesisAsync("1", req, "student@fpt.edu.vn"))
                 .ReturnsAsync(returnedDto);
 
             // Act
@@ -140,8 +157,12 @@ namespace FCTMS.Tests.Controllers
             // Assert
             var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
             // anonymous type { Message, Data }
-            okResult.Value!.GetType().GetProperty("Data")!.GetValue(okResult.Value, null)
-                .Should().Be(returnedDto);
+            okResult
+                .Value!.GetType()
+                .GetProperty("Data")!
+                .GetValue(okResult.Value, null)
+                .Should()
+                .Be(returnedDto);
         }
 
         [Fact]
@@ -152,54 +173,91 @@ namespace FCTMS.Tests.Controllers
             {
                 new Claim(ClaimTypes.Email, "reviewer@fpt.edu.vn"),
                 new Claim(ClaimTypes.NameIdentifier, "2"), // reviewer userId
-                new Claim("IsReviewer", "true")
+                new Claim("IsReviewer", "true"),
             };
             var identity = new ClaimsIdentity(claims, "TestAuthType");
             _controller.ControllerContext = new ControllerContext
             {
-                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
+                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) },
             };
 
-            var dto = new ReviewSubmissionDTO { Status = "Approve", Comment = "Looks good" };
-            var returnedDto = new ThesisDTO { Status = "Reviewing" };
-            _mockThesisService.Setup(x => x.SubmitReviewAsync("guid-1", dto, "reviewer@fpt.edu.vn")).ReturnsAsync(returnedDto);
+            var dto = new SubmitThesisDecisionDTO { Decision = "Pass" };
+            var returnedResult = new ThesisReviewStatusDTO { OverallStatus = "Published" };
+
+            _mockThesisService
+                .Setup(x => x.SubmitReviewerDecisionAsync("guid-1", 2, dto))
+                .ReturnsAsync(returnedResult);
 
             // Act
             var result = await _controller.SubmitReviewerDecision("guid-1", dto);
 
             // Assert
             var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-            _mockThesisService.Verify(x => x.SubmitReviewAsync("guid-1", dto, "reviewer@fpt.edu.vn"), Times.Once);
+            okResult.Value.Should().Be(returnedResult);
+            _mockThesisService.Verify(
+                x => x.SubmitReviewerDecisionAsync("guid-1", 2, dto),
+                Times.Once
+            );
         }
 
         [Fact]
         public async Task SubmitReviewerDecision_ShouldReturnBadRequest_WhenArgumentInvalid()
         {
-            var claims = new List<Claim> { new Claim(ClaimTypes.Email, "r@fpt.edu.vn"), new Claim(ClaimTypes.NameIdentifier, "2") };
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Email, "r@fpt.edu.vn"),
+                new Claim(ClaimTypes.NameIdentifier, "2"),
+            };
             _controller.ControllerContext = new ControllerContext
             {
-                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test")) }
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test")),
+                },
             };
 
-            var result = await _controller.ReviewThesis("guid-1", new ReviewSubmissionDTO { Status = "Invalid" });
+            var dto = new SubmitThesisDecisionDTO { Decision = "Invalid" };
+            _mockThesisService
+                .Setup(x =>
+                    x.SubmitReviewerDecisionAsync(
+                        It.IsAny<string>(),
+                        It.IsAny<int>(),
+                        It.IsAny<SubmitThesisDecisionDTO>()
+                    )
+                )
+                .ThrowsAsync(new ArgumentException("Invalid decision"));
+
+            var result = await _controller.SubmitReviewerDecision("guid-1", dto);
 
             result.Should().BeOfType<BadRequestObjectResult>();
-            _mockThesisService.Verify(x => x.SubmitReviewAsync(It.IsAny<string>(), It.IsAny<ReviewSubmissionDTO>(), It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
         public async Task SubmitReviewerDecision_ShouldReturnNotFound_WhenThesisNotFound()
         {
-            var claims = new List<Claim> { new Claim(ClaimTypes.Email, "r@fpt.edu.vn"), new Claim(ClaimTypes.NameIdentifier, "2") };
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Email, "r@fpt.edu.vn"),
+                new Claim(ClaimTypes.NameIdentifier, "2"),
+            };
             _controller.ControllerContext = new ControllerContext
             {
-                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test")) }
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(claims, "Test")),
+                },
             };
 
-            _mockThesisService.Setup(x => x.SubmitReviewAsync("missing", It.IsAny<ReviewSubmissionDTO>(), "r@fpt.edu.vn"))
+            _mockThesisService
+                .Setup(x =>
+                    x.SubmitReviewerDecisionAsync("missing", 2, It.IsAny<SubmitThesisDecisionDTO>())
+                )
                 .ThrowsAsync(new KeyNotFoundException("Thesis not found"));
 
-            var result = await _controller.ReviewThesis("missing", new ReviewSubmissionDTO { Status = "Reject", Comment = "Bad" });
+            var result = await _controller.SubmitReviewerDecision(
+                "missing",
+                new SubmitThesisDecisionDTO { Decision = "Fail", Note = "Reason" }
+            );
 
             result.Should().BeOfType<NotFoundObjectResult>();
         }

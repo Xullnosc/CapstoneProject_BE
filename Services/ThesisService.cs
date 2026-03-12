@@ -20,7 +20,7 @@ namespace Services
         private readonly ICloudinaryHelper _cloudinaryHelper;
         private readonly ISemesterRepository _semesterRepository;
         private readonly ILecturerRepository _lecturerRepository;
-        private readonly IThesisReviewRepository _thesisReviewRepository;
+        private readonly ITeamInvitationRepository _teamInvitationRepository;
         private readonly IMapper _mapper;
 
         public ThesisService(
@@ -31,7 +31,7 @@ namespace Services
             ICloudinaryHelper cloudinaryHelper,
             ISemesterRepository semesterRepository,
             ILecturerRepository lecturerRepository,
-            IThesisReviewRepository thesisReviewRepository,
+            ITeamInvitationRepository teamInvitationRepository,
             IMapper mapper)
         {
             _thesisRepository = thesisRepository;
@@ -41,7 +41,7 @@ namespace Services
             _cloudinaryHelper = cloudinaryHelper;
             _semesterRepository = semesterRepository;
             _lecturerRepository = lecturerRepository;
-            _thesisReviewRepository = thesisReviewRepository;
+            _teamInvitationRepository = teamInvitationRepository;
             _mapper = mapper;
         }
 
@@ -86,8 +86,8 @@ namespace Services
             var thesis = new Thesis
             {
                 ThesisId = Guid.NewGuid().ToString(),
-                Title = string.IsNullOrWhiteSpace(req.Title) 
-                    ? System.IO.Path.GetFileNameWithoutExtension(req.File.FileName) 
+                Title = string.IsNullOrWhiteSpace(req.Title)
+                    ? System.IO.Path.GetFileNameWithoutExtension(req.File.FileName)
                     : req.Title.Trim(),
                 ShortDescription = req.ShortDescription,
                 UserId = user.UserId,
@@ -135,7 +135,7 @@ namespace Services
                         ReviewDate = DateTime.UtcNow
                     };
                     await _thesisReviewRepository.AddOrUpdateReviewAsync(autoReview);
-                    
+
                     // Reload and recalculate status
                     var reloaded = await _thesisRepository.GetThesisByIdWithHistoriesAsync(createdThesis.ThesisId);
                     if (reloaded != null)
@@ -303,20 +303,20 @@ namespace Services
             };
 
             await _thesisReviewRepository.AddOrUpdateReviewAsync(review);
-            
+
             // Reload and recalculate
             var updatedThesis = await _thesisRepository.GetThesisByIdWithHistoriesAsync(id);
             if (updatedThesis == null) throw new Exception("Failed to reload thesis after review.");
 
             await RecalculateThesisStatusAsync(updatedThesis);
-            
+
             return _mapper.Map<ThesisDTO>(updatedThesis);
         }
 
         private async Task RecalculateThesisStatusAsync(Thesis thesis)
         {
             var reviews = thesis.ThesisReviews.ToList();
-            
+
             // Recalculate global status
             // If we have at least 2 reviews
             if (reviews.Count >= 2)
@@ -378,7 +378,7 @@ namespace Services
                     // Add theses from teams that have a Pending mentor invitation for this lecturer
                     var pendingInvitations = await _teamInvitationRepository.GetPendingMentorInvitationsByMentorIdAsync(user.UserId);
                     var pendingTeamIds = pendingInvitations.Select(i => i.TeamId).Distinct().ToList();
-                    
+
                     var pendingLeaderIds = allTeams
                         .Where(t => pendingTeamIds.Contains(t.TeamId) && t.Status != CampusConstants.TeamStatus.Disbanded)
                         .Select(t => t.LeaderId)
@@ -407,7 +407,7 @@ namespace Services
 
             var currentSem = await _semesterRepository.GetCurrentSemesterAsync();
             var theses = await _thesisRepository.GetThesesByUserIdsAsync(ownerIds, currentSem?.SemesterId);
-            
+
             // Apply filtering in memory
             if (!string.IsNullOrWhiteSpace(status))
             {
