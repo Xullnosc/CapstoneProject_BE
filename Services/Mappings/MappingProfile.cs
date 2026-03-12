@@ -111,6 +111,10 @@ namespace Services.Mappings
             CreateMap<AccessLog, AccessLogDTO>()
                 .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.User != null ? src.User.FullName : null))
                 .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.User != null && src.User.Role != null ? src.User.Role.RoleName : null));
+
+            // Notification
+            CreateMap<Notification, NotificationDTO>()
+                .ForMember(dest => dest.IsRead, opt => opt.MapFrom(src => src.IsRead == true));
         }
     }
 }

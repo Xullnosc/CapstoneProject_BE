@@ -2,6 +2,7 @@ using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Repositories;
 using System;
 using System.Collections.Generic;
@@ -22,6 +23,8 @@ namespace Services
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
         private readonly IRedisService _redisService;
+        private readonly INotificationService _notificationService;
+        private readonly ILogger<MentorInvitationService> _logger;
 
         // Cache key helpers
         private static string MentorInvitationsKey(int mentorId) => $"mentor-invitations:{mentorId}";
@@ -39,7 +42,9 @@ namespace Services
             ILecturerRepository lecturerRepo,
             IEmailService emailService,
             IConfiguration configuration,
-            IRedisService redisService)
+            IRedisService redisService,
+            INotificationService notificationService,
+            ILogger<MentorInvitationService> logger)
         {
             _invitationRepo = invitationRepo;
             _teamRepo = teamRepo;
@@ -51,6 +56,8 @@ namespace Services
             _emailService = emailService;
             _configuration = configuration;
             _redisService = redisService;
+            _notificationService = notificationService;
+            _logger = logger;
         }
 
         public async Task<PagedResult<MentorInvitationDTO>> GetMentorInvitationsAsync(int mentorId, int pageIndex, int pageSize)
@@ -218,6 +225,15 @@ namespace Services
             
             // Reload with relations for mapping
             var loadedInvitation = await _invitationRepo.GetByIdAsync(created.InvitationId);
+
+            await TryCreateNotificationAsync(
+                mentor.UserId,
+                NotificationType.MentorChange.ToString(),
+                "New mentor invitation",
+                $"Team {team.TeamName} invited you to mentor them.",
+                "Team",
+                team.TeamId);
+
             return MapToDTO(loadedInvitation!);
         }
 
@@ -267,6 +283,14 @@ namespace Services
             // Invalidate cache after accepting
             await _redisService.DeleteValueAsync(MentorInvitationsKey(mentorId));
             await _redisService.DeleteValueAsync(MentorActiveCountKey(mentorId));
+
+            await TryCreateNotificationAsync(
+                invitation.InvitedBy,
+                NotificationType.MentorChange.ToString(),
+                "Mentor invitation accepted",
+                $"{invitation.Student?.FullName ?? "A mentor"} accepted the mentor invitation for team {team.TeamName}.",
+                "Team",
+                team.TeamId);
         }
 
         public async Task DeclineMentorInvitationAsync(int invitationId, int mentorId)
@@ -286,6 +310,15 @@ namespace Services
 
             // Invalidate invitation cache after declining
             await _redisService.DeleteValueAsync(MentorInvitationsKey(mentorId));
+
+            var team = await _teamRepo.GetByIdAsync(invitation.TeamId);
+            await TryCreateNotificationAsync(
+                invitation.InvitedBy,
+                NotificationType.MentorChange.ToString(),
+                "Mentor invitation declined",
+                $"{invitation.Student?.FullName ?? "A mentor"} declined the mentor invitation{(team == null ? string.Empty : $" for team {team.TeamName}")}.",
+                team == null ? null : "Team",
+                team?.TeamId);
         }
 
         public async Task CancelMentorInvitationAsync(int invitationId, int leaderId)
@@ -337,6 +370,25 @@ namespace Services
                 CreatedAt = entity.CreatedAt,
                 RespondedAt = entity.RespondedAt
             };
+        }
+
+        private async Task TryCreateNotificationAsync(int userId, string type, string title, string message, string? relatedEntityType, int? relatedEntityId)
+        {
+            try
+            {
+                await _notificationService.CreateNotificationAsync(
+                    userId,
+                    type,
+                    title,
+                    message,
+                    relatedEntityType,
+                    relatedEntityId,
+                    sendEmail: false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create mentor invitation notification. UserId: {UserId}, Type: {Type}", userId, type);
+            }
         }
     }
 }

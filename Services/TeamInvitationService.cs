@@ -6,6 +6,7 @@ using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Repositories;
 
 namespace Services
@@ -21,6 +22,8 @@ namespace Services
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
         private readonly ISemesterService _semesterService;
+        private readonly INotificationService _notificationService;
+        private readonly ILogger<TeamInvitationService> _logger;
 
         public TeamInvitationService(
             ITeamInvitationRepository invitationRepository,
@@ -31,7 +34,9 @@ namespace Services
             IWhitelistRepository whitelistRepository,
             IEmailService emailService,
             IConfiguration configuration,
-            ISemesterService semesterService
+            ISemesterService semesterService,
+            INotificationService notificationService,
+            ILogger<TeamInvitationService> logger
         )
         {
             _invitationRepository = invitationRepository;
@@ -43,6 +48,8 @@ namespace Services
             _emailService = emailService;
             _configuration = configuration;
             _semesterService = semesterService;
+            _notificationService = notificationService;
+            _logger = logger;
         }
 
         public async Task<List<TeamInvitationDTO>> GetMyInvitationsAsync(int studentId)
@@ -80,15 +87,32 @@ namespace Services
 
             // 7. Invalidate Semester Cache
             await _semesterService.InvalidateSemesterCacheAsync();
+
+            await TryCreateNotificationAsync(
+                invitation.InvitedBy,
+                NotificationType.TeamInvitation.ToString(),
+                "Invitation accepted",
+                $"{invitation.Student?.FullName ?? "A student"} accepted your invitation to join team {team.TeamName}.",
+                "Team",
+                team.TeamId);
         }
 
         public async Task DeclineInvitationAsync(int invitationId, int studentId)
         {
-            await ValidateInvitationAsync(invitationId, studentId);
+            var invitation = await ValidateInvitationAsync(invitationId, studentId);
             await _invitationRepository.UpdateStatusAsync(
                 invitationId,
                 CampusConstants.InvitationStatus.Declined
             );
+
+            var team = await _teamRepository.GetByIdAsync(invitation.TeamId);
+            await TryCreateNotificationAsync(
+                invitation.InvitedBy,
+                NotificationType.TeamInvitation.ToString(),
+                "Invitation declined",
+                $"{invitation.Student?.FullName ?? "A student"} declined your invitation{(team == null ? string.Empty : $" to join team {team.TeamName}")}.",
+                team == null ? null : "Team",
+                team?.TeamId);
         }
 
         public async Task<TeamInvitationDTO> SendInvitationAsync(
@@ -114,7 +138,7 @@ namespace Services
             // SearchUsersAsync uses 'Contains', we want exact match for invite
             var student = users.FirstOrDefault(u =>
                 u.Email.Equals(studentCodeOrEmail, StringComparison.OrdinalIgnoreCase)
-                || u.StudentCode.Equals(studentCodeOrEmail, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(u.StudentCode, studentCodeOrEmail, StringComparison.OrdinalIgnoreCase)
             );
 
             if (student == null)
@@ -222,6 +246,15 @@ namespace Services
 
             // Reload to get navigation props for DTO
             var fullInv = await _invitationRepository.GetByIdAsync(createdInv.InvitationId);
+
+            await TryCreateNotificationAsync(
+                student.UserId,
+                NotificationType.TeamInvitation.ToString(),
+                "New team invitation",
+                $"You have been invited by {fullInv?.InvitedByNavigation?.FullName ?? "a team leader"} to join team {team.TeamName}.",
+                "Team",
+                team.TeamId);
+
             return MapToDTO(fullInv!);
         }
 
@@ -363,6 +396,25 @@ namespace Services
                 Status = inv.Status,
                 CreatedAt = inv.CreatedAt ?? DateTime.UtcNow,
             };
+        }
+
+        private async Task TryCreateNotificationAsync(int userId, string type, string title, string message, string? relatedEntityType, int? relatedEntityId)
+        {
+            try
+            {
+                await _notificationService.CreateNotificationAsync(
+                    userId,
+                    type,
+                    title,
+                    message,
+                    relatedEntityType,
+                    relatedEntityId,
+                    sendEmail: false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create team invitation notification. UserId: {UserId}, Type: {Type}", userId, type);
+            }
         }
 
         #endregion

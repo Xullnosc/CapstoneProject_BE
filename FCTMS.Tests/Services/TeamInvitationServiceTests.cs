@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Xunit;
 using Microsoft.Extensions.Configuration; // Added
+using Microsoft.Extensions.Logging;
 using System.Linq; // Added
 
 namespace FCTMS.Tests.Services
@@ -24,6 +25,8 @@ namespace FCTMS.Tests.Services
         private readonly Mock<IEmailService> _mockEmailService; // Added
         private readonly Mock<IConfiguration> _mockConfiguration; // Added
         private readonly Mock<ISemesterService> _mockSemesterService;
+        private readonly Mock<INotificationService> _mockNotificationService;
+        private readonly Mock<ILogger<TeamInvitationService>> _mockLogger;
         private readonly TeamInvitationService _service;
 
         public TeamInvitationServiceTests()
@@ -37,6 +40,8 @@ namespace FCTMS.Tests.Services
             _mockEmailService = new Mock<IEmailService>(); // Added
             _mockConfiguration = new Mock<IConfiguration>(); // Added
             _mockSemesterService = new Mock<ISemesterService>();
+            _mockNotificationService = new Mock<INotificationService>();
+            _mockLogger = new Mock<ILogger<TeamInvitationService>>();
 
             // Setup Email Configuration Mocks
             // Email template is now hardcoded, no need to mock configuration for it.
@@ -51,7 +56,9 @@ namespace FCTMS.Tests.Services
                 _mockWhitelistRepository.Object,
                 _mockEmailService.Object,
                 _mockConfiguration.Object,
-                _mockSemesterService.Object
+                _mockSemesterService.Object,
+                _mockNotificationService.Object,
+                _mockLogger.Object
             );
         }
 
