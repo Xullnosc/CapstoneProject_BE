@@ -38,4 +38,10 @@ public class SystemUserCredentialDAO : ISystemUserCredentialDAO
         _context.SystemUserCredentials.Update(credential);
         await _context.SaveChangesAsync();
     }
+
+    public async Task DeleteAsync(SystemUserCredential credential)
+    {
+        _context.SystemUserCredentials.Remove(credential);
+        await _context.SaveChangesAsync();
+    }
 }

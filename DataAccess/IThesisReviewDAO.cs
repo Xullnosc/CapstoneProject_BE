@@ -1,5 +1,5 @@
-using BusinessObjects.DTOs;
 using BusinessObjects.Models;
+using BusinessObjects.DTOs;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -7,6 +7,9 @@ namespace DataAccess;
 
 public interface IThesisReviewDAO
 {
+    Task AddOrUpdateReviewAsync(ThesisReview review);
+    Task<ThesisReview?> GetReviewByThesisAndReviewerAsync(string thesisId, int reviewerId);
+
     Task<List<ThesisReviewerAssignment>> ReplaceAssignmentsAsync(string thesisId, IEnumerable<int> reviewerIds, int? assignedBy);
     Task<List<ThesisReviewerAssignment>> GetAssignmentsAsync(string thesisId);
 
@@ -18,4 +21,3 @@ public interface IThesisReviewDAO
 
     Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId);
 }
-

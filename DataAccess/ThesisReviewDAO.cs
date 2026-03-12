@@ -17,6 +17,36 @@ public class ThesisReviewDAO : IThesisReviewDAO
         _context = context;
     }
 
+    public async Task AddOrUpdateReviewAsync(ThesisReview review)
+    {
+        var existing = await _context.ThesisReviews
+            .FirstOrDefaultAsync(r => r.ThesisId == review.ThesisId && r.ReviewerId == review.ReviewerId);
+
+        if (existing == null)
+        {
+            _context.ThesisReviews.Add(review);
+        }
+        else
+        {
+            existing.Status = review.Status;
+            existing.Comment = review.Comment;
+            if (review.FileUrl != null)
+            {
+                existing.FileUrl = review.FileUrl;
+            }
+            existing.ReviewDate = System.DateTime.UtcNow;
+            _context.Entry(existing).State = EntityState.Modified;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<ThesisReview?> GetReviewByThesisAndReviewerAsync(string thesisId, int reviewerId)
+    {
+        return await _context.ThesisReviews
+            .FirstOrDefaultAsync(r => r.ThesisId == thesisId && r.ReviewerId == reviewerId);
+    }
+
     public async Task<List<ThesisReviewerAssignment>> ReplaceAssignmentsAsync(string thesisId, IEnumerable<int> reviewerIds, int? assignedBy)
     {
         // Reviewer assignment is derived from Team.MentorId/MentorId2 now.
@@ -205,4 +235,3 @@ public class ThesisReviewDAO : IThesisReviewDAO
         return status;
     }
 }
-

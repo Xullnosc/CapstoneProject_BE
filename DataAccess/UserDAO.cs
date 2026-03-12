@@ -53,6 +53,12 @@ namespace DataAccess
             await _context.Entry(user).Reference(u => u.Role).LoadAsync();
         }
 
+        public async Task DeleteAsync(User user)
+        {
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<List<User>> SearchUsersAsync(string term)
         {
             return await _context.Users

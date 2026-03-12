@@ -13,7 +13,7 @@ namespace Repositories
         Task UpdateThesisAsync(Thesis thesis);
 
         // New methods for Phase 02
-        Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false);
+        Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false, int? excludeUserId = null);
 
         Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id);
         Task AddThesisHistoryAsync(ThesisHistory history);

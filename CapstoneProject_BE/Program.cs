@@ -137,7 +137,6 @@ builder.Services.AddScoped<IAccessLogDAO, AccessLogDAO>();
 builder.Services.AddScoped<IImportDAO, ImportDAO>();
 builder.Services.AddScoped<INotificationDAO, NotificationDAO>();
 
-
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ISystemUserCredentialRepository, SystemUserCredentialRepository>();
@@ -156,7 +155,6 @@ builder.Services.AddScoped<ILecturerRepository, LecturerRepository>();
 builder.Services.AddScoped<IAccessLogRepository, AccessLogRepository>();
 builder.Services.AddScoped<IImportRepository, ImportRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
-
 
 //Middleware
 // AutoMapper

@@ -91,7 +91,7 @@ namespace DataAccess
 
         // ─── Phase 02: New Methods ───────────────────────────────────────────────
 
-        public async Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false)
+        public async Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false, int? excludeUserId = null)
         {
             var query = _context.Theses
                 .AsNoTracking()
@@ -104,6 +104,9 @@ namespace DataAccess
 
             if (userId.HasValue)
                 query = query.Where(t => t.UserId == userId.Value);
+
+            if (excludeUserId.HasValue)
+                query = query.Where(t => t.UserId != excludeUserId.Value);
 
             if (semesterId.HasValue)
                 query = query.Where(t => t.SemesterId == semesterId.Value);
@@ -122,9 +125,10 @@ namespace DataAccess
             if (string.IsNullOrEmpty(id)) return null;
 
             var thesis = await _context.Theses
-                .AsNoTracking()
                 .Include(t => t.User)
-                .Include(t => t.ThesisHistories) // Explicitly included
+                .Include(t => t.ThesisHistories)
+                .Include(t => t.ThesisReviews)
+                    .ThenInclude(r => r.Reviewer)
                 .FirstOrDefaultAsync(t => t.ThesisId == id);
 
             if (thesis != null && thesis.ThesisHistories != null)

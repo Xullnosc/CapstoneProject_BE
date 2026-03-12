@@ -15,6 +15,12 @@ public class ThesisReviewRepository : IThesisReviewRepository
         _dao = dao;
     }
 
+    public Task AddOrUpdateReviewAsync(ThesisReview review)
+        => _dao.AddOrUpdateReviewAsync(review);
+
+    public Task<ThesisReview?> GetReviewByThesisAndReviewerAsync(string thesisId, int reviewerId)
+        => _dao.GetReviewByThesisAndReviewerAsync(thesisId, reviewerId);
+
     public Task<List<ThesisReviewerAssignment>> ReplaceAssignmentsAsync(string thesisId, IEnumerable<int> reviewerIds, int? assignedBy)
         => _dao.ReplaceAssignmentsAsync(thesisId, reviewerIds, assignedBy);
 
@@ -36,4 +42,3 @@ public class ThesisReviewRepository : IThesisReviewRepository
     public Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId)
         => _dao.GetReviewStatusAsync(thesisId);
 }
-

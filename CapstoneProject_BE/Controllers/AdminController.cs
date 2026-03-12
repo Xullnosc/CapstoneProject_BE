@@ -82,5 +82,63 @@ public class AdminController : ControllerBase
             return StatusCode(500, new { message = ex.Message });
         }
     }
+    
+    [HttpDelete("hod/{userId}")]
+    public async Task<IActionResult> DeleteHod(int userId)
+    {
+        try
+        {
+            await _adminService.DeleteHodAsync(userId);
+            return Ok(new { message = "HOD account deleted successfully." });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting HOD");
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
 
+    [HttpPut("hod/{userId}/email")]
+    public async Task<IActionResult> UpdateHodEmail(int userId, [FromBody] UpdateEmailDTO dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto?.Email))
+                return BadRequest(new { message = "Email is required." });
+
+            await _adminService.UpdateHodEmailAsync(userId, dto.Email);
+            return Ok(new { message = "HOD email updated successfully." });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating HOD email");
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+}
+
+public class UpdateEmailDTO
+{
+    public string Email { get; set; } = null!;
 }
