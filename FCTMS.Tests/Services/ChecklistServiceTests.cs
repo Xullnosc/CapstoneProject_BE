@@ -2,6 +2,7 @@ using AutoMapper;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Repositories;
 using Services;
@@ -16,13 +17,27 @@ namespace FCTMS.Tests.Services
     {
         private readonly Mock<IChecklistRepository> _mockRepository;
         private readonly Mock<IMapper> _mockMapper;
+        private readonly Mock<ISemesterRepository> _mockSemesterRepository;
+        private readonly Mock<ITeamRepository> _mockTeamRepository;
+        private readonly Mock<INotificationService> _mockNotificationService;
+        private readonly Mock<ILogger<ChecklistService>> _mockLogger;
         private readonly ChecklistService _service;
 
         public ChecklistServiceTests()
         {
             _mockRepository = new Mock<IChecklistRepository>();
             _mockMapper = new Mock<IMapper>();
-            _service = new ChecklistService(_mockRepository.Object, _mockMapper.Object);
+            _mockSemesterRepository = new Mock<ISemesterRepository>();
+            _mockTeamRepository = new Mock<ITeamRepository>();
+            _mockNotificationService = new Mock<INotificationService>();
+            _mockLogger = new Mock<ILogger<ChecklistService>>();
+            _service = new ChecklistService(
+                _mockRepository.Object,
+                _mockMapper.Object,
+                _mockSemesterRepository.Object,
+                _mockTeamRepository.Object,
+                _mockNotificationService.Object,
+                _mockLogger.Object);
         }
 
         [Fact]
