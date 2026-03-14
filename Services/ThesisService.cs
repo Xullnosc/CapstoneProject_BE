@@ -351,7 +351,7 @@ namespace Services
             var decision = (dto.Decision ?? "").Trim();
             if (!string.Equals(decision, "Pass", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("Decision must be Pass or Fail.");
+                throw new ArgumentException("Invalid decision");
 
             if (string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase)
                 && string.IsNullOrWhiteSpace(dto.Comment))
@@ -411,7 +411,7 @@ namespace Services
             var decision = (dto.Decision ?? "").Trim();
             if (!string.Equals(decision, "Pass", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("Decision must be Pass or Fail.");
+                throw new ArgumentException("Invalid decision");
 
             if (string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase)
                 && string.IsNullOrWhiteSpace(dto.Comment))

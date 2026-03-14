@@ -281,7 +281,7 @@ namespace Services
 
                 if (conflictingUser != null)
                 {
-                    MarkItem(item, conflictingUser.Role?.RoleName ?? $"RoleId {conflictingUser.RoleId}", "Users table contains this email or student code under a non-student role.");
+                    MarkItem(item, conflictingUser.Role?.RoleName ?? $"RoleId {conflictingUser.RoleId}", "Role conflict");
                     continue;
                 }
 
@@ -291,7 +291,7 @@ namespace Services
 
                 if (conflictingWhitelist != null)
                 {
-                    MarkItem(item, conflictingWhitelist.Role?.RoleName ?? $"RoleId {conflictingWhitelist.RoleId}", "Whitelist already contains this email or student code under a non-student role.");
+                    MarkItem(item, conflictingWhitelist.Role?.RoleName ?? $"RoleId {conflictingWhitelist.RoleId}", "Role conflict");
                 }
             }
         }
