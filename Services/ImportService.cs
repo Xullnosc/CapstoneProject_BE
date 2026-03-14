@@ -68,9 +68,20 @@ namespace Services
 
             var preparedResult = await PrepareImportResultAsync(importResult, uploaderEmail);
 
-            if (preparedResult.Items.Any(item => item.IsMarked))
+            // Filter out marked (conflicting) items — they'll appear in errors but won't block the rest
+            var markedItems = preparedResult.Items.Where(item => item.IsMarked).ToList();
+            if (markedItems.Any())
             {
-                throw new InvalidOperationException("Import contains records marked with conflicting non-student roles. Resolve them before saving.");
+                foreach (var marked in markedItems)
+                {
+                    preparedResult.Errors.Add(new ImportError
+                    {
+                        Row = marked.RowNumber,
+                        Column = "Email/StudentCode",
+                        Message = $"Skipped: {marked.MarkedReason} (Existing role: {marked.ExistingRole})"
+                    });
+                }
+                preparedResult.Items = preparedResult.Items.Where(item => !item.IsMarked).ToList();
             }
 
             var items = preparedResult.Items ?? new List<WhitelistImportDTO>();
@@ -270,7 +281,7 @@ namespace Services
 
                 if (conflictingUser != null)
                 {
-                    MarkItem(item, conflictingUser.Role?.RoleName ?? $"RoleId {conflictingUser.RoleId}", "Users table contains this email or student code under a non-student role.");
+                    MarkItem(item, conflictingUser.Role?.RoleName ?? $"RoleId {conflictingUser.RoleId}", "Role conflict");
                     continue;
                 }
 
@@ -280,7 +291,7 @@ namespace Services
 
                 if (conflictingWhitelist != null)
                 {
-                    MarkItem(item, conflictingWhitelist.Role?.RoleName ?? $"RoleId {conflictingWhitelist.RoleId}", "Whitelist already contains this email or student code under a non-student role.");
+                    MarkItem(item, conflictingWhitelist.Role?.RoleName ?? $"RoleId {conflictingWhitelist.RoleId}", "Role conflict");
                 }
             }
         }

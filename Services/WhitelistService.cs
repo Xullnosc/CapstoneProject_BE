@@ -9,11 +9,13 @@ namespace Services
     {
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly IRedisService _redisService;
+        private readonly ILecturerRepository _lecturerRepository;
 
-        public WhitelistService(IWhitelistRepository whitelistRepository, IRedisService redisService)
+        public WhitelistService(IWhitelistRepository whitelistRepository, IRedisService redisService, ILecturerRepository lecturerRepository)
         {
             _whitelistRepository = whitelistRepository;
             _redisService = redisService;
+            _lecturerRepository = lecturerRepository;
         }
 
         public async Task<IEnumerable<Whitelist>> GetWhitelistByRoleAsync(int roleId)
@@ -29,8 +31,27 @@ namespace Services
                 throw new KeyNotFoundException($"Whitelist entry with ID {whitelistId} not found.");
             }
 
-            whitelist.IsReviewer = isReviewer;
-            await _whitelistRepository.UpdateAsync(whitelist);
+            // Move the IsReviewer status logic to the Lecturer table
+            var lecturer = await _lecturerRepository.GetByEmailAsync(whitelist.Email);
+            if (lecturer != null)
+            {
+                lecturer.IsReviewer = isReviewer;
+                await _lecturerRepository.UpdateAsync(lecturer);
+            }
+            else if (isReviewer)
+            {
+                // If they don't exist in Lecturer yet but are being assigned as reviewer, 
+                // we should create a basic lecturer entry for them.
+                var newLecturer = new Lecturer
+                {
+                    Email = whitelist.Email,
+                    FullName = whitelist.FullName ?? "New Lecturer",
+                    Campus = whitelist.Campus ?? "N/A",
+                    IsReviewer = true,
+                    IsActive = true
+                };
+                await _lecturerRepository.AddAsync(newLecturer);
+            }
 
             await InvalidateCache(whitelist.SemesterId);
         }
@@ -53,7 +74,7 @@ namespace Services
             existing.Campus = whitelist.Campus;
             existing.StudentCode = whitelist.StudentCode;
             existing.RoleId = whitelist.RoleId;
-            existing.IsReviewer = whitelist.IsReviewer;
+            // existing.IsReviewer = whitelist.IsReviewer; // Property removed from models
             existing.Avatar = whitelist.Avatar;
 
             await _whitelistRepository.UpdateAsync(existing);

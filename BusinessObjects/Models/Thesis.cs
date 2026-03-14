@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace BusinessObjects.Models;
@@ -44,5 +44,5 @@ public partial class Thesis
 
     public virtual ICollection<ThesisHistory> ThesisHistories { get; set; } = new List<ThesisHistory>();
 
-    public virtual ICollection<ThesisReview> ThesisReviews { get; set; } = new List<ThesisReview>();
+    public virtual ThesisReview? ThesisReview { get; set; }
 }

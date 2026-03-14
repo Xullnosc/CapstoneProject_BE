@@ -125,7 +125,7 @@ namespace FCTMS.Tests.Services
         }
 
         [Fact]
-        public async Task SaveWhitelistBatchAsync_MarkedConflict_ThrowsAndDoesNotSave()
+        public async Task SaveWhitelistBatchAsync_MarkedConflict_SkipsAndAddsError()
         {
             using var context = CreateContext();
             SeedUploader(context);
@@ -152,19 +152,20 @@ namespace FCTMS.Tests.Services
                         Email = "lecturer@example.com",
                         FullName = "Conflict User",
                         StudentCode = "ST099",
-                        SemesterCode = "SP25"
+                        SemesterCode = "SP25",
+                        IsMarked = true,
+                        MarkedReason = "Role conflict",
+                        ExistingRole = "Lecturer"
                     }
                 },
                 Errors = new List<ImportError>()
             };
 
-            Func<Task> act = async () => await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
-
-            await act.Should().ThrowAsync<InvalidOperationException>()
-                .WithMessage("*marked with conflicting non-student roles*");
+            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
 
             context.Whitelists.Should().BeEmpty();
             context.Users.Count(user => user.Email == "lecturer@example.com").Should().Be(1);
+            importResult.Errors.Should().ContainSingle(e => e.Message.Contains("Skipped") && e.Message.Contains("Role conflict"));
         }
 
         [Fact]

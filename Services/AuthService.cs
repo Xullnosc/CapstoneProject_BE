@@ -19,6 +19,7 @@ public class AuthService : IAuthService
     private readonly IConfiguration _configuration;
     private readonly HttpClient _httpClient;
     private readonly IAccessLogRepository _accessLogRepository;
+    private readonly ILecturerRepository _lecturerRepository;
 
     public AuthService(
         IUserRepository userRepository,
@@ -28,7 +29,8 @@ public class AuthService : IAuthService
         IMapper mapper,
         IConfiguration configuration,
         HttpClient httpClient,
-        IAccessLogRepository accessLogRepository
+        IAccessLogRepository accessLogRepository,
+        ILecturerRepository lecturerRepository
     )
     {
         _userRepository = userRepository;
@@ -39,6 +41,7 @@ public class AuthService : IAuthService
         _configuration = configuration;
         _httpClient = httpClient;
         _accessLogRepository = accessLogRepository;
+        _lecturerRepository = lecturerRepository;
     }
 
     public async Task<LoginResultDTO> GoogleLoginAsync(LoginRequestDTO request)
@@ -184,7 +187,13 @@ public class AuthService : IAuthService
                 // 5. Generate JWT Token
                 var jwtSettings = GetJwtSettings();
 
-                var isReviewer = whitelistEntry?.IsReviewer ?? false;
+                // Fetch IsReviewer from Lecturers table if applicable
+                bool isReviewer = false;
+                if (user.Role?.RoleName == CampusConstants.Roles.Lecturer)
+                {
+                    var lecturer = await _lecturerRepository.GetByEmailAsync(user.Email);
+                    isReviewer = lecturer?.IsReviewer ?? false;
+                }
 
                 var accessToken = JwtTokenGenerator.GenerateToken(user, isReviewer, jwtSettings);
                 var (refreshToken, refreshExpiresAt) = await CreateRefreshTokenAndSaveAsync(user.UserId);
@@ -302,7 +311,16 @@ public class AuthService : IAuthService
             return null;
 
         var jwtSettings = GetJwtSettings();
-        var accessToken = JwtTokenGenerator.GenerateToken(user, user.Role.RoleName == CampusConstants.Roles.Lecturer && false, jwtSettings);
+        
+        // Determine IsReviewer for refresh token
+        bool isReviewer = false;
+        if (user.Role.RoleName == CampusConstants.Roles.Lecturer)
+        {
+            var lecturer = await _lecturerRepository.GetByEmailAsync(user.Email);
+            isReviewer = lecturer?.IsReviewer ?? false;
+        }
+
+        var accessToken = JwtTokenGenerator.GenerateToken(user, isReviewer, jwtSettings);
         var (newRefreshToken, newRefreshExpiresAt) = await CreateRefreshTokenAndSaveAsync(user.UserId);
 
         return new RefreshResultDTO

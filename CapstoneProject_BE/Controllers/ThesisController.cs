@@ -124,12 +124,9 @@ namespace CapstoneProject_BE.Controllers
                 int? excludeUserId = null;
                 var roleClaim = User.FindFirst(ClaimTypes.Role) ?? User.FindFirst("role");
                 var nameIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-
+                
                 // If it's a lecturer/reviewer, exclude their own proposals from the list
-                if (
-                    roleClaim?.Value == BusinessObjects.CampusConstants.Roles.Lecturer
-                    && nameIdClaim != null
-                )
+                if (roleClaim?.Value == BusinessObjects.CampusConstants.Roles.Lecturer && nameIdClaim != null)
                 {
                     if (int.TryParse(nameIdClaim.Value, out int currentUserId))
                     {
@@ -137,15 +134,7 @@ namespace CapstoneProject_BE.Controllers
                     }
                 }
 
-                var theses = await _thesisService.GetFilteredThesesAsync(
-                    status,
-                    userId,
-                    searchTitle,
-                    semesterId,
-                    isLocked,
-                    lecturerOnly,
-                    excludeUserId
-                );
+                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle, semesterId, isLocked, lecturerOnly, excludeUserId);
                 return Ok(theses);
             }
             catch (Exception ex)
@@ -219,10 +208,7 @@ namespace CapstoneProject_BE.Controllers
         /// </summary>
         [HttpPut("{id}/reviewers")]
         [Authorize(Policy = "HodOrAdmin")]
-        public async Task<IActionResult> AssignReviewers(
-            string id,
-            [FromBody] AssignThesisReviewersDTO dto
-        )
+        public async Task<IActionResult> AssignReviewers(string id, [FromBody] AssignThesisReviewersDTO dto)
         {
             try
             {
@@ -249,27 +235,20 @@ namespace CapstoneProject_BE.Controllers
 
         /// <summary>
         /// PUT /api/thesis/{id}/review
-        /// Reviewer only: submit reviewer decision (Pass/Fail). If Fail, note is required.
+        /// Reviewer only: submit reviewer decision (Pass/Fail). If Fail, comment is required.
         /// Auto-finalize when all reviewers agree. If split, require HOD decision.
         /// MUST be declared before PUT "{id}" so that /review is matched correctly.
         /// </summary>
         [HttpPut("{id}/review")]
         [Authorize] // temporarily allow any authenticated user; policy-level checks moved into service logic
-        public async Task<IActionResult> SubmitReviewerDecision(
-            string id,
-            [FromBody] SubmitThesisDecisionDTO dto
-        )
+        public async Task<IActionResult> SubmitReviewerDecision(string id, [FromForm] SubmitThesisDecisionDTO dto)
         {
             try
             {
                 var userId = GetUserId();
-                Console.WriteLine(
-                    $"[ThesisReview] SubmitReviewerDecision START - UserId={userId}, ThesisId={id}, Decision={dto?.Decision}"
-                );
+                Console.WriteLine($"[ThesisReview] SubmitReviewerDecision START - UserId={userId}, ThesisId={id}, Decision={dto?.Decision}");
                 var status = await _thesisService.SubmitReviewerDecisionAsync(id, userId, dto);
-                Console.WriteLine(
-                    $"[ThesisReview] SubmitReviewerDecision OK - UserId={userId}, ThesisId={id}, OverallStatus={status.OverallStatus}"
-                );
+                Console.WriteLine($"[ThesisReview] SubmitReviewerDecision OK - UserId={userId}, ThesisId={id}, OverallStatus={status.OverallStatus}");
                 return Ok(status);
             }
             catch (UnauthorizedAccessException ex)
@@ -297,14 +276,11 @@ namespace CapstoneProject_BE.Controllers
         /// <summary>
         /// PUT /api/thesis/{id}/hod-decision
         /// HOD: submit final decision when reviewers are split (1 pass / 1 fail).
-        /// If Fail, note is required.
+        /// If Fail, comment is required.
         /// </summary>
         [HttpPut("{id}/hod-decision")]
         [Authorize(Policy = "HodOrAdmin")]
-        public async Task<IActionResult> SubmitHodDecision(
-            string id,
-            [FromBody] SubmitThesisDecisionDTO dto
-        )
+        public async Task<IActionResult> SubmitHodDecision(string id, [FromBody] SubmitThesisDecisionDTO dto)
         {
             try
             {

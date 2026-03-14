@@ -4,41 +4,24 @@ namespace BusinessObjects.Models;
 
 public partial class ThesisReview
 {
-    public long Id { get; set; }
     public string ThesisId { get; set; } = null!;
-    public int ReviewerId { get; set; }
-    public string Decision { get; set; } = null!; // Pass | Fail
-    public string? Note { get; set; }
-    public DateTime ReviewedAt { get; set; }
 
-    // Backward compatibility aliases for older workflow code.
-    public int ReviewId
-    {
-        get => (int)Id;
-        set => Id = value;
-    }
+    public int? Reviewer1Id { get; set; }
+    public int? Reviewer2Id { get; set; }
 
-    public string Status
-    {
-        get => Decision;
-        set => Decision = value;
-    }
+    public string? Reviewer1Decision { get; set; }
+    public string? Reviewer2Decision { get; set; }
 
-    public string? Comment
-    {
-        get => Note;
-        set => Note = value;
-    }
+    public string? Reviewer1Comment { get; set; }
+    public string? Reviewer2Comment { get; set; }
 
-    public DateTime? ReviewDate
-    {
-        get => ReviewedAt;
-        set => ReviewedAt = value ?? ReviewedAt;
-    }
+    public string? Reviewer1FileUrl { get; set; }
+    public string? Reviewer2FileUrl { get; set; }
 
-    public string? FileUrl { get; set; }
+    public DateTime? Reviewer1Date { get; set; }
+    public DateTime? Reviewer2Date { get; set; }
 
     public virtual Thesis Thesis { get; set; } = null!;
-
-    public virtual Lecturer Reviewer { get; set; } = null!;
+    public virtual Lecturer? Reviewer1 { get; set; }
+    public virtual Lecturer? Reviewer2 { get; set; }
 }
