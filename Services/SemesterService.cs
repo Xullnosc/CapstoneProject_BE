@@ -497,7 +497,7 @@ namespace Services
                 }
             }
 
-            // 2. Fetch Avatars for all collected whitelists (Directly from database)
+            // 2. Fetch Avatars and Reviewer status for all collected whitelists (Directly from database)
             var emails = allWhitelists
                 .Where(w => !string.IsNullOrWhiteSpace(w.Email))
                 .Select(w => w.Email.Trim())
@@ -513,11 +513,24 @@ namespace Services
                     .GroupBy(u => u.Email!.Trim(), StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Key, g => g.First().Avatar, StringComparer.OrdinalIgnoreCase);
 
+                var lecturers = await _lecturerRepository.GetActiveLecturersAsync();
+                var reviewerDict = lecturers
+                    .Where(l => !string.IsNullOrEmpty(l.Email))
+                    .ToDictionary(l => l.Email.Trim(), l => l.IsReviewer, StringComparer.OrdinalIgnoreCase);
+
                 foreach (var wl in allWhitelists)
                 {
-                    if (!string.IsNullOrWhiteSpace(wl.Email) && avatarDict.TryGetValue(wl.Email.Trim(), out var avatar))
+                    if (!string.IsNullOrWhiteSpace(wl.Email))
                     {
-                        wl.Avatar = avatar;
+                        var trimmedEmail = wl.Email.Trim();
+                        if (avatarDict.TryGetValue(trimmedEmail, out var avatar))
+                        {
+                            wl.Avatar = avatar;
+                        }
+                        if (reviewerDict.TryGetValue(trimmedEmail, out var isReviewer))
+                        {
+                            wl.IsReviewer = isReviewer;
+                        }
                     }
                 }
             }

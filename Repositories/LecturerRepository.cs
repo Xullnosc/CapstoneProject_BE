@@ -1,4 +1,5 @@
 using BusinessObjects.Models;
+using BusinessObjects.DTOs;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -26,6 +27,11 @@ namespace Repositories
         public async Task<Lecturer?> GetByEmailAsync(string email)
         {
             return await _lecturerDAO.GetByEmailAsync(email);
+        }
+
+        public async Task<PagedResult<Lecturer>> GetByCampusAsync(string campus, int pageIndex, int pageSize)
+        {
+            return await _lecturerDAO.GetByCampusAsync(campus, pageIndex, pageSize);
         }
 
         public async Task<IEnumerable<Lecturer>> GetActiveLecturersAsync()

@@ -67,6 +67,12 @@ namespace Services
                 existingForm.UploadedBy = user.UserId;
                 existingForm.UpdatedAt = DateTime.UtcNow;
 
+                // Clear navigation properties to prevent EF Core tracking conflict 
+                // since existingForm was fetched AsNoTracking 
+                // and the Context is already tracking the user object.
+                existingForm.Uploader = null!;
+                existingForm.Histories = null!;
+
                 await _thesisFormRepository.UpdateFormAsync(existingForm);
                 formId = existingForm.Id;
             }

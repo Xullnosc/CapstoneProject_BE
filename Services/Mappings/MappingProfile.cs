@@ -26,7 +26,6 @@ namespace Services.Mappings
             CreateMap<Whitelist, WhitelistDTO>()
                 .ForMember(dest => dest.RoleId, opt => opt.MapFrom(src => src.RoleId))
                 .ForMember(dest => dest.RoleName, opt => opt.MapFrom(src => src.Role != null ? src.Role.RoleName : null))
-                .ForMember(dest => dest.IsReviewer, opt => opt.MapFrom(src => src.IsReviewer))
                 .ForMember(dest => dest.Avatar, opt => opt.MapFrom(src => src.Avatar))
                 .ForMember(dest => dest.Campus, opt => opt.MapFrom(src => CampusConstants.MapCodeToFullName(src.Campus)))
                 .ForMember(dest => dest.StudentCode, opt => opt.MapFrom(src => src.StudentCode))
@@ -96,12 +95,32 @@ namespace Services.Mappings
             CreateMap<Thesis, ThesisDTO>()
                 .ForMember(dest => dest.OwnerName, opt => opt.MapFrom(src => src.User != null ? src.User.FullName : null))
                 .ForMember(dest => dest.OwnerEmail, opt => opt.MapFrom(src => src.User != null ? src.User.Email : null))
-                .ForMember(dest => dest.Reviews, opt => opt.MapFrom(src => src.ThesisReviews))
+                .ForMember(dest => dest.Reviews, opt => opt.MapFrom(src => src.ThesisReview == null ? new List<ReviewDTO>() : new List<ReviewDTO>
+                {
+                    new ReviewDTO {
+                        ReviewerId = src.ThesisReview.Reviewer1Id,
+                        ReviewerName = src.ThesisReview.Reviewer1 != null ? src.ThesisReview.Reviewer1.FullName : null,
+                        Decision = src.ThesisReview.Reviewer1Decision ?? "Pending",
+                        Comment = src.ThesisReview.Reviewer1Comment,
+                        FileUrl = src.ThesisReview.Reviewer1FileUrl,
+                        ReviewedAt = src.ThesisReview.Reviewer1Date ?? DateTime.MinValue,
+                        ThesisId = src.ThesisId
+                    },
+                    new ReviewDTO {
+                        ReviewerId = src.ThesisReview.Reviewer2Id,
+                        ReviewerName = src.ThesisReview.Reviewer2 != null ? src.ThesisReview.Reviewer2.FullName : null,
+                        Decision = src.ThesisReview.Reviewer2Decision ?? "Pending",
+                        Comment = src.ThesisReview.Reviewer2Comment,
+                        FileUrl = src.ThesisReview.Reviewer2FileUrl,
+                        ReviewedAt = src.ThesisReview.Reviewer2Date ?? DateTime.MinValue,
+                        ThesisId = src.ThesisId
+                    }
+                }.Where(r => r.ReviewerId != null && r.ReviewerId != 0).ToList()))
                 .ForMember(dest => dest.Histories, opt => opt.MapFrom(src => src.ThesisHistories));
 
             // ThesisReview -> ReviewDTO
             CreateMap<ThesisReview, ReviewDTO>()
-                .ForMember(dest => dest.ReviewerName, opt => opt.MapFrom(src => src.Reviewer != null ? src.Reviewer.FullName : null));
+                .ForMember(dest => dest.ReviewerName, opt => opt.Ignore());
 
             // ThesisHistory → ThesisHistoryDTO
             CreateMap<ThesisHistory, ThesisHistoryDTO>()

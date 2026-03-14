@@ -28,6 +28,7 @@ namespace DataAccess
             return await _context.Theses
                 .AsNoTracking()
                 .Include(t => t.User)
+                .Include(t => t.ThesisReview)
                 .ToListAsync();
         }
 
@@ -53,6 +54,7 @@ namespace DataAccess
             return await _context.Theses
                 .AsNoTracking()
                 .Include(t => t.User)
+                .Include(t => t.ThesisReview)
                 .FirstOrDefaultAsync(t => t.ThesisId == id);
         }
 
@@ -85,7 +87,15 @@ namespace DataAccess
 
         public async Task UpdateThesisAsync(Thesis thesis)
         {
-            _context.Entry(thesis).State = EntityState.Modified;
+            var tracked = _context.Theses.Local.FirstOrDefault(t => t.ThesisId == thesis.ThesisId);
+            if (tracked != null && tracked != thesis)
+            {
+                _context.Entry(tracked).CurrentValues.SetValues(thesis);
+            }
+            else
+            {
+                _context.Entry(thesis).State = EntityState.Modified;
+            }
             await _context.SaveChangesAsync();
         }
 
@@ -117,7 +127,12 @@ namespace DataAccess
             if (lecturerOnly)
                 query = query.Where(t => t.User.Role != null && t.User.Role.RoleName == "Lecturer");
 
-            return await query.OrderByDescending(t => t.UpdateDate).ToListAsync();
+            return await query
+                .Include(t => t.ThesisReview)
+                    .ThenInclude(r => r.Reviewer1)
+                .Include(t => t.ThesisReview)
+                    .ThenInclude(r => r.Reviewer2)
+                .OrderByDescending(t => t.UpdateDate).ToListAsync();
         }
 
         public async Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id)
@@ -127,8 +142,10 @@ namespace DataAccess
             var thesis = await _context.Theses
                 .Include(t => t.User)
                 .Include(t => t.ThesisHistories)
-                .Include(t => t.ThesisReviews)
-                    .ThenInclude(r => r.Reviewer)
+                .Include(t => t.ThesisReview)
+                    .ThenInclude(r => r.Reviewer1)
+                .Include(t => t.ThesisReview)
+                    .ThenInclude(r => r.Reviewer2)
                 .FirstOrDefaultAsync(t => t.ThesisId == id);
 
             if (thesis != null && thesis.ThesisHistories != null)
@@ -160,7 +177,12 @@ namespace DataAccess
                 query = query.Where(t => t.SemesterId == semesterId.Value);
             }
 
-            return await query.OrderByDescending(t => t.UpdateDate).ToListAsync();
+            return await query
+                .Include(t => t.ThesisReview)
+                    .ThenInclude(r => r.Reviewer1)
+                .Include(t => t.ThesisReview)
+                    .ThenInclude(r => r.Reviewer2)
+                .OrderByDescending(t => t.UpdateDate).ToListAsync();
         }
 
         public async Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId, int? semesterId = null)

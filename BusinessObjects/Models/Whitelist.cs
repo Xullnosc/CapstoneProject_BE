@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace BusinessObjects.Models;
@@ -14,8 +14,6 @@ public partial class Whitelist
     public string? FullName { get; set; }
 
     public int? RoleId { get; set; }
-
-    public bool IsReviewer { get; set; }
 
     public string? Avatar { get; set; }
 

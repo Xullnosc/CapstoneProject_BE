@@ -1,25 +1,35 @@
+using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using DataAccess;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Repositories;
 
 public class ThesisReviewRepository : IThesisReviewRepository
 {
-    private readonly IThesisReviewDAO _thesisReviewDAO;
+    private readonly IThesisReviewDAO _dao;
 
-    public ThesisReviewRepository(IThesisReviewDAO thesisReviewDAO)
+    public ThesisReviewRepository(IThesisReviewDAO dao)
     {
-        _thesisReviewDAO = thesisReviewDAO;
+        _dao = dao;
     }
 
-    public async Task AddOrUpdateReviewAsync(ThesisReview review)
-    {
-        await _thesisReviewDAO.AddOrUpdateReviewAsync(review);
-    }
+    public Task<ThesisReview> UpsertReviewerReviewAsync(string thesisId, int reviewerId, string decision, string? note, string? fileUrl)
+        => _dao.UpsertReviewerReviewAsync(thesisId, reviewerId, decision, note, fileUrl);
 
-    public async Task<ThesisReview?> GetReviewByThesisAndReviewerAsync(string thesisId, int reviewerId)
-    {
-        return await _thesisReviewDAO.GetReviewByThesisAndReviewerAsync(thesisId, reviewerId);
-    }
+    public Task<List<ThesisReview>> GetReviewsAsync(string thesisId)
+        => _dao.GetReviewsAsync(thesisId);
+
+    public Task<ThesisHodDecision> UpsertHodDecisionAsync(string thesisId, int hodId, string decision, string? note)
+        => _dao.UpsertHodDecisionAsync(thesisId, hodId, decision, note);
+
+    public Task<ThesisHodDecision?> GetHodDecisionAsync(string thesisId)
+        => _dao.GetHodDecisionAsync(thesisId);
+
+    public Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId)
+        => _dao.GetReviewStatusAsync(thesisId);
+
+    public Task InitializeReviewersAsync(string thesisId, int reviewer1Id, int reviewer2Id)
+        => _dao.InitializeReviewersAsync(thesisId, reviewer1Id, reviewer2Id);
 }
