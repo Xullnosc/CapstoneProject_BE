@@ -115,6 +115,7 @@ builder.Services.AddScoped<IChecklistService, ChecklistService>();
 builder.Services.AddScoped<IThesisFormService, ThesisFormService>();
 builder.Services.AddScoped<ILecturerService, LecturerService>();
 builder.Services.AddScoped<IAccessLogService, AccessLogService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();

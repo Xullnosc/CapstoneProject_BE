@@ -1,12 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
 using BusinessObjects.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Services;
-using System;
-using System.Collections.Generic;
-using System.Security.Claims;
-using System.Threading.Tasks;
-using System.Linq;
 
 namespace CapstoneProject_BE.Controllers
 {
@@ -52,7 +52,10 @@ namespace CapstoneProject_BE.Controllers
         /// IMPORTANT: must be declared BEFORE /{id} to avoid route conflict.
         /// </summary>
         [HttpGet("my")]
-        public async Task<IActionResult> GetMyTheses([FromQuery] string? status, [FromQuery] string? searchTitle)
+        public async Task<IActionResult> GetMyTheses(
+            [FromQuery] string? status,
+            [FromQuery] string? searchTitle
+        )
         {
             try
             {
@@ -60,7 +63,11 @@ namespace CapstoneProject_BE.Controllers
                 if (emailClaim == null)
                     return Unauthorized(new { Message = "Email claim not found in token." });
 
-                var theses = await _thesisService.GetMyThesesAsync(emailClaim.Value, status, searchTitle);
+                var theses = await _thesisService.GetMyThesesAsync(
+                    emailClaim.Value,
+                    status,
+                    searchTitle
+                );
                 return Ok(theses);
             }
             catch (UnauthorizedAccessException ex)
@@ -103,7 +110,14 @@ namespace CapstoneProject_BE.Controllers
         /// Returns filtered list of all theses. All query params are optional.
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> GetAllTheses([FromQuery] string? status, [FromQuery] int? userId, [FromQuery] string? searchTitle, [FromQuery] int? semesterId, [FromQuery] bool? isLocked, [FromQuery] bool lecturerOnly = false)
+        public async Task<IActionResult> GetAllTheses(
+            [FromQuery] string? status,
+            [FromQuery] int? userId,
+            [FromQuery] string? searchTitle,
+            [FromQuery] int? semesterId,
+            [FromQuery] bool? isLocked,
+            [FromQuery] bool lecturerOnly = false
+        )
         {
             try
             {

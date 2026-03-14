@@ -301,7 +301,7 @@ namespace Services
 
             var currentSem = await _semesterRepository.GetCurrentSemesterAsync();
             var theses = await _thesisRepository.GetThesesByUserIdsAsync(ownerIds, currentSem?.SemesterId);
-            
+
             // Apply filtering in memory
             if (!string.IsNullOrWhiteSpace(status))
             {
