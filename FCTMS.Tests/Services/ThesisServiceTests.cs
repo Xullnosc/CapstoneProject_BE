@@ -87,7 +87,8 @@ namespace FCTMS.Tests.Services
                 .ReturnsAsync((Team?)null);
             _mockThesisRepository
                 .Setup(x =>
-                    x.GetThesesByUserIdsAsync(
+                    x.GetThesesByOwnerOrTeamAsync(
+                        It.IsAny<IEnumerable<int>>(),
                         It.IsAny<IEnumerable<int>>(),
                         It.Is<int?>(id => id == currentSemester.SemesterId)
                     )
@@ -419,12 +420,15 @@ namespace FCTMS.Tests.Services
                 .Setup(x => x.GetActiveTeamByStudentIdAsync(studentId))
                 .ReturnsAsync(team);
 
-            // Should call GetThesesByUserIdsAsync with [2, 1] and semesterId 1
+            // Should call GetThesesByOwnerOrTeamAsync with ownerIds [2, 1] and teamIds [10]
             _mockThesisRepository
                 .Setup(x =>
-                    x.GetThesesByUserIdsAsync(
+                    x.GetThesesByOwnerOrTeamAsync(
                         It.Is<IEnumerable<int>>(ids =>
                             ids.Contains(studentId) && ids.Contains(leaderId)
+                        ),
+                        It.Is<IEnumerable<int>>(ids =>
+                           ids.Contains(team.TeamId)
                         ),
                         It.Is<int?>(id => id == currentSemester.SemesterId)
                     )
@@ -450,7 +454,7 @@ namespace FCTMS.Tests.Services
             result.Should().Contain(t => t.Title == "Member Thesis");
 
             _mockThesisRepository.Verify(
-                x => x.GetThesesByUserIdsAsync(It.IsAny<IEnumerable<int>>(), It.IsAny<int?>()),
+                x => x.GetThesesByOwnerOrTeamAsync(It.IsAny<IEnumerable<int>>(), It.IsAny<IEnumerable<int>>(), It.IsAny<int?>()),
                 Times.Once
             );
             _mockThesisRepository.Verify(

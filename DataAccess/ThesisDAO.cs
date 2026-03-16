@@ -165,12 +165,12 @@ namespace DataAccess
             await _context.SaveChangesAsync();
         }
 
-        public async Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds, int? semesterId = null)
+        public async Task<IEnumerable<Thesis>> GetThesesByOwnerOrTeamAsync(IEnumerable<int> ownerIds, IEnumerable<int> teamIds, int? semesterId = null)
         {
             var query = _context.Theses
                 .AsNoTracking()
                 .Include(t => t.User)
-                .Where(t => userIds.Contains(t.UserId));
+                .Where(t => ownerIds.Contains(t.UserId) || (t.TeamId.HasValue && teamIds.Contains(t.TeamId.Value)));
 
             if (semesterId.HasValue)
             {

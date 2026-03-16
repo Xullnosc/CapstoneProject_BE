@@ -116,7 +116,7 @@ namespace Services
             var thesis = await _thesisRepo.GetThesisForInvitationAsync(leaderId, currentSemester.SemesterId);
             if (thesis == null)
             {
-                throw new Exception("Your team must have a valid thesis (Proposed, Approved, or Published) before inviting a mentor.");
+                throw new Exception("Your team must have a thesis before inviting a mentor.");
             }
 
             // 1. Try to find in Global Lecturer Pool (Priority)
