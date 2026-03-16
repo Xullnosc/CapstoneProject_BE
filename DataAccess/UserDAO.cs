@@ -1,4 +1,4 @@
-﻿using BusinessObjects;
+using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +23,7 @@ namespace DataAccess
         {
             return await _context.Users
                 .Include(u => u.Role)
+                .Include(u => u.AccountDetail)
                 .FirstOrDefaultAsync(u => u.Email == email);
         }
 
@@ -30,6 +31,7 @@ namespace DataAccess
         {
             return await _context.Users
                 .Include(u => u.Role)
+                .Include(u => u.AccountDetail)
                 .FirstOrDefaultAsync(u => u.UserId == id);
         }
 

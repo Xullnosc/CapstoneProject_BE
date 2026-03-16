@@ -20,7 +20,18 @@ namespace Services.Mappings
                 .ForMember(
                     dest => dest.RoleName,
                     opt => opt.MapFrom(src => src.Role != null ? src.Role.RoleName : null)
-                );
+                )
+                .ForMember(dest => dest.PhoneNumber, opt => opt.MapFrom(src => src.AccountDetail != null ? src.AccountDetail.PhoneNumber : null))
+                .ForMember(dest => dest.GithubLink, opt => opt.MapFrom(src => src.AccountDetail != null ? src.AccountDetail.GithubLink : null))
+                .ForMember(dest => dest.LinkedInLink, opt => opt.MapFrom(src => src.AccountDetail != null ? src.AccountDetail.LinkedInLink : null))
+                .ForMember(dest => dest.FacebookLink, opt => opt.MapFrom(src => src.AccountDetail != null ? src.AccountDetail.FacebookLink : null))
+                .ForMember(dest => dest.DateOfBirth, opt => opt.MapFrom(src => src.AccountDetail != null ? src.AccountDetail.DateOfBirth : null))
+                .ForMember(dest => dest.Gender, opt => opt.MapFrom(src => src.AccountDetail != null ? src.AccountDetail.Gender : null))
+                .ForMember(dest => dest.Address, opt => opt.MapFrom(src => src.AccountDetail != null ? src.AccountDetail.Address : null))
+                .ForMember(dest => dest.Major, opt => opt.MapFrom(src => src.AccountDetail != null ? src.AccountDetail.Major : null))
+                .ForMember(dest => dest.PersonalId, opt => opt.MapFrom(src => src.AccountDetail != null ? src.AccountDetail.PersonalId : null))
+                .ForMember(dest => dest.PlaceOfBirth, opt => opt.MapFrom(src => src.AccountDetail != null ? src.AccountDetail.PlaceOfBirth : null))
+                .ForMember(dest => dest.EnrollmentYear, opt => opt.MapFrom(src => src.AccountDetail != null ? src.AccountDetail.EnrollmentYear : null));
 
             // Whitelist -> WhitelistDTO
             CreateMap<Whitelist, WhitelistDTO>()

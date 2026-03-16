@@ -1,18 +1,8 @@
 namespace Services.DTOs
 {
-    public class UserInfoDTO
+    public class UpdateProfileDTO
     {
-        public int UserId { get; set; }
-        public string Email { get; set; } = null!;
-        public string? StudentCode { get; set; }
         public string? FullName { get; set; }
-        public string? Avatar { get; set; }
-        public string? RoleName { get; set; }
-        public string? Campus { get; set; }
-        public DateTime? LastLogin { get; set; }
-        public bool HasTeam { get; set; }
-        public int? PendingInvitationId { get; set; }
-        public bool IsReviewer { get; set; }
         public string? PhoneNumber { get; set; }
         public string? GithubLink { get; set; }
         public string? LinkedInLink { get; set; }

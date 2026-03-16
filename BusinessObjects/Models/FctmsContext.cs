@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
@@ -50,7 +50,8 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<SystemUserCredential> SystemUserCredentials { get; set; }
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
     public virtual DbSet<AccessLog> AccessLogs { get; set; }
-    
+
+    public virtual DbSet<AccountDetail> AccountDetails { get; set; }
 
     public virtual DbSet<Notification> Notifications { get; set; }
 
@@ -412,6 +413,32 @@ public partial class FctmsContext : DbContext
             entity.HasOne(d => d.Role).WithMany(p => p.Users)
                 .HasForeignKey(d => d.RoleId)
                 .HasConstraintName("FK__Users__RoleID__5535A963");
+
+            entity.HasOne(d => d.AccountDetail).WithOne(p => p.User)
+                .HasForeignKey<AccountDetail>(d => d.UserId)
+                .HasConstraintName("FK_AccountDetail_Users");
+        });
+
+        modelBuilder.Entity<AccountDetail>(entity =>
+        {
+            entity.HasKey(e => e.AccountDetailId).HasName("PRIMARY");
+
+            entity.ToTable("account_detail");
+
+            entity.HasIndex(e => e.UserId, "UQ_AccountDetail_UserId").IsUnique();
+
+            entity.Property(e => e.Address).HasMaxLength(500);
+            entity.Property(e => e.PhoneNumber).HasMaxLength(20);
+            entity.Property(e => e.GithubLink).HasMaxLength(255);
+            entity.Property(e => e.LinkedInLink).HasMaxLength(255);
+            entity.Property(e => e.FacebookLink).HasMaxLength(255);
+            entity.Property(e => e.DateOfBirth).HasColumnType("date");
+            entity.Property(e => e.Gender).HasMaxLength(20);
+            entity.Property(e => e.Major).HasMaxLength(100);
+            entity.Property(e => e.PersonalId).HasMaxLength(20);
+            entity.Property(e => e.PlaceOfBirth).HasMaxLength(200);
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
         });
 
         modelBuilder.Entity<Whitelist>(entity =>

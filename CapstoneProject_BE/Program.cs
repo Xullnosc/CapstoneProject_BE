@@ -134,6 +134,7 @@ builder.Services.AddScoped<IChecklistDAO, ChecklistDAO>();
 builder.Services.AddScoped<IThesisFormDAO, ThesisFormDAO>();
 builder.Services.AddScoped<ILecturerDAO, LecturerDAO>();
 builder.Services.AddScoped<IAccessLogDAO, AccessLogDAO>();
+builder.Services.AddScoped<IAccountDetailDAO, AccountDetailDAO>();
 builder.Services.AddScoped<IImportDAO, ImportDAO>();
 builder.Services.AddScoped<INotificationDAO, NotificationDAO>();
 
@@ -153,6 +154,7 @@ builder.Services.AddScoped<IChecklistRepository, ChecklistRepository>();
 builder.Services.AddScoped<IThesisFormRepository, ThesisFormRepository>();
 builder.Services.AddScoped<ILecturerRepository, LecturerRepository>();
 builder.Services.AddScoped<IAccessLogRepository, AccessLogRepository>();
+builder.Services.AddScoped<IAccountDetailRepository, AccountDetailRepository>();
 builder.Services.AddScoped<IImportRepository, ImportRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace BusinessObjects.Models;
@@ -38,4 +38,6 @@ public partial class User
     public virtual ICollection<Team> Teams { get; set; } = new List<Team>();
 
     public virtual ICollection<Thesis> Theses { get; set; } = new List<Thesis>();
+
+    public virtual AccountDetail? AccountDetail { get; set; }
 }
