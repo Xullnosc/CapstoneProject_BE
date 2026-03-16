@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -84,6 +84,7 @@ namespace BusinessObjects
             public const string Campus = "Campus";
             public const string SemesterId = "SemesterId";
             public const string SemesterCode = "SemesterCode";
+            public const string IsReviewer = "IsReviewer";
         }
     }
 }

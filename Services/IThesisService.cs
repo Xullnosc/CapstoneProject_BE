@@ -22,8 +22,6 @@ namespace Services
         Task<ThesisDTO?> GetThesisDetailAsync(string id);
         Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false, int? excludeUserId = null);
         Task<ThesisDTO> ToggleThesisLockAsync(string thesisId, string email);
-        Task<ThesisDTO> SubmitReviewAsync(string id, ReviewSubmissionDTO dto, string email);
-
         // Review workflow (multi reviewer + optional HOD final decision)
         Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId);
         Task<ThesisReviewStatusDTO> AssignReviewersAsync(string thesisId, int[] reviewerIds, int assignedByUserId);

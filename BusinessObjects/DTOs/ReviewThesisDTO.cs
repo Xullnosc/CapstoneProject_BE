@@ -6,5 +6,5 @@ namespace BusinessObjects.DTOs;
 public class ReviewThesisDTO
 {
     public string Status { get; set; } = null!; // "Published" | "Rejected" | "Need Update"
-    public string? Note { get; set; }
+    public string? Comment { get; set; }
 }

@@ -15,20 +15,8 @@ public class ThesisReviewRepository : IThesisReviewRepository
         _dao = dao;
     }
 
-    public Task AddOrUpdateReviewAsync(ThesisReview review)
-        => _dao.AddOrUpdateReviewAsync(review);
-
-    public Task<ThesisReview?> GetReviewByThesisAndReviewerAsync(string thesisId, int reviewerId)
-        => _dao.GetReviewByThesisAndReviewerAsync(thesisId, reviewerId);
-
-    public Task<List<ThesisReviewerAssignment>> ReplaceAssignmentsAsync(string thesisId, IEnumerable<int> reviewerIds, int? assignedBy)
-        => _dao.ReplaceAssignmentsAsync(thesisId, reviewerIds, assignedBy);
-
-    public Task<List<ThesisReviewerAssignment>> GetAssignmentsAsync(string thesisId)
-        => _dao.GetAssignmentsAsync(thesisId);
-
-    public Task<ThesisReview> UpsertReviewerReviewAsync(string thesisId, int reviewerId, string decision, string? note)
-        => _dao.UpsertReviewerReviewAsync(thesisId, reviewerId, decision, note);
+    public Task<ThesisReview> UpsertReviewerReviewAsync(string thesisId, int reviewerId, string decision, string? note, string? fileUrl)
+        => _dao.UpsertReviewerReviewAsync(thesisId, reviewerId, decision, note, fileUrl);
 
     public Task<List<ThesisReview>> GetReviewsAsync(string thesisId)
         => _dao.GetReviewsAsync(thesisId);
@@ -41,4 +29,7 @@ public class ThesisReviewRepository : IThesisReviewRepository
 
     public Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId)
         => _dao.GetReviewStatusAsync(thesisId);
+
+    public Task InitializeReviewersAsync(string thesisId, int reviewer1Id, int reviewer2Id)
+        => _dao.InitializeReviewersAsync(thesisId, reviewer1Id, reviewer2Id);
 }

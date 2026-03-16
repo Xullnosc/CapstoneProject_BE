@@ -10,6 +10,11 @@ public class SubmitThesisDecisionDTO
     /// <summary>
     /// Required when Decision = "Fail"
     /// </summary>
-    public string? Note { get; set; }
+    public string? Comment { get; set; }
+
+    /// <summary>
+    /// Optional review report file
+    /// </summary>
+    public Microsoft.AspNetCore.Http.IFormFile? ReviewFile { get; set; }
 }
 

@@ -4,12 +4,12 @@ namespace BusinessObjects.DTOs;
 
 public class ReviewDTO
 {
-    public int ReviewId { get; set; }
+    public long Id { get; set; }
     public string ThesisId { get; set; } = null!;
-    public int ReviewerId { get; set; }
+    public int? ReviewerId { get; set; }
     public string? ReviewerName { get; set; }
-    public string Status { get; set; } = null!;
+    public string Decision { get; set; } = null!; // Pass | Fail
     public string? Comment { get; set; }
     public string? FileUrl { get; set; }
-    public DateTime? ReviewDate { get; set; }
+    public DateTime ReviewedAt { get; set; }
 }

@@ -193,31 +193,11 @@ namespace FCTMS.Tests.Services
                     IsLocked = false,
                 },
             };
-            _mockThesisRepository
-                .Setup(x =>
-                    x.GetAllThesesFilteredAsync(
-                        It.IsAny<string?>(),
-                        It.IsAny<int?>(),
-                        It.IsAny<int?>(),
-                        It.IsAny<bool?>(),
-                        It.IsAny<bool>(),
-                        It.IsAny<int?>()
-                    )
-                )
-                .ReturnsAsync(theses);
-            _mockMapper
-                .Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses))
-                .Returns(
-                    new List<ThesisDTO>
-                    {
-                        new ThesisDTO
-                        {
-                            ThesisId = "1",
-                            Status = "Published",
-                            IsLocked = false,
-                        },
-                    }
-                );
+            _mockThesisRepository.Setup(x => x.GetAllThesesFilteredAsync(It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<bool?>(), It.IsAny<bool>(), It.IsAny<int?>())).ReturnsAsync(theses);
+            _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(theses)).Returns(new List<ThesisDTO> 
+            { 
+                new ThesisDTO { ThesisId = "1", Status = "Published", IsLocked = false } 
+            });
 
             // Act
             var result = await _thesisService.GetFilteredThesesAsync(
@@ -235,10 +215,7 @@ namespace FCTMS.Tests.Services
             result.First().IsLocked.Should().BeFalse();
 
             // Verify the repository was called with the exact parameters
-            _mockThesisRepository.Verify(
-                x => x.GetAllThesesFilteredAsync("Published", null, null, false, true, null),
-                Times.Once
-            );
+            _mockThesisRepository.Verify(x => x.GetAllThesesFilteredAsync("Published", null, null, false, true, null), Times.Once);
         }
 
         [Fact]

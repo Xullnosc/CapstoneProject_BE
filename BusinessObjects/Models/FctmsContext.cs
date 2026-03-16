@@ -35,7 +35,6 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<ThesisHistory> ThesisHistories { get; set; }
 
-    public virtual DbSet<ThesisReviewerAssignment> ThesisReviewerAssignments { get; set; }
 
     public virtual DbSet<ThesisReview> ThesisReviews { get; set; }
 
@@ -268,31 +267,12 @@ public partial class FctmsContext : DbContext
                 .HasConstraintName("FK_Teams_Users_MentorId2");
         });
 
-        modelBuilder.Entity<ThesisReviewerAssignment>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
-            entity.ToTable("thesis_reviewer_assignments");
-            entity.HasIndex(e => new { e.ThesisId, e.ReviewerId }, "UQ_Thesis_Reviewer").IsUnique();
-            entity.Property(e => e.AssignedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-            entity.Property(e => e.ThesisId)
-                .HasMaxLength(36)
-                .HasColumnType("char(36)")
-                .HasConversion(
-                    v => Guid.Parse(v),
-                    v => v.ToString()
-                );
-        });
 
         modelBuilder.Entity<ThesisReview>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.HasKey(e => e.ThesisId).HasName("PRIMARY");
             entity.ToTable("thesis_reviews");
-            entity.HasIndex(e => new { e.ThesisId, e.ReviewerId }, "UQ_Review_Thesis_Reviewer").IsUnique();
-            entity.Property(e => e.ReviewedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
+
             entity.Property(e => e.ThesisId)
                 .HasMaxLength(36)
                 .HasColumnType("char(36)")
@@ -300,6 +280,25 @@ public partial class FctmsContext : DbContext
                     v => Guid.Parse(v),
                     v => v.ToString()
                 );
+
+            entity.Property(e => e.Reviewer1Decision).HasColumnType("enum('Pass','Fail')");
+            entity.Property(e => e.Reviewer2Decision).HasColumnType("enum('Pass','Fail')");
+            
+            entity.Property(e => e.Reviewer1Id).HasColumnName("Reviewer1Id");
+            entity.Property(e => e.Reviewer2Id).HasColumnName("Reviewer2Id");
+
+            entity.HasOne(d => d.Thesis).WithOne(p => p.ThesisReview)
+                .HasForeignKey<ThesisReview>(d => d.ThesisId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Reviews_Thesis_Identity");
+
+            entity.HasOne(d => d.Reviewer1).WithMany()
+                .HasForeignKey(d => d.Reviewer1Id)
+                .HasConstraintName("FK_Reviews_Lecturers_Reviewer1");
+
+            entity.HasOne(d => d.Reviewer2).WithMany()
+                .HasForeignKey(d => d.Reviewer2Id)
+                .HasConstraintName("FK_Reviews_Lecturers_Reviewer2");
         });
 
         modelBuilder.Entity<ThesisHodDecision>(entity =>
@@ -586,6 +585,8 @@ public partial class FctmsContext : DbContext
             entity.Property(e => e.Email).HasMaxLength(255);
             entity.Property(e => e.FullName).HasMaxLength(255);
             entity.Property(e => e.Campus).HasMaxLength(100);
+            entity.Property(e => e.IsActive).HasColumnName("IsActive");
+            entity.Property(e => e.IsReviewer).HasColumnName("IsReviewer");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
@@ -657,39 +658,6 @@ public partial class FctmsContext : DbContext
                 .HasConstraintName("FK_AccessLogs_Users_UserId");
         });
 
-        modelBuilder.Entity<ThesisReview>(entity =>
-        {
-            entity.HasKey(e => e.ReviewId).HasName("PRIMARY");
-            entity.ToTable("thesis_reviews");
-
-            entity.HasIndex(e => e.ThesisId, "fk_thesisreviews_thesis");
-            entity.HasIndex(e => e.ReviewerId, "fk_thesisreviews_reviewer");
-
-            entity.Property(e => e.ReviewId).HasColumnName("ReviewId");
-            entity.Property(e => e.ThesisId)
-                .HasMaxLength(36)
-                .HasColumnType("char(36)")
-                .HasConversion(
-                    v => Guid.Parse(v),
-                    v => v.ToString()
-                );
-            entity.Property(e => e.Status).HasMaxLength(50);
-            entity.Property(e => e.FileUrl).HasMaxLength(500);
-            entity.Property(e => e.Comment).HasColumnType("text");
-            entity.Property(e => e.ReviewDate)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-
-            entity.HasOne(d => d.Thesis).WithMany(p => p.ThesisReviews)
-                .HasForeignKey(d => d.ThesisId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("FK_ThesisReviews_Thesis");
-
-            entity.HasOne(d => d.Reviewer).WithMany()
-                .HasForeignKey(d => d.ReviewerId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("FK_ThesisReviews_Lecturers");
-        });
 
         OnModelCreatingPartial(modelBuilder);
     }

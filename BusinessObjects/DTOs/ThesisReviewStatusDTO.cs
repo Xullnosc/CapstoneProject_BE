@@ -26,7 +26,8 @@ public class ReviewerProgressDTO
     public string? Email { get; set; }
     public string? FullName { get; set; }
     public string? Decision { get; set; } // Pass | Fail
-    public string? Note { get; set; }
+    public string? Comment { get; set; }
+    public string? FileUrl { get; set; }
     public DateTime? ReviewedAt { get; set; }
 }
 
@@ -36,7 +37,7 @@ public class HodDecisionDTO
     public string? Email { get; set; }
     public string? FullName { get; set; }
     public string Decision { get; set; } = null!;
-    public string? Note { get; set; }
+    public string? Comment { get; set; }
     public DateTime DecidedAt { get; set; }
 }
 

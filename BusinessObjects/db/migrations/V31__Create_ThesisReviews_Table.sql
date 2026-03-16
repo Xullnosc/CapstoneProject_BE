@@ -13,6 +13,7 @@ DROP COLUMN ReviewStatus2,
 DROP COLUMN ReviewComment2,
 DROP COLUMN ReviewFileUrl2;
 
+Drop TABLE IF EXISTS thesis_reviews;
 -- Create ThesisReviews table
 CREATE TABLE thesis_reviews (
     ReviewId INT AUTO_INCREMENT PRIMARY KEY,

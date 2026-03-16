@@ -17,81 +17,68 @@ public class ThesisReviewDAO : IThesisReviewDAO
         _context = context;
     }
 
-    public async Task AddOrUpdateReviewAsync(ThesisReview review)
+
+    public async Task<ThesisReview> UpsertReviewerReviewAsync(string thesisId, int reviewerId, string decision, string? note, string? fileUrl)
     {
         var existing = await _context.ThesisReviews
-            .FirstOrDefaultAsync(r => r.ThesisId == review.ThesisId && r.ReviewerId == review.ReviewerId);
+            .FirstOrDefaultAsync(r => r.ThesisId == thesisId);
 
         if (existing == null)
         {
-            _context.ThesisReviews.Add(review);
+            // This should normally not happen if reviewers are assigned first, but handle it
+            existing = new ThesisReview { ThesisId = thesisId };
+            _context.ThesisReviews.Add(existing);
+        }
+
+        if (existing.Reviewer1Id == reviewerId)
+        {
+            existing.Reviewer1Decision = decision;
+            existing.Reviewer1Comment = note;
+            existing.Reviewer1FileUrl = fileUrl;
+            existing.Reviewer1Date = DateTime.UtcNow;
+        }
+        else if (existing.Reviewer2Id == reviewerId)
+        {
+            existing.Reviewer2Decision = decision;
+            existing.Reviewer2Comment = note;
+            existing.Reviewer2FileUrl = fileUrl;
+            existing.Reviewer2Date = DateTime.UtcNow;
         }
         else
         {
-            existing.Status = review.Status;
-            existing.Comment = review.Comment;
-            if (review.FileUrl != null)
+            // Fallback: If not assigned to a slot, assign to a free slot or throw
+            if (existing.Reviewer1Id == null)
             {
-                existing.FileUrl = review.FileUrl;
+                existing.Reviewer1Id = reviewerId;
+                existing.Reviewer1Decision = decision;
+                existing.Reviewer1Comment = note;
+                existing.Reviewer1FileUrl = fileUrl;
+                existing.Reviewer1Date = DateTime.UtcNow;
             }
-            existing.ReviewDate = System.DateTime.UtcNow;
-            _context.Entry(existing).State = EntityState.Modified;
-        }
-
-        await _context.SaveChangesAsync();
-    }
-
-    public async Task<ThesisReview?> GetReviewByThesisAndReviewerAsync(string thesisId, int reviewerId)
-    {
-        return await _context.ThesisReviews
-            .FirstOrDefaultAsync(r => r.ThesisId == thesisId && r.ReviewerId == reviewerId);
-    }
-
-    public async Task<List<ThesisReviewerAssignment>> ReplaceAssignmentsAsync(string thesisId, IEnumerable<int> reviewerIds, int? assignedBy)
-    {
-        // Reviewer assignment is derived from Team.MentorId/MentorId2 now.
-        // Keep method for backward compatibility; no-op.
-        return new List<ThesisReviewerAssignment>();
-    }
-
-    public Task<List<ThesisReviewerAssignment>> GetAssignmentsAsync(string thesisId)
-        // Reviewer assignment is derived from Team.MentorId/MentorId2 now.
-        // Keep method for backward compatibility; return empty.
-        => Task.FromResult(new List<ThesisReviewerAssignment>());
-
-    public async Task<ThesisReview> UpsertReviewerReviewAsync(string thesisId, int reviewerId, string decision, string? note)
-    {
-        var existing = await _context.ThesisReviews
-            .FirstOrDefaultAsync(r => r.ThesisId == thesisId && r.ReviewerId == reviewerId);
-
-        if (existing == null)
-        {
-            var created = new ThesisReview
+            else if (existing.Reviewer2Id == null)
             {
-                ThesisId = thesisId,
-                ReviewerId = reviewerId,
-                Decision = decision,
-                Note = note,
-                ReviewedAt = DateTime.UtcNow
-            };
-            _context.ThesisReviews.Add(created);
-            await _context.SaveChangesAsync();
-            return created;
+                existing.Reviewer2Id = reviewerId;
+                existing.Reviewer2Decision = decision;
+                existing.Reviewer2Comment = note;
+                existing.Reviewer2FileUrl = fileUrl;
+                existing.Reviewer2Date = DateTime.UtcNow;
+            }
+            else
+            {
+                throw new InvalidOperationException("Both reviewer slots are already occupied by different users.");
+            }
         }
 
-        existing.Decision = decision;
-        existing.Note = note;
-        existing.ReviewedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
         return existing;
     }
 
-    public Task<List<ThesisReview>> GetReviewsAsync(string thesisId)
-        => _context.ThesisReviews
-            .AsNoTracking()
-            .Where(r => r.ThesisId == thesisId)
-            .OrderBy(r => r.Id)
-            .ToListAsync();
+    public async Task<List<ThesisReview>> GetReviewsAsync(string thesisId)
+    {
+        var r = await _context.ThesisReviews.AsNoTracking().FirstOrDefaultAsync(x => x.ThesisId == thesisId);
+        if (r == null) return new List<ThesisReview>();
+        return new List<ThesisReview> { r }; // Note: The service might need adjustment if it expects multiple rows
+    }
 
     public async Task<ThesisHodDecision> UpsertHodDecisionAsync(string thesisId, int hodId, string decision, string? note)
     {
@@ -131,68 +118,73 @@ public class ThesisReviewDAO : IThesisReviewDAO
         var thesis = await _context.Theses.AsNoTracking().FirstOrDefaultAsync(t => t.ThesisId == thesisId);
         if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
 
-        // Resolve 2 reviewers from Team.MentorId and Team.MentorId2 (mentors of thesis owner's team)
-        var activeSemester = await _context.Semesters.AsNoTracking().FirstOrDefaultAsync(s => s.Status == "Active");
-        var now = DateTime.UtcNow;
-        var currentSemester = activeSemester
-            ?? await _context.Semesters.AsNoTracking().FirstOrDefaultAsync(s => s.StartDate <= now && s.EndDate >= now);
-
-        if (currentSemester == null)
-            throw new InvalidOperationException("Current semester not found.");
-
-        var team = await _context.Teams
-            .AsNoTracking()
-            .Include(t => t.Teammembers)
-            .Where(t => t.SemesterId == currentSemester.SemesterId && t.Status != "Disbanded")
-            .FirstOrDefaultAsync(t => t.Teammembers.Any(tm => tm.StudentId == thesis.UserId));
-
-        var reviewerIds = new List<int>();
-        if (team?.MentorId != null) reviewerIds.Add(team.MentorId.Value);
-        if (team?.MentorId2 != null) reviewerIds.Add(team.MentorId2.Value);
-        reviewerIds = reviewerIds.Distinct().ToList();
-
-        var reviews = await _context.ThesisReviews.AsNoTracking()
-            .Where(r => r.ThesisId == thesisId)
-            .ToListAsync();
+        var review = await _context.ThesisReviews.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.ThesisId == thesisId);
 
         var hod = await _context.ThesisHodDecisions.AsNoTracking()
             .FirstOrDefaultAsync(d => d.ThesisId == thesisId);
 
+        var reviewerIds = new List<int>();
+        if (review?.Reviewer1Id != null) reviewerIds.Add(review.Reviewer1Id.Value);
+        if (review?.Reviewer2Id != null) reviewerIds.Add(review.Reviewer2Id.Value);
+
+        var reviewerUids = reviewerIds.Distinct().ToList();
+        var relevantUserIds = new List<int>(reviewerUids);
+        if (hod != null) relevantUserIds.Add(hod.HodId);
+
         var users = await _context.Users.AsNoTracking()
-            .Where(u => reviewerIds.Contains(u.UserId) || (hod != null && u.UserId == hod.HodId))
+            .Where(u => relevantUserIds.Contains(u.UserId))
             .Select(u => new { u.UserId, u.Email, u.FullName })
             .ToListAsync();
-
-        var byReviewer = reviews.ToDictionary(r => r.ReviewerId, r => r);
 
         var status = new ThesisReviewStatusDTO
         {
             ThesisId = thesisId,
             ThesisStatus = thesis.Status,
-            Reviewers = reviewerIds.Select(id =>
-            {
-                var u = users.FirstOrDefault(x => x.UserId == id);
-                byReviewer.TryGetValue(id, out var r);
-                return new ReviewerProgressDTO
-                {
-                    UserId = id,
-                    Email = u?.Email,
-                    FullName = u?.FullName,
-                    Decision = r?.Decision,
-                    Note = r?.Note,
-                    ReviewedAt = r?.ReviewedAt
-                };
-            }).ToList()
+            Reviewers = new List<ReviewerProgressDTO>()
         };
 
-        // Compute overall status for UI
+        if (review != null)
+        {
+            if (review.Reviewer1Id.HasValue)
+            {
+                var u1 = users.FirstOrDefault(x => x.UserId == review.Reviewer1Id.Value);
+                status.Reviewers.Add(new ReviewerProgressDTO
+                {
+                    UserId = review.Reviewer1Id.Value,
+                    Email = u1?.Email,
+                    FullName = u1?.FullName,
+                    Decision = review.Reviewer1Decision,
+                    Comment = review.Reviewer1Comment,
+                    FileUrl = review.Reviewer1FileUrl,
+                    ReviewedAt = review.Reviewer1Date
+                });
+            }
+            if (review.Reviewer2Id.HasValue)
+            {
+                var u2 = users.FirstOrDefault(x => x.UserId == review.Reviewer2Id.Value);
+                status.Reviewers.Add(new ReviewerProgressDTO
+                {
+                    UserId = review.Reviewer2Id.Value,
+                    Email = u2?.Email,
+                    FullName = u2?.FullName,
+                    Decision = review.Reviewer2Decision,
+                    Comment = review.Reviewer2Comment,
+                    FileUrl = review.Reviewer2FileUrl,
+                    ReviewedAt = review.Reviewer2Date
+                });
+            }
+        }
+
+        // Compute overall status logic
         var decided = status.Reviewers.Where(x => !string.IsNullOrWhiteSpace(x.Decision)).ToList();
-        if (reviewerIds.Count == 0)
+        
+        if (reviewerIds.Count < 2)
         {
             status.OverallStatus = "Pending";
             status.RequiresHodDecision = false;
         }
-        else if (decided.Count < reviewerIds.Count)
+        else if (decided.Count < 2)
         {
             status.OverallStatus = "Pending";
             status.RequiresHodDecision = false;
@@ -200,12 +192,11 @@ public class ThesisReviewDAO : IThesisReviewDAO
         else
         {
             var passCount = decided.Count(x => string.Equals(x.Decision, "Pass", StringComparison.OrdinalIgnoreCase));
-            var failCount = decided.Count - passCount;
-            if (passCount == decided.Count)
+            if (passCount == 2)
             {
                 status.OverallStatus = "Pass";
             }
-            else if (failCount == decided.Count)
+            else if (passCount == 0)
             {
                 status.OverallStatus = "Fail";
             }
@@ -225,7 +216,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
                 Email = u?.Email,
                 FullName = u?.FullName,
                 Decision = hod.Decision,
-                Note = hod.Note,
+                Comment = hod.Note,
                 DecidedAt = hod.DecidedAt
             };
             status.OverallStatus = "HodDecided";
@@ -233,5 +224,36 @@ public class ThesisReviewDAO : IThesisReviewDAO
         }
 
         return status;
+    }
+
+    public async Task InitializeReviewersAsync(string thesisId, int reviewer1Id, int reviewer2Id)
+    {
+        var existing = await _context.ThesisReviews.FirstOrDefaultAsync(r => r.ThesisId == thesisId);
+        if (existing == null)
+        {
+            existing = new ThesisReview
+            {
+                ThesisId = thesisId,
+                Reviewer1Id = reviewer1Id,
+                Reviewer2Id = reviewer2Id
+            };
+            _context.ThesisReviews.Add(existing);
+        }
+        else
+        {
+            existing.Reviewer1Id = reviewer1Id;
+            existing.Reviewer2Id = reviewer2Id;
+            // Optionally reset decisions if HOD reassigns? Assuming reassign clears old decisions for slots.
+            existing.Reviewer1Decision = null;
+            existing.Reviewer2Decision = null;
+            existing.Reviewer1Comment = null;
+            existing.Reviewer2Comment = null;
+            existing.Reviewer1FileUrl = null;
+            existing.Reviewer2FileUrl = null;
+            existing.Reviewer1Date = null;
+            existing.Reviewer2Date = null;
+        }
+
+        await _context.SaveChangesAsync();
     }
 }
