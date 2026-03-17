@@ -200,11 +200,14 @@ namespace DataAccess
         public async Task<Team?> GetActiveTeamByStudentIdAsync(int studentId)
         {
             return await _context.Teams
+                .Include(t => t.Semester)
                 .Include(t => t.Teammembers)
                 .ThenInclude(tm => tm.Student)
                 .Include(t => t.Mentor)
                 .Include(t => t.Mentor2)
-                .Where(t => t.Status != "Disbanded" && t.Teammembers.Any(tm => tm.StudentId == studentId))
+                .Where(t => t.Status != "Disbanded" 
+                        && t.Semester.Status != "Ended"
+                        && t.Teammembers.Any(tm => tm.StudentId == studentId))
                 .OrderByDescending(t => t.CreatedAt)
                 .FirstOrDefaultAsync();
         }

@@ -1,4 +1,4 @@
-﻿using BusinessObjects.Models;
+using BusinessObjects.Models;
 using DataAccess;
 
 namespace Repositories
@@ -64,6 +64,11 @@ namespace Repositories
         public async Task<List<Whitelist>> SearchAsync(string term, int semesterId)
         {
             return await _whitelistDAO.SearchAsync(term, semesterId);
+        }
+
+        public async Task<bool> IsWhitelistedInSemesterAsync(string email, int semesterId)
+        {
+            return await _whitelistDAO.IsWhitelistedInSemesterAsync(email, semesterId);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
@@ -16,9 +16,13 @@ namespace DataAccess
 
         public async Task<Whitelist?> GetByEmailAsync(string email)
         {
-            return await _context
-                .Whitelists.Include(w => w.Role)
-                .FirstOrDefaultAsync(w => w.Email == email);
+            return await _context.Whitelists
+                .Include(w => w.Role)
+                .Include(w => w.Semester)
+                .Where(w => w.Email == email)
+                .OrderByDescending(w => w.Semester != null && w.Semester.Status == "Active")
+                .ThenByDescending(w => w.SemesterId)
+                .FirstOrDefaultAsync();
         }
 
         public async Task<List<Whitelist>> GetBySemesterIdAsync(int semesterId)
@@ -149,6 +153,12 @@ namespace DataAccess
                             (w.FullName.Contains(term) || w.Email.Contains(term) || w.StudentCode.Contains(term)))
                 .Take(10)
                 .ToListAsync();
+        }
+
+        public async Task<bool> IsWhitelistedInSemesterAsync(string email, int semesterId)
+        {
+            return await _context.Whitelists
+                .AnyAsync(w => w.Email == email && w.SemesterId == semesterId);
         }
     }
 }

@@ -39,39 +39,6 @@ namespace Services.Mappings
                     opt => opt.MapFrom(src => src.Teammembers != null ? src.Teammembers.Count : 0)
                 );
 
-            // ArchivedTeam -> TeamSimpleDTO
-            CreateMap<ArchivedTeam, TeamSimpleDTO>()
-                .ForMember(dest => dest.TeamId, opt => opt.MapFrom(src => src.OriginalTeamId))
-                .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status ?? "Archived"))
-                .AfterMap(
-                    (src, dest) =>
-                    {
-                        if (!string.IsNullOrEmpty(src.JsonData))
-                        {
-                            try
-                            {
-                                using var doc = System.Text.Json.JsonDocument.Parse(src.JsonData);
-                                if (doc.RootElement.TryGetProperty("Members", out var members))
-                                {
-                                    dest.MemberCount = members.GetArrayLength();
-                                }
-                            }
-                            catch
-                            { /* Fallback to 0 if JSON is malformed */
-                            }
-                        }
-                    }
-                );
-
-            // ArchivedWhitelist -> WhitelistDTO
-            CreateMap<ArchivedWhitelist, WhitelistDTO>()
-                .ForMember(dest => dest.WhitelistId, opt => opt.MapFrom(src => src.OriginalWhitelistId))
-                .ForMember(dest => dest.RoleId, opt => opt.MapFrom(src => src.RoleId))
-                .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
-                .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.FullName))
-                .ForMember(dest => dest.Avatar, opt => opt.MapFrom(src => src.Avatar))
-                .ForMember(dest => dest.Campus, opt => opt.MapFrom(src => CampusConstants.MapCodeToFullName(src.Campus)))
-                .ForMember(dest => dest.StudentCode, opt => opt.MapFrom(src => src.StudentCode));
 
             // Semester -> SemesterDTO
             CreateMap<Semester, SemesterDTO>()
