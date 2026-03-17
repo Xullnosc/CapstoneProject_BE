@@ -35,8 +35,8 @@ namespace Repositories
         public Task AddThesisHistoryAsync(ThesisHistory history)
             => _thesisDAO.AddThesisHistoryAsync(history);
 
-        public Task<IEnumerable<Thesis>> GetThesesByUserIdsAsync(IEnumerable<int> userIds, int? semesterId = null)
-            => _thesisDAO.GetThesesByUserIdsAsync(userIds, semesterId);
+        public Task<IEnumerable<Thesis>> GetThesesByOwnerOrTeamAsync(IEnumerable<int> ownerIds, IEnumerable<int> teamIds, int? semesterId = null)
+            => _thesisDAO.GetThesesByOwnerOrTeamAsync(ownerIds, teamIds, semesterId);
 
         public Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId, int? semesterId = null)
             => _thesisDAO.GetApprovedThesisByLeaderIdAsync(leaderId, semesterId);

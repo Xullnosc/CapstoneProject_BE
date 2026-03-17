@@ -251,6 +251,7 @@ namespace Services
                 throw new UnauthorizedAccessException("User not found.");
 
             var ownerIds = new HashSet<int>();
+            var teamIds = new HashSet<int>();
 
             if (user.Role?.RoleName == CampusConstants.Roles.Lecturer)
             {
@@ -262,45 +263,51 @@ namespace Services
                 if (currentSemester != null)
                 {
                     var allTeams = await _teamRepository.GetBySemesterAsync(currentSemester.SemesterId);
-                    var mentoredLeaderIds = allTeams
+                    var mentoredTeams = allTeams
                         .Where(t => (t.MentorId == user.UserId || t.MentorId2 == user.UserId) && t.Status != CampusConstants.TeamStatus.Disbanded)
-                        .Select(t => t.LeaderId)
                         .ToList();
 
-                    foreach (var id in mentoredLeaderIds) ownerIds.Add(id);
-
+                    foreach (var t in mentoredTeams)
+                    {
+                        teamIds.Add(t.TeamId);
+                        ownerIds.Add(t.LeaderId); // Fallback: See leader's thesis if TeamId is null
+                    }
+                    
                     // Add theses from teams that have a Pending mentor invitation for this lecturer
                     var pendingInvitations = await _teamInvitationRepository.GetPendingMentorInvitationsByMentorIdAsync(user.UserId);
                     var pendingTeamIds = pendingInvitations.Select(i => i.TeamId).Distinct().ToList();
                     
-                    var pendingLeaderIds = allTeams
+                    var pendingTeams = allTeams
                         .Where(t => pendingTeamIds.Contains(t.TeamId) && t.Status != CampusConstants.TeamStatus.Disbanded)
-                        .Select(t => t.LeaderId)
                         .ToList();
 
-                    foreach (var id in pendingLeaderIds) ownerIds.Add(id);
+                    foreach (var t in pendingTeams)
+                    {
+                        teamIds.Add(t.TeamId);
+                        ownerIds.Add(t.LeaderId); // Also see leader's thesis for invitation review
+                    }
                 }
             }
             else
             {
-                // Student view: check if in a team
+                // Student view: always see their own proposed theses
+                ownerIds.Add(user.UserId);
+
+                // check if in a team
                 var team = await _teamRepository.GetActiveTeamByStudentIdAsync(user.UserId);
                 if (team != null)
                 {
-                    // Strictly see ONLY the leader's theses of their current team
+                    // See the leader's theses of their current team
                     ownerIds.Add(team.LeaderId);
-                }
-                else
-                {
-                    // If not in any team, see their own proposed theses
-                    ownerIds.Add(user.UserId);
+                    // AND see any thesis explicitly assigned to this team (e.g. proposed by a Mentor)
+                    teamIds.Add(team.TeamId);
                 }
             }
 
-            if (!ownerIds.Any()) return new List<ThesisDTO>();
+            if (!ownerIds.Any() && !teamIds.Any()) return new List<ThesisDTO>();
 
             var currentSem = await _semesterRepository.GetCurrentSemesterAsync();
-            var theses = await _thesisRepository.GetThesesByUserIdsAsync(ownerIds, currentSem?.SemesterId);
+            var theses = await _thesisRepository.GetThesesByOwnerOrTeamAsync(ownerIds, teamIds, currentSem?.SemesterId);
 
             // Apply filtering in memory
             if (!string.IsNullOrWhiteSpace(status))
