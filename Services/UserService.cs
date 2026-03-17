@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BusinessObjects.Models;
+using AutoMapper;
+using System;
 
 namespace Services
 {
@@ -17,6 +19,8 @@ namespace Services
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly ITeamRepository _teamRepository;
         private readonly ILecturerRepository _lecturerRepository;
+        private readonly IAccountDetailRepository _accountDetailRepository;
+        private readonly IMapper _mapper;
 
         public UserService(
             IUserRepository userRepository, 
@@ -25,7 +29,9 @@ namespace Services
             ITeamInvitationRepository teamInvitationRepository,
             IWhitelistRepository whitelistRepository,
             ITeamRepository teamRepository,
-            ILecturerRepository lecturerRepository)
+            ILecturerRepository lecturerRepository,
+            IAccountDetailRepository accountDetailRepository,
+            IMapper mapper)
         {
             _userRepository = userRepository;
             _semesterRepository = semesterRepository;
@@ -34,6 +40,21 @@ namespace Services
             _whitelistRepository = whitelistRepository;
             _teamRepository = teamRepository;
             _lecturerRepository = lecturerRepository;
+            _accountDetailRepository = accountDetailRepository;
+            _mapper = mapper;
+        }
+
+        public async Task<UserInfoDTO?> GetProfileAsync(int userId)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null) return null;
+
+            var roles = await _whitelistRepository.GetByEmailAsync(user.Email);
+            var result = _mapper.Map<UserInfoDTO>(user);
+            if (roles != null)
+                result.RoleName = roles.Role?.RoleName ?? result.RoleName;
+
+            return result;
         }
 
         public async Task<List<UserInfoDTO>> SearchStudentsAsync(string term, int currentUserId, int? teamId = null)
@@ -174,6 +195,64 @@ namespace Services
                 }
 
                 result.Add(dto);
+            }
+
+            return result;
+        }
+
+        public async Task<UserInfoDTO?> UpdateProfileAsync(int userId, UpdateProfileDTO profileDto)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null) return null;
+
+            if (!string.IsNullOrWhiteSpace(profileDto.FullName))
+                user.FullName = profileDto.FullName;
+
+            await _userRepository.UpdateAsync(user);
+
+            // Account detail (chỉ dùng bảng account_detail)
+            var detail = await _accountDetailRepository.GetByUserIdAsync(userId);
+            if (detail == null)
+            {
+                detail = new AccountDetail
+                {
+                    UserId = userId,
+                    PhoneNumber = profileDto.PhoneNumber,
+                    GithubLink = profileDto.GithubLink,
+                    LinkedInLink = profileDto.LinkedInLink,
+                    FacebookLink = profileDto.FacebookLink,
+                    DateOfBirth = profileDto.DateOfBirth,
+                    Gender = profileDto.Gender,
+                    Address = profileDto.Address,
+                    Major = profileDto.Major,
+                    PersonalId = profileDto.PersonalId,
+                    PlaceOfBirth = profileDto.PlaceOfBirth,
+                    EnrollmentYear = profileDto.EnrollmentYear
+                };
+                await _accountDetailRepository.AddAsync(detail);
+            }
+            else
+            {
+                detail.PhoneNumber = profileDto.PhoneNumber;
+                detail.GithubLink = profileDto.GithubLink;
+                detail.LinkedInLink = profileDto.LinkedInLink;
+                detail.FacebookLink = profileDto.FacebookLink;
+                if (profileDto.DateOfBirth.HasValue) detail.DateOfBirth = profileDto.DateOfBirth;
+                detail.Gender = profileDto.Gender;
+                detail.Address = profileDto.Address;
+                detail.Major = profileDto.Major;
+                detail.PersonalId = profileDto.PersonalId;
+                detail.PlaceOfBirth = profileDto.PlaceOfBirth;
+                if (profileDto.EnrollmentYear.HasValue) detail.EnrollmentYear = profileDto.EnrollmentYear;
+                await _accountDetailRepository.UpdateAsync(detail);
+            }
+
+            user.AccountDetail = detail;
+            var roles = await _whitelistRepository.GetByEmailAsync(user.Email);
+            var result = _mapper.Map<UserInfoDTO>(user);
+            if (roles != null)
+            {
+                result.RoleName = roles.Role?.RoleName ?? result.RoleName;
             }
 
             return result;
