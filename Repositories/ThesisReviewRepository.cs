@@ -21,8 +21,8 @@ public class ThesisReviewRepository : IThesisReviewRepository
     public Task<List<ThesisReview>> GetReviewsAsync(string thesisId)
         => _dao.GetReviewsAsync(thesisId);
 
-    public Task<ThesisHodDecision> UpsertHodDecisionAsync(string thesisId, int hodId, string decision, string? note)
-        => _dao.UpsertHodDecisionAsync(thesisId, hodId, decision, note);
+    public Task<ThesisHodDecision> UpsertHodDecisionAsync(string thesisId, int hodId, string decision, string? comment)
+        => _dao.UpsertHodDecisionAsync(thesisId, hodId, decision, comment);
 
     public Task<ThesisHodDecision?> GetHodDecisionAsync(string thesisId)
         => _dao.GetHodDecisionAsync(thesisId);

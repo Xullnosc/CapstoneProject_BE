@@ -171,7 +171,7 @@ namespace Services
                     ThesisId = thesis.ThesisId,
                     FileUrl = newFileUrl,
                     VersionNumber = nextVersion,
-                    Note = req.Note?.Trim(),
+
                     UploadedBy = user.UserId,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -514,6 +514,9 @@ namespace Services
 
             if (thesis.UserId != user.UserId)
                 throw new UnauthorizedAccessException("You are not authorized to lock/unlock this thesis.");
+
+            if (thesis.Status != "Published")
+                throw new InvalidOperationException("Registration can only be toggled for 'Published' theses.");
 
             thesis.IsLocked = !thesis.IsLocked;
             thesis.UpdateDate = DateTime.UtcNow;

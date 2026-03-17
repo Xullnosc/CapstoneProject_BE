@@ -10,7 +10,7 @@ public interface IThesisReviewRepository
     Task<ThesisReview> UpsertReviewerReviewAsync(string thesisId, int reviewerId, string decision, string? note, string? fileUrl);
     Task<List<ThesisReview>> GetReviewsAsync(string thesisId);
 
-    Task<ThesisHodDecision> UpsertHodDecisionAsync(string thesisId, int hodId, string decision, string? note);
+    Task<ThesisHodDecision> UpsertHodDecisionAsync(string thesisId, int hodId, string decision, string? comment);
     Task<ThesisHodDecision?> GetHodDecisionAsync(string thesisId);
 
     Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId);

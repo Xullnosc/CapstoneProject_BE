@@ -26,16 +26,19 @@ CREATE TABLE `thesis_reviews` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 3. Update Lecturer table
--- Adding BIT column if not exists. If V33 was run partially, we handle it.
+-- Removed IF EXISTS for columns as it's not supported in some versions.
+-- If the column doesn't exist, this script might fail; in that case, remove the DROP line.
+-- We ADD it fresh to ensure it's BIT type.
 ALTER TABLE `lecturers`
 ADD COLUMN `IsReviewer` BIT NOT NULL DEFAULT 0;
 
 -- 4. Clean up Whitelist table
-ALTER TABLE `whitelist`
-DROP COLUMN `IsReviewer`;
+-- Only run this if you know IsReviewer was previously added to whitelist.
+-- ALTER TABLE `whitelist` DROP COLUMN `IsReviewer`;
 
 -- 5. Trigger to ensure IsActive=0 => IsReviewer=0
 DELIMITER //
+DROP TRIGGER IF EXISTS `trg_lecturer_deactivate` //
 CREATE TRIGGER `trg_lecturer_deactivate` BEFORE UPDATE ON `lecturers`
 FOR EACH ROW
 BEGIN
@@ -46,7 +49,9 @@ END //
 DELIMITER ;
 
 -- 6. Rename Note to Comment in thesis_hod_decisions
+-- Using CHANGE which is more standard for renaming and type definition.
+-- It will rename Note to Comment and set its type to TEXT.
 ALTER TABLE `thesis_hod_decisions`
-CHANGE COLUMN `Note` `Comment` TEXT NULL;
+CHANGE `Note` `Comment` TEXT NULL;
 
 -- Note: thesis_hod_decisions is already created in V25, so we don't recreate it here.
