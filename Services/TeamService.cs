@@ -206,7 +206,7 @@ namespace Services
             return new TeamDTO
             {
                 TeamId = team.TeamId,
-                TeamCode = team.TeamCode,
+                TeamCode = DisplayHelper.FormatTeamCode(team.TeamCode),
                 TeamName = team.TeamName,
                 TeamAvatar = team.TeamAvatar,
                 Description = team.Description,

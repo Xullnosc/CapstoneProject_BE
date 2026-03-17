@@ -389,7 +389,7 @@ namespace Services
                 InvitationId = entity.InvitationId,
                 TeamId = entity.TeamId,
                 TeamName = entity.Team?.TeamName ?? string.Empty,
-                TeamCode = entity.Team?.TeamCode ?? string.Empty,
+                TeamCode = DisplayHelper.FormatTeamCode(entity.Team?.TeamCode),
                 MentorId = entity.StudentId,
                 MentorEmail = entity.Student?.Email ?? string.Empty,
                 MentorName = entity.Student?.FullName ?? string.Empty,
