@@ -219,7 +219,7 @@ namespace FCTMS.Tests.Services
             var result = await _teamService.CreateTeamAsync(userId, createDto);
 
             // Assert
-            result.TeamCode.Should().Be("FA24_SE_01");
+            result.TeamCode.Should().Be("SE_01");
         }
 
         [Fact]
@@ -242,7 +242,7 @@ namespace FCTMS.Tests.Services
             var result = await _teamService.CreateTeamAsync(userId, createDto);
 
             // Assert
-            result.TeamCode.Should().Be("SP25_SE_16");
+            result.TeamCode.Should().Be("SE_16");
         }
     }
 }
