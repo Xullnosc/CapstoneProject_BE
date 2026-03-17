@@ -15,6 +15,9 @@ namespace BusinessObjects.DTOs
         public string InvitedByName { get; set; } = string.Empty;
         public string InvitedByEmail { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;
+        public string? ThesisId { get; set; }
+        public string? ThesisTitle { get; set; }
+        public string? ThesisStatus { get; set; }
         public string Status { get; set; } = string.Empty;
         public DateTime? CreatedAt { get; set; }
         public DateTime? RespondedAt { get; set; }
