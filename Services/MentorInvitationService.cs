@@ -401,7 +401,7 @@ namespace Services
                 CreatedAt = entity.CreatedAt,
                 RespondedAt = entity.RespondedAt
             };
-
+ 
             if (thesis != null)
             {
                 dto.ThesisId = thesis.ThesisId;
