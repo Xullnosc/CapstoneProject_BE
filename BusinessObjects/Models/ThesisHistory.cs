@@ -13,7 +13,7 @@ public partial class ThesisHistory
 
     public int VersionNumber { get; set; }
 
-    public string? Note { get; set; }
+
 
     public int UploadedBy { get; set; }
 

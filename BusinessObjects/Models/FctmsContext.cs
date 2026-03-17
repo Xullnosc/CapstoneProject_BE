@@ -275,6 +275,7 @@ public partial class FctmsContext : DbContext
                     v => Guid.Parse(v),
                     v => v.ToString()
                 );
+            entity.Property(e => e.Comment).HasColumnType("text");
         });
 
         modelBuilder.Entity<Teaminvitation>(entity =>
@@ -503,7 +504,7 @@ public partial class FctmsContext : DbContext
                 );
             entity.Property(e => e.FileUrl).HasMaxLength(500);
             entity.Property(e => e.VersionNumber).HasDefaultValueSql("1");
-            entity.Property(e => e.Note).HasColumnType("text");
+
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");

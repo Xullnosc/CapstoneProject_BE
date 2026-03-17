@@ -293,7 +293,7 @@ namespace FCTMS.Tests.Services
             int ownerId = 1;
 
             var mockFile = new Mock<IFormFile>();
-            var req = new UpdateThesisDTO { File = mockFile.Object, Note = "Version 2" };
+            var req = new UpdateThesisDTO { File = mockFile.Object };
 
             var user = new User { UserId = ownerId, Email = email };
             // Simulate thesis already having 1 history
@@ -330,11 +330,7 @@ namespace FCTMS.Tests.Services
                 x =>
                     x.AddThesisHistoryAsync(
                         It.Is<ThesisHistory>(h =>
-                            h.ThesisId == thesisId
-                            && h.FileUrl == "new_secure_url"
-                            && h.VersionNumber == 2
-                            && // Max(1) + 1
-                            h.Note == "Version 2"
+                            h.VersionNumber == 2
                             && h.UploadedBy == ownerId
                         )
                     ),

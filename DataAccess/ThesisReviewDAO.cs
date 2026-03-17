@@ -92,7 +92,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
                 ThesisId = thesisId,
                 HodId = hodId,
                 Decision = decision,
-                Note = note,
+                Comment = note,
                 DecidedAt = DateTime.UtcNow
             };
             _context.ThesisHodDecisions.Add(created);
@@ -102,7 +102,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
 
         existing.HodId = hodId;
         existing.Decision = decision;
-        existing.Note = note;
+        existing.Comment = note;
         existing.DecidedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
         return existing;
@@ -216,7 +216,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
                 Email = u?.Email,
                 FullName = u?.FullName,
                 Decision = hod.Decision,
-                Comment = hod.Note,
+                Comment = hod.Comment,
                 DecidedAt = hod.DecidedAt
             };
             status.OverallStatus = "HodDecided";
