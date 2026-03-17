@@ -16,29 +16,29 @@ namespace Services
         private readonly ISemesterRepository _semesterRepository;
         private readonly IUserRepository _userRepository;
         private readonly ICloudinaryHelper _cloudinaryHelper;
-        private readonly IArchivingService _archivingService;
         private readonly ITeamMemberRepository _teamMemberRepository;
         private readonly IThesisRepository _thesisRepository;
         private readonly ISemesterService _semesterService;
+        private readonly IWhitelistRepository _whitelistRepository;
 
         public TeamService(
             ITeamRepository teamRepository, 
             ISemesterRepository semesterRepository, 
             IUserRepository userRepository, 
             ICloudinaryHelper cloudinaryHelper, 
-            IArchivingService archivingService, 
             ITeamMemberRepository teamMemberRepository,
             IThesisRepository thesisRepository,
-            ISemesterService semesterService)
+            ISemesterService semesterService,
+            IWhitelistRepository whitelistRepository)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
             _userRepository = userRepository;
             _cloudinaryHelper = cloudinaryHelper;
-            _archivingService = archivingService;
             _teamMemberRepository = teamMemberRepository;
             _thesisRepository = thesisRepository;
             _semesterService = semesterService;
+            _whitelistRepository = whitelistRepository;
         }
 
         public async Task<TeamDTO> CreateTeamAsync(int leaderId, CreateTeamDTO createTeamDto)
@@ -50,15 +50,25 @@ namespace Services
                  throw new InvalidOperationException("No active semester found at the moment.");
             }
 
-            // 2. Validate User not in another team
+            // 2. Validate User is whitelisted for current semester
+            var leader = await _userRepository.GetByIdAsync(leaderId);
+            if (leader == null) throw new KeyNotFoundException("User not found.");
+
+            var isWhitelisted = await _whitelistRepository.IsWhitelistedInSemesterAsync(leader.Email, currentSemester.SemesterId);
+            if (!isWhitelisted)
+            {
+                throw new UnauthorizedAccessException("Bạn không có tên trong danh sách tham gia học kỳ hiện tại.");
+            }
+
+            // 3. Validate User not in another team
             var existingTeam = await _teamRepository.GetTeamByStudentIdAsync(leaderId, currentSemester.SemesterId);
             if (existingTeam != null)
             {
                 throw new InvalidOperationException("You are already a member of another team in this semester.");
             }
 
-            // 3. Generate Team Code
-            string teamCode = await GenerateTeamCodeAsync(currentSemester.SemesterId, currentSemester.SemesterName);
+            // 4. Generate Team Code
+            string teamCode = await GenerateTeamCodeAsync(currentSemester.SemesterId, currentSemester.SemesterCode);
 
             // 4. Create Team Entity
             var team = new Team
@@ -74,9 +84,7 @@ namespace Services
                 UpdatedAt = DateTime.UtcNow
             };
 
-            // 5. Add Leader as Member
-            var leader = await _userRepository.GetByIdAsync(leaderId);
-            if (leader == null) throw new KeyNotFoundException("User not found.");
+            // 6. Add Leader as Member
 
             var member = new Teammember
             {
@@ -91,29 +99,30 @@ namespace Services
             return MapToDTO(createdTeam);
         }
 
-        private async Task<string> GenerateTeamCodeAsync(int semesterId, string semesterName)
+        private async Task<string> GenerateTeamCodeAsync(int semesterId, string semesterCode)
         {
-            const string ValidPrefix = "SE_";
+            // Prefix: [SemesterCode]_SE_ (e.g., SP26_SE_)
+            string validPrefix = $"{semesterCode}_SE_";
             var teamCodes = await _teamRepository.GetTeamCodesBySemesterAsync(semesterId);
             
             if (teamCodes == null || !teamCodes.Any())
             {
-                return $"{ValidPrefix}01";
+                return $"{validPrefix}01";
             }
 
             // Optimized LINQ:
-            // 1. Filter codes starting with "SE_"
+            // 1. Filter codes starting with the semester-specific prefix
             // 2. Extract number part
-            // 3. Parse to int (use valid numbers only)
+            // 3. Parse to int
             // 4. Find Max
             int maxId = teamCodes
-                .Where(code => code.StartsWith(ValidPrefix))
-                .Select(code => code.Substring(ValidPrefix.Length))
+                .Where(code => code.StartsWith(validPrefix))
+                .Select(code => code.Substring(validPrefix.Length))
                 .Select(numPart => int.TryParse(numPart, out int id) ? id : 0)
                 .DefaultIfEmpty(0)
                 .Max();
 
-            return $"{ValidPrefix}{maxId + 1:D2}";
+            return $"{validPrefix}{maxId + 1:D2}";
         }
 
         public async Task<TeamDTO?> GetTeamByIdAsync(int teamId, int userId)
@@ -159,7 +168,9 @@ namespace Services
             // TODO: Check if team has matched topic (when Topic module implemented)
             // if (team.TopicId != null && !semesterEnded) throw ...
 
-            await _archivingService.ArchiveTeamAsync(team);
+            team.Status = CampusConstants.TeamStatus.Disbanded;
+            team.UpdatedAt = DateTime.UtcNow;
+            await _teamRepository.UpdateAsync(team);
             return true;
         }
 
@@ -195,7 +206,7 @@ namespace Services
             return new TeamDTO
             {
                 TeamId = team.TeamId,
-                TeamCode = team.TeamCode,
+                TeamCode = DisplayHelper.FormatTeamCode(team.TeamCode),
                 TeamName = team.TeamName,
                 TeamAvatar = team.TeamAvatar,
                 Description = team.Description,

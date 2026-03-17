@@ -1,4 +1,4 @@
-﻿using BusinessObjects.DTOs;
+using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 
 namespace DataAccess
@@ -18,5 +18,6 @@ namespace DataAccess
         Task AddAsync(Whitelist whitelist);
         Task DeleteAsync(Whitelist whitelist);
         Task<List<Whitelist>> SearchAsync(string term, int semesterId);
+        Task<bool> IsWhitelistedInSemesterAsync(string email, int semesterId);
     }
 }

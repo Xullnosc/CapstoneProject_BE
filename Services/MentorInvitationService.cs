@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Services.Helpers;
 
 namespace Services
 {
@@ -70,7 +71,14 @@ namespace Services
             }
 
             var pagedResult = await _invitationRepo.GetPendingMentorInvitationsByMentorIdAsync(mentorId, pageIndex, pageSize);
-            var dtos = pagedResult.Items.Select(MapToDTO).ToList();
+            
+            // Bulk fetch theses for teams in invitations
+            var teamIds = pagedResult.Items.Select(i => i.TeamId).Distinct();
+            var semester = await _semesterRepo.GetCurrentSemesterAsync();
+            var theses = await _thesisRepo.GetThesesByOwnerOrTeamAsync(new List<int>(), teamIds, semester?.SemesterId);
+            var thesisMap = theses.Where(t => t.TeamId.HasValue).ToDictionary(t => t.TeamId!.Value);
+
+            var dtos = pagedResult.Items.Select(i => MapToDTO(i, thesisMap.GetValueOrDefault(i.TeamId))).ToList();
             var result = new PagedResult<MentorInvitationDTO>(dtos, pagedResult.TotalCount, pagedResult.PageIndex, pagedResult.PageSize);
 
             if (pageIndex == 1 && pageSize == 10)
@@ -92,7 +100,11 @@ namespace Services
             }
 
             var pagedResult = await _invitationRepo.GetMentorInvitationsByTeamAsync(teamId, pageIndex, pageSize);
-            var dtos = pagedResult.Items.Select(MapToDTO).ToList();
+            
+            // Fetch thesis for this team once
+            var thesis = await _thesisRepo.GetThesisForInvitationAsync(team.LeaderId, team.SemesterId);
+
+            var dtos = pagedResult.Items.Select(i => MapToDTO(i, thesis)).ToList();
             return new PagedResult<MentorInvitationDTO>(dtos, pagedResult.TotalCount, pagedResult.PageIndex, pagedResult.PageSize);
         }
 
@@ -234,7 +246,7 @@ namespace Services
                 "Team",
                 team.TeamId);
 
-            return MapToDTO(loadedInvitation!);
+            return MapToDTO(loadedInvitation!, thesis);
         }
 
         public async Task AcceptMentorInvitationAsync(int invitationId, int mentorId)
@@ -279,6 +291,26 @@ namespace Services
             }
             await _teamRepo.UpdateAsync(team);
             await _invitationRepo.UpdateStatusAsync(invitationId, CampusConstants.InvitationStatus.Accepted);
+
+            // AUTO-TRANSITION Thesis Status
+            // If student proposed a thesis and it's waiting for a mentor, transition to Reviewing
+            try
+            {
+                var thesis = await _thesisRepo.GetThesisForInvitationAsync(team.LeaderId, team.SemesterId);
+                if (thesis != null && thesis.Status == "On Mentor Inviting")
+                {
+                    thesis.Status = "Reviewing";
+                    thesis.UpdateDate = DateTime.UtcNow;
+                    await _thesisRepo.UpdateThesisAsync(thesis);
+                    _logger.LogInformation("Thesis {ThesisId} transitioned to 'Reviewing' after mentor {MentorId} accepted invitation for team {TeamId}.", 
+                        thesis.ThesisId, mentorId, team.TeamId);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-blocking error
+                _logger.LogError(ex, "Failed to auto-transition thesis status for team {TeamId} after mentor acceptance.", team.TeamId);
+            }
 
             // Invalidate cache after accepting
             await _redisService.DeleteValueAsync(MentorInvitationsKey(mentorId));
@@ -351,14 +383,14 @@ namespace Services
             return count;
         }
 
-        private MentorInvitationDTO MapToDTO(Teaminvitation entity)
+        private MentorInvitationDTO MapToDTO(Teaminvitation entity, Thesis? thesis = null)
         {
-            return new MentorInvitationDTO
+            var dto = new MentorInvitationDTO
             {
                 InvitationId = entity.InvitationId,
                 TeamId = entity.TeamId,
                 TeamName = entity.Team?.TeamName ?? string.Empty,
-                TeamCode = entity.Team?.TeamCode ?? string.Empty,
+                TeamCode = DisplayHelper.FormatTeamCode(entity.Team?.TeamCode),
                 MentorId = entity.StudentId,
                 MentorEmail = entity.Student?.Email ?? string.Empty,
                 MentorName = entity.Student?.FullName ?? string.Empty,
@@ -370,6 +402,15 @@ namespace Services
                 CreatedAt = entity.CreatedAt,
                 RespondedAt = entity.RespondedAt
             };
+
+            if (thesis != null)
+            {
+                dto.ThesisId = thesis.ThesisId;
+                dto.ThesisTitle = thesis.Title;
+                dto.ThesisStatus = thesis.Status;
+            }
+
+            return dto;
         }
 
         private async Task TryCreateNotificationAsync(int userId, string type, string title, string message, string? relatedEntityType, int? relatedEntityId)

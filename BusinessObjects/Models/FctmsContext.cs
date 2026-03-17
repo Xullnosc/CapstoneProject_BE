@@ -11,10 +11,6 @@ public partial class FctmsContext : DbContext
     {
     }
 
-    public virtual DbSet<ArchivedTeam> ArchivedTeams { get; set; }
-
-    public virtual DbSet<ArchivedWhitelist> ArchivedWhitelists { get; set; }
-
     public virtual DbSet<FlywaySchemaHistory> FlywaySchemaHistories { get; set; }
 
     public virtual DbSet<Role> Roles { get; set; }
@@ -84,43 +80,6 @@ public partial class FctmsContext : DbContext
                 .HasColumnType("datetime");
         });
 
-        modelBuilder.Entity<ArchivedTeam>(entity =>
-        {
-            entity.HasKey(e => e.ArchivedTeamId).HasName("PRIMARY");
-
-            entity.ToTable("archived_teams");
-
-            entity.HasIndex(e => e.OriginalTeamId, "IX_ArchivedTeam_Original");
-
-            entity.HasIndex(e => e.SemesterId, "IX_ArchivedTeam_Semester");
-
-            entity.Property(e => e.ArchivedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-            entity.Property(e => e.JsonData).HasColumnType("json");
-            entity.Property(e => e.Status).HasMaxLength(50);
-            entity.Property(e => e.TeamCode).HasMaxLength(50);
-            entity.Property(e => e.TeamName).HasMaxLength(100);
-        });
-
-        modelBuilder.Entity<ArchivedWhitelist>(entity =>
-        {
-            entity.HasKey(e => e.ArchivedWhitelistId).HasName("PRIMARY");
-
-            entity.ToTable("archived_whitelists");
-
-            entity.HasIndex(e => e.SemesterId, "IX_ArchivedWhitelist_Semester");
-
-            entity.HasIndex(e => e.StudentCode, "IX_ArchivedWhitelist_Student");
-
-            entity.Property(e => e.ArchivedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-            entity.Property(e => e.Campus).HasMaxLength(50);
-            entity.Property(e => e.Email).HasMaxLength(100);
-            entity.Property(e => e.FullName).HasMaxLength(100);
-            entity.Property(e => e.StudentCode).HasMaxLength(50);
-        });
 
         modelBuilder.Entity<Notification>(entity =>
         {

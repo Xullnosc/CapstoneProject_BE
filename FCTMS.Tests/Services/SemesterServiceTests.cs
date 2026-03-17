@@ -16,7 +16,6 @@ namespace FCTMS.Tests.Services
     public class SemesterServiceTests
     {
         private readonly Mock<ISemesterRepository> _mockSemesterRepository;
-        private readonly Mock<IArchivingService> _mockArchivingService;
         private readonly Mock<IMapper> _mockMapper;
         private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<IRedisService> _mockRedisService;
@@ -28,7 +27,6 @@ namespace FCTMS.Tests.Services
         public SemesterServiceTests()
         {
             _mockSemesterRepository = new Mock<ISemesterRepository>();
-            _mockArchivingService = new Mock<IArchivingService>();
             _mockMapper = new Mock<IMapper>();
             _mockUserRepository = new Mock<IUserRepository>();
             _mockRedisService = new Mock<IRedisService>();
@@ -58,7 +56,6 @@ namespace FCTMS.Tests.Services
 
             _semesterService = new SemesterService(
                 _mockSemesterRepository.Object,
-                _mockArchivingService.Object,
                 _mockMapper.Object,
                 _mockUserRepository.Object,
                 _mockRedisService.Object,
@@ -259,8 +256,6 @@ namespace FCTMS.Tests.Services
             };
 
             _mockSemesterRepository.Setup(r => r.GetAllSemestersAsync()).ReturnsAsync(semesters);
-            _mockArchivingService.Setup(s => s.GetArchivedTeamsBySemesterIdsAsync(It.IsAny<List<int>>()))
-                .ReturnsAsync(new List<ArchivedTeam>());
             _mockMapper.Setup(m => m.Map<List<SemesterDTO>>(semesters)).Returns(semesterDTOs);
 
             // Act
@@ -280,8 +275,6 @@ namespace FCTMS.Tests.Services
             var semesterDTOs = new List<SemesterDTO>();
 
             _mockSemesterRepository.Setup(r => r.GetAllSemestersAsync()).ReturnsAsync(semesters);
-            _mockArchivingService.Setup(s => s.GetArchivedTeamsBySemesterIdsAsync(It.IsAny<List<int>>()))
-                .ReturnsAsync(new List<ArchivedTeam>());
             _mockMapper.Setup(m => m.Map<List<SemesterDTO>>(semesters)).Returns(semesterDTOs);
 
             // Act
@@ -319,21 +312,11 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
             _mockMapper.Setup(m => m.Map<SemesterDTO>(semester)).Returns(semesterDTO);
 
-            // Mock archived data (empty)
-            _mockArchivingService.Setup(s => s.GetArchivedTeamsBySemesterAsync(id))
-                .ReturnsAsync(new List<ArchivedTeam>());
-            _mockArchivingService.Setup(s => s.GetArchivedWhitelistsBySemesterIdsAsync(It.IsAny<List<int>>()))
-                .ReturnsAsync(new List<ArchivedWhitelist>());
-
             // Mock studentRoleId
             _mockSemesterRepository.Setup(r => r.GetStudentRoleIdAsync()).ReturnsAsync(2);
 
             // Mock mapper for list types used inside the method
             _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(It.IsAny<List<Whitelist>>()))
-                .Returns(new List<WhitelistDTO>());
-            _mockMapper.Setup(m => m.Map<List<TeamSimpleDTO>>(It.IsAny<List<ArchivedTeam>>()))
-                .Returns(new List<TeamSimpleDTO>());
-            _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(It.IsAny<List<ArchivedWhitelist>>()))
                 .Returns(new List<WhitelistDTO>());
 
             // Mock user lookup for avatar population
@@ -375,7 +358,6 @@ namespace FCTMS.Tests.Services
 
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
             _mockSemesterRepository.Setup(r => r.UpdateSemesterAsync(semester)).Returns(Task.CompletedTask);
-            _mockArchivingService.Setup(s => s.ArchiveSemesterAsync(id)).Returns(Task.CompletedTask);
 
             // Act
             await _semesterService.EndSemesterAsync(id);
@@ -383,28 +365,8 @@ namespace FCTMS.Tests.Services
             // Assert
             semester.Status.Should().Be("Ended");
             _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(semester), Times.Once);
-            _mockArchivingService.Verify(s => s.ArchiveSemesterAsync(id), Times.Once);
         }
 
-        [Fact]
-        public async Task EndSemesterAsync_ShouldStillEnd_WhenArchivingFails()
-        {
-            // Arrange
-            int id = 1;
-            var semester = new Semester { SemesterId = id, Status = "Active" };
-
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
-            _mockSemesterRepository.Setup(r => r.UpdateSemesterAsync(semester)).Returns(Task.CompletedTask);
-            _mockArchivingService.Setup(s => s.ArchiveSemesterAsync(id)).ThrowsAsync(new Exception("Archive failed"));
-
-            // Act
-            await _semesterService.EndSemesterAsync(id);
-
-            // Assert
-            semester.Status.Should().Be("Ended"); // Should still be Ended
-            _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(semester), Times.Once);
-            _mockArchivingService.Verify(s => s.ArchiveSemesterAsync(id), Times.Once);
-        }
 
         [Fact]
         public async Task EndSemesterAsync_ShouldThrowKeyNotFound_WhenIdDoesNotExist()
@@ -421,7 +383,6 @@ namespace FCTMS.Tests.Services
                 .WithMessage($"Semester with ID {id} not found.");
             
             _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(It.IsAny<Semester>()), Times.Never);
-            _mockArchivingService.Verify(s => s.ArchiveSemesterAsync(It.IsAny<int>()), Times.Never);
         }
 
         #endregion

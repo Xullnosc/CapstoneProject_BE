@@ -1,4 +1,4 @@
-﻿using BusinessObjects.Models;
+using BusinessObjects.Models;
 
 namespace Repositories
 {
@@ -14,6 +14,7 @@ namespace Repositories
         Task UpdateAsync(Whitelist whitelist);
         Task AddAsync(Whitelist whitelist);
         Task DeleteAsync(Whitelist whitelist);
+        Task<bool> IsWhitelistedInSemesterAsync(string email, int semesterId);
         Task<List<Whitelist>> SearchAsync(string term, int semesterId);
     }
 }
