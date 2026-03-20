@@ -214,6 +214,7 @@ namespace Services
                 LeaderId = team.LeaderId,
                 Status = team.Status,
                 MemberCount = team.Teammembers?.Count ?? 0,
+                IsSpecial = team.IsSpecial,
                 CreatedAt = team.CreatedAt ?? DateTime.UtcNow,
                 Members = team.Teammembers?.Select(tm => new TeamMemberDTO
                 {
@@ -326,6 +327,25 @@ namespace Services
                 await _semesterService.InvalidateSemesterCacheAsync();
             }
             return result;
+        }
+
+        public async Task<bool> ToggleSpecialFlagAsync(int teamId, int hodUserId)
+        {
+            var user = await _userRepository.GetByIdAsync(hodUserId);
+            if (user == null || user.Role?.RoleName != CampusConstants.Roles.HOD)
+            {
+                throw new UnauthorizedAccessException("Only Head of Department can toggle the special flag.");
+            }
+
+            var team = await _teamRepository.GetByIdAsync(teamId);
+            if (team == null) return false;
+
+            team.IsSpecial = !team.IsSpecial;
+            team.UpdatedAt = DateTime.UtcNow;
+
+            await _teamRepository.UpdateAsync(team);
+            await _semesterService.InvalidateSemesterCacheAsync();
+            return true;
         }
     }
 }

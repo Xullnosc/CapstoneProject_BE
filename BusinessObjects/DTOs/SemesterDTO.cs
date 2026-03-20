@@ -33,6 +33,7 @@ namespace BusinessObjects.DTOs
         public string TeamName { get; set; } = null!;
         public string? Status { get; set; }
         public int MemberCount { get; set; }
+        public bool IsSpecial { get; set; }
     }
 
     public class WhitelistDTO

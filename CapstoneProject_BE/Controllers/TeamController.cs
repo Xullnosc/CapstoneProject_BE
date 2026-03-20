@@ -12,7 +12,7 @@ namespace CapstoneProject_BE.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Student,Lecturer")]
+    [Authorize(Roles = "Student,Lecturer,HOD")]
     public class TeamController : ControllerBase
     {
         private readonly ITeamService _teamService;
@@ -276,6 +276,32 @@ namespace CapstoneProject_BE.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        [HttpPut("{id}/special")]
+        [Authorize(Roles = "HOD")]
+        public async Task<IActionResult> ToggleSpecialFlag(int id)
+        {
+            try
+            {
+                if (!int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
+
+                bool result = await _teamService.ToggleSpecialFlagAsync(id, userId);
+                if (!result) return NotFound(new { message = "Team not found." });
+
+                return Ok(new { message = "Team special status toggled successfully." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
             }
         }
     }

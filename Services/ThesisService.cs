@@ -72,9 +72,9 @@ namespace Services
                 if (team.LeaderId != user.UserId)
                     throw new InvalidOperationException("Only the team leader can propose a thesis.");
 
-                if (team.Teammembers.Count < 4)
+                if (!team.IsSpecial && team.Teammembers.Count < 4)
                     throw new InvalidOperationException(
-                        $"Your team must have at least 4 members to propose a thesis. Current members: {team.Teammembers.Count}.");
+                        $"Your team must have at least 4 members to propose a thesis unless marked as special. Current members: {team.Teammembers.Count}.");
             }
 
             string? fileUrl = null;

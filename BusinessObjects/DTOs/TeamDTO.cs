@@ -24,6 +24,7 @@ namespace BusinessObjects.DTOs
 
         public string Status { get; set; }
         public int MemberCount { get; set; }
+        public bool IsSpecial { get; set; }
         public DateTime CreatedAt { get; set; }
         public List<TeamMemberDTO> Members { get; set; }
     }
