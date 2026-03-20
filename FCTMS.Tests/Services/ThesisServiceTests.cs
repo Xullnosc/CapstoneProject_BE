@@ -833,8 +833,66 @@ namespace FCTMS.Tests.Services
             await act.Should()
                 .ThrowAsync<InvalidOperationException>()
                 .WithMessage(
-                    "Your team must have at least 4 members to propose a thesis. Current members: 3."
+                    "Your team must have at least 4 members to propose a thesis unless marked as special. Current members: 3."
                 );
+        }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldSucceed_WhenTeamIsSpecialWithFewerThan4Members()
+        {
+            // Arrange
+            string email = "leader@fpt.edu.vn";
+            int userId = 5;
+            var user = new User
+            {
+                UserId = userId,
+                Email = email,
+                Role = new Role { RoleName = "Student" },
+            };
+            // Only 2 members but team is marked as Special
+            var team = new Team
+            {
+                TeamId = 1,
+                LeaderId = userId,
+                IsSpecial = true,
+                Teammembers = new List<Teammember> { new(), new() }, // 2 members
+            };
+            var currentSemester = new Semester { SemesterId = 1 };
+
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.FileName).Returns("thesis.docx");
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository
+                .Setup(x => x.GetThesesByUserIdAsync(userId))
+                .ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository
+                .Setup(x => x.GetActiveTeamByStudentIdAsync(userId))
+                .ReturnsAsync(team);
+            _mockCloudinaryHelper
+                .Setup(x => x.UploadFileAsync(mockFile.Object))
+                .ReturnsAsync("https://cloudinary.com/file.docx");
+            _mockSemesterRepository
+                .Setup(x => x.GetCurrentSemesterAsync())
+                .ReturnsAsync(currentSemester);
+
+            Thesis? capturedThesis = null;
+            _mockThesisRepository
+                .Setup(x => x.CreateThesisAsync(It.IsAny<Thesis>()))
+                .Callback<Thesis>(t => capturedThesis = t)
+                .ReturnsAsync((Thesis t) => t);
+
+            // Act
+            var result = await _thesisService.ProposeThesisAsync(
+                new ProposeThesisDTO { Title = "Special Team Thesis", File = mockFile.Object },
+                email
+            );
+
+            // Assert — should succeed despite only 2 members because IsSpecial = true
+            capturedThesis.Should().NotBeNull();
+            capturedThesis!.Status.Should().Be("On Mentor Inviting");
+            capturedThesis.UserId.Should().Be(userId);
+            _mockThesisRepository.Verify(x => x.CreateThesisAsync(It.IsAny<Thesis>()), Times.Once);
         }
 
         [Fact]
