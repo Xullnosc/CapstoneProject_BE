@@ -195,12 +195,13 @@ public class AuthService : IAuthService
                 // 5. Generate JWT Token
                 var jwtSettings = GetJwtSettings();
 
-                // Fetch IsReviewer from Lecturers table if applicable
+                // Fetch IsReviewer + LecturerId from Lecturers table if applicable
                 bool isReviewer = false;
+                Lecturer? lecturerRow = null;
                 if (user.Role?.RoleName == CampusConstants.Roles.Lecturer)
                 {
-                    var lecturer = await _lecturerRepository.GetByEmailAsync(user.Email);
-                    isReviewer = lecturer?.IsReviewer ?? false;
+                    lecturerRow = await _lecturerRepository.GetByEmailAsync(user.Email);
+                    isReviewer = lecturerRow?.IsReviewer ?? false;
                 }
 
                 var accessToken = JwtTokenGenerator.GenerateToken(user, isReviewer, jwtSettings);
@@ -208,6 +209,7 @@ public class AuthService : IAuthService
 
                 var userInfo = _mapper.Map<UserInfoDTO>(user);
                 userInfo.IsReviewer = isReviewer;
+                userInfo.LecturerId = lecturerRow?.LecturerId;
 
                 await _accessLogRepository.CreateLogAsync(new AccessLog
                 {
@@ -244,8 +246,9 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException("Invalid username or password.");
 
         var roleName = credential.User.Role.RoleName;
-        if (roleName != CampusConstants.Roles.HOD && roleName != CampusConstants.Roles.Admin)
-            throw new UnauthorizedAccessException("Credential login is only allowed for HOD and Admin.");
+        // pass rule student login
+        // if (roleName != CampusConstants.Roles.HOD && roleName != CampusConstants.Roles.Admin)
+        //     throw new UnauthorizedAccessException("Credential login is only allowed for HOD and Admin.");
 
         bool isValid = false;
         try
@@ -279,10 +282,20 @@ public class AuthService : IAuthService
         await _userRepository.UpdateAsync(user);
 
         var jwtSettings = GetJwtSettings();
-        var accessToken = JwtTokenGenerator.GenerateToken(user, false, jwtSettings);
+        
+        // Fetch IsReviewer from Lecturers table if applicable
+        bool isReviewer = false;
+        if (user.Role?.RoleName == CampusConstants.Roles.Lecturer)
+        {
+            var lecturer = await _lecturerRepository.GetByEmailAsync(user.Email);
+            isReviewer = lecturer?.IsReviewer ?? false;
+        }
+
+        var accessToken = JwtTokenGenerator.GenerateToken(user, isReviewer, jwtSettings);
         var (refreshToken, refreshExpiresAt) = await CreateRefreshTokenAndSaveAsync(user.UserId);
 
         var userInfo = _mapper.Map<UserInfoDTO>(user);
+        userInfo.IsReviewer = isReviewer;
         
         await _accessLogRepository.CreateLogAsync(new AccessLog
         {
