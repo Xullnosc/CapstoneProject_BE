@@ -16,5 +16,6 @@ namespace Services
         Task<bool> RemoveMemberAsync(int teamId, int studentId);
         Task<bool> ChangeLeaderAsync(int teamId, int currentLeaderId, int newLeaderId);
         Task<List<TeamDTO>> GetMentorTeamsAsync(int mentorId);
+        Task<bool> ToggleSpecialFlagAsync(int teamId, int hodUserId);
     }
 }

@@ -2,4 +2,4 @@
 -- Consolidating schema to remove unused Note field in history for simplicity.
 
 ALTER TABLE `thesis_histories`
-DROP COLUMN IF EXISTS `Note`;
+DROP COLUMN `Note`;

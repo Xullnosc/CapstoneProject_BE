@@ -244,5 +244,97 @@ namespace FCTMS.Tests.Services
             // Assert
             result.TeamCode.Should().Be("SE_16");
         }
+
+        #region ToggleSpecialFlagAsync Tests
+
+        [Fact]
+        public async Task ToggleSpecialFlagAsync_ShouldMarkAsSpecial_WhenHodCallsOnNonSpecialTeam()
+        {
+            // Arrange
+            int teamId = 1;
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var team = new Team { TeamId = teamId, IsSpecial = false };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
+            _mockTeamRepository.Setup(r => r.UpdateAsync(team)).ReturnsAsync(true);
+
+            // Act
+            var result = await _teamService.ToggleSpecialFlagAsync(teamId, hodUserId);
+
+            // Assert
+            result.Should().BeTrue();
+            team.IsSpecial.Should().BeTrue();
+            _mockTeamRepository.Verify(r => r.UpdateAsync(team), Times.Once);
+            _mockSemesterService.Verify(s => s.InvalidateSemesterCacheAsync(null), Times.Once);
+        }
+
+        [Fact]
+        public async Task ToggleSpecialFlagAsync_ShouldUnmarkAsSpecial_WhenHodCallsOnSpecialTeam()
+        {
+            // Arrange
+            int teamId = 1;
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var team = new Team { TeamId = teamId, IsSpecial = true };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
+            _mockTeamRepository.Setup(r => r.UpdateAsync(team)).ReturnsAsync(true);
+
+            // Act
+            var result = await _teamService.ToggleSpecialFlagAsync(teamId, hodUserId);
+
+            // Assert
+            result.Should().BeTrue();
+            team.IsSpecial.Should().BeFalse();
+            _mockTeamRepository.Verify(r => r.UpdateAsync(team), Times.Once);
+        }
+
+        [Fact]
+        public async Task ToggleSpecialFlagAsync_ShouldReturnFalse_WhenTeamNotFound()
+        {
+            // Arrange
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(999)).ReturnsAsync((Team?)null);
+
+            // Act
+            var result = await _teamService.ToggleSpecialFlagAsync(999, hodUserId);
+
+            // Assert
+            result.Should().BeFalse();
+            _mockTeamRepository.Verify(r => r.UpdateAsync(It.IsAny<Team>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task ToggleSpecialFlagAsync_ShouldThrowUnauthorized_WhenUserIsNotHod()
+        {
+            // Arrange
+            int userId = 5;
+            var studentUser = new User { UserId = userId, Role = new Role { RoleName = "Student" } };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(studentUser);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(
+                () => _teamService.ToggleSpecialFlagAsync(1, userId));
+        }
+
+        [Fact]
+        public async Task ToggleSpecialFlagAsync_ShouldThrowUnauthorized_WhenUserNotFound()
+        {
+            // Arrange
+            _mockUserRepository.Setup(r => r.GetByIdAsync(999)).ReturnsAsync((User?)null);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(
+                () => _teamService.ToggleSpecialFlagAsync(1, 999));
+        }
+
+        #endregion
     }
 }
