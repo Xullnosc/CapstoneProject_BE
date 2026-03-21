@@ -1,0 +1,312 @@
+using BusinessObjects.Models;
+using Repositories;
+using Services.DTOs;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Services
+{
+    public class ThesisApplicationService : IThesisApplicationService
+    {
+        private readonly IThesisApplicationRepository _appRepo;
+        private readonly IThesisRepository _thesisRepo;
+        private readonly ITeamRepository _teamRepo;
+        private readonly ISemesterRepository _semesterRepo;
+        private readonly ITeamInvitationRepository _teamInvRepo;
+
+        public ThesisApplicationService(
+            IThesisApplicationRepository appRepo,
+            IThesisRepository thesisRepo,
+            ITeamRepository teamRepo,
+            ISemesterRepository semesterRepo,
+            ITeamInvitationRepository teamInvRepo)
+        {
+            _appRepo = appRepo;
+            _thesisRepo = thesisRepo;
+            _teamRepo = teamRepo;
+            _semesterRepo = semesterRepo;
+            _teamInvRepo = teamInvRepo;
+        }
+
+        public async Task<ThesisApplicationDTO> SubmitApplicationAsync(int userId, string thesisId)
+        {
+            // 1. Find the active semester
+            var semester = await _semesterRepo.GetCurrentSemesterAsync();
+            if (semester == null)
+                throw new InvalidOperationException("No active semester found.");
+
+            // 2. Find team where user is Leader in the active semester
+            var team = await _teamRepo.GetTeamByStudentIdAsync(userId, semester.SemesterId);
+            if (team == null)
+                throw new InvalidOperationException("You are not a member of any team in the current semester.");
+            if (team.LeaderId != userId)
+                throw new InvalidOperationException("Only the team leader can submit an application.");
+
+            // 3. Find the thesis
+            var thesis = await _thesisRepo.GetThesisByIdAsync(thesisId);
+            if (thesis == null)
+                throw new KeyNotFoundException("Thesis not found.");
+
+            // 4. Validate: thesis must be Published
+            if (thesis.Status != "Published")
+                throw new InvalidOperationException("Only theses with 'Published' status can be applied for.");
+
+            // 5. Validate: team must not already have an Approved application in this semester
+            var hasApproved = await _appRepo.HasApprovedInSemesterAsync(team.TeamId, semester.SemesterId);
+            if (hasApproved)
+                throw new InvalidOperationException("Your team already has an approved application in this semester.");
+
+            // 6. Validate: no active (Pending/Approved) application for same thesis + team
+            var existing = await _appRepo.GetActiveByThesisAndTeamAsync(thesisId, team.TeamId);
+            if (existing != null)
+                throw new InvalidOperationException("Your team already has an active application for this thesis.");
+
+            // 7. Create
+            var application = new ThesisApplication
+            {
+                ThesisId = thesisId,
+                TeamId = team.TeamId,
+                Status = "Pending",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var created = await _appRepo.CreateAsync(application);
+
+            return new ThesisApplicationDTO
+            {
+                Id = created.Id,
+                ThesisId = created.ThesisId,
+                ThesisTitle = thesis.Title,
+                ThesisOwnerName = null,
+                TeamId = team.TeamId,
+                TeamName = team.TeamName,
+                Status = created.Status,
+                CreatedAt = created.CreatedAt
+            };
+        }
+
+        public async Task CancelApplicationAsync(int userId, int applicationId)
+        {
+            var app = await _appRepo.GetByIdAsync(applicationId);
+            if (app == null)
+                throw new KeyNotFoundException("Application not found.");
+
+            // Validate: user must be Leader of the team
+            if (app.Team.LeaderId != userId)
+                throw new UnauthorizedAccessException("Only the team leader can cancel this application.");
+
+            // Validate: only Pending can be cancelled
+            if (app.Status != "Pending")
+                throw new InvalidOperationException("Only applications with 'Pending' status can be cancelled.");
+
+            // Soft-delete: set status to Cancelled
+            app.Status = "Cancelled";
+            await _appRepo.UpdateAsync(app);
+        }
+
+        public async Task<List<ThesisApplicationDTO>> GetApplicationsByTeamAsync(int userId, int? teamId = null)
+        {
+            int resolvedTeamId;
+
+            if (teamId.HasValue)
+            {
+                resolvedTeamId = teamId.Value;
+            }
+            else
+            {
+                var semester = await _semesterRepo.GetCurrentSemesterAsync();
+                if (semester == null)
+                    return new List<ThesisApplicationDTO>();
+
+                var team = await _teamRepo.GetTeamByStudentIdAsync(userId, semester.SemesterId);
+                if (team == null)
+                    return new List<ThesisApplicationDTO>();
+
+                resolvedTeamId = team.TeamId;
+            }
+
+            var apps = await _appRepo.GetByTeamIdAsync(resolvedTeamId);
+
+            return apps.Select(a => new ThesisApplicationDTO
+            {
+                Id = a.Id,
+                ThesisId = a.ThesisId,
+                ThesisTitle = a.Thesis?.Title,
+                ThesisOwnerName = a.Thesis?.User?.FullName,
+                TeamId = a.TeamId,
+                TeamName = a.Team?.TeamName,
+                Status = a.Status,
+                CreatedAt = a.CreatedAt
+            }).ToList();
+        }
+
+        // ===== F093: Approve / Reject / Get by Thesis =====
+
+        public async Task<object> GetApplicationsByThesisAsync(
+            int userId, string thesisId, string? status, string? search, int page, int limit)
+        {
+            // Authorization: thesis owner OR reviewer (mentor) of the owner's team can view
+            var thesis = await _thesisRepo.GetThesisByIdAsync(thesisId);
+            if (thesis == null)
+                throw new KeyNotFoundException("Thesis not found.");
+
+            bool isAuthorized = false;
+            if (thesis.UserId == userId)
+            {
+                isAuthorized = true;
+            }
+            else
+            {
+                var semester = await _semesterRepo.GetCurrentSemesterAsync();
+                if (semester != null)
+                {
+                    var ownerTeam = await _teamRepo.GetTeamByStudentIdAsync(thesis.UserId, semester.SemesterId);
+                    if (ownerTeam != null && (ownerTeam.MentorId == userId || ownerTeam.MentorId2 == userId))
+                    {
+                        isAuthorized = true;
+                    }
+                }
+            }
+
+            if (!isAuthorized)
+                throw new UnauthorizedAccessException("You are not authorized to view applications for this thesis.");
+
+            var (items, totalCount) = await _appRepo.GetByThesisIdPagedAsync(thesisId, status, search, page, limit);
+
+            var dtos = items.Select(a => new
+            {
+                a.Id,
+                a.ThesisId,
+                a.TeamId,
+                TeamName = a.Team?.TeamName,
+                TeamCode = a.Team?.TeamCode,
+                LeaderName = a.Team?.Leader?.FullName,
+                a.Status,
+                a.CreatedAt,
+                Members = a.Team?.Teammembers?.Select(m => new
+                {
+                    m.StudentId,
+                    FullName = m.Student?.FullName,
+                    StudentCode = m.Student?.StudentCode
+                }).ToList()
+            }).ToList();
+
+            return new
+            {
+                Items = dtos,
+                TotalCount = totalCount,
+                Page = page,
+                Limit = limit,
+                TotalPages = (int)Math.Ceiling((double)totalCount / limit)
+            };
+        }
+
+        public async Task ApproveApplicationAsync(int userId, int applicationId)
+        {
+            var app = await _appRepo.GetByIdAsync(applicationId);
+            if (app == null)
+                throw new KeyNotFoundException("Application not found.");
+
+            // Authorization: only thesis owner or their team mentor can approve
+            var thesis = await _thesisRepo.GetThesisByIdAsync(app.ThesisId);
+            if (thesis == null)
+                throw new KeyNotFoundException("Thesis not found.");
+
+            bool isAuthorized = false;
+            if (thesis.UserId == userId)
+            {
+                isAuthorized = true;
+            }
+            else
+            {
+                var authSemester = await _semesterRepo.GetCurrentSemesterAsync();
+                if (authSemester != null)
+                {
+                    var ownerTeam = await _teamRepo.GetTeamByStudentIdAsync(thesis.UserId, authSemester.SemesterId);
+                    if (ownerTeam != null && (ownerTeam.MentorId == userId || ownerTeam.MentorId2 == userId))
+                    {
+                        isAuthorized = true;
+                    }
+                }
+            }
+
+            if (!isAuthorized)
+                throw new UnauthorizedAccessException("Only the thesis owner or their team mentor can approve applications.");
+
+            if (app.Status != "Pending")
+                throw new InvalidOperationException("Only Pending applications can be approved.");
+
+            // Validate: GV is mentor of fewer than 4 teams in current semester
+            var semester = await _semesterRepo.GetCurrentSemesterAsync();
+            if (semester == null)
+                throw new InvalidOperationException("No active semester found.");
+
+            var mentorTeamCount = await _teamInvRepo.GetMentorActiveTeamCountAsync(userId, semester.SemesterId);
+            if (mentorTeamCount >= 4)
+                throw new InvalidOperationException("You have reached the maximum number of mentored teams (4) for this semester.");
+
+            // 1. Approve this application
+            app.Status = "Approved";
+            await _appRepo.UpdateAsync(app);
+
+            // 2. Reject all other Pending applications for the same thesis
+            await _appRepo.RejectAllPendingByThesisIdExceptAsync(app.ThesisId, app.Id);
+
+            // 3. Assign thesis.TeamId
+            thesis.TeamId = app.TeamId;
+
+            // 4. Set thesis status → "Registered"
+            thesis.Status = "Registered";
+            await _thesisRepo.UpdateThesisAsync(thesis);
+
+            // 5. Set GV as team's MentorId
+            var team = await _teamRepo.GetByIdAsync(app.TeamId);
+            if (team != null)
+            {
+                team.MentorId = userId;
+                await _teamRepo.UpdateAsync(team);
+            }
+        }
+
+        public async Task RejectApplicationAsync(int userId, int applicationId)
+        {
+            var app = await _appRepo.GetByIdAsync(applicationId);
+            if (app == null)
+                throw new KeyNotFoundException("Application not found.");
+
+            // Authorization: only thesis owner or their team mentor can reject
+            var thesis = await _thesisRepo.GetThesisByIdAsync(app.ThesisId);
+            if (thesis == null)
+                throw new KeyNotFoundException("Thesis not found.");
+
+            bool isAuthorized = false;
+            if (thesis.UserId == userId)
+            {
+                isAuthorized = true;
+            }
+            else
+            {
+                var semester = await _semesterRepo.GetCurrentSemesterAsync();
+                if (semester != null)
+                {
+                    var ownerTeam = await _teamRepo.GetTeamByStudentIdAsync(thesis.UserId, semester.SemesterId);
+                    if (ownerTeam != null && (ownerTeam.MentorId == userId || ownerTeam.MentorId2 == userId))
+                    {
+                        isAuthorized = true;
+                    }
+                }
+            }
+
+            if (!isAuthorized)
+                throw new UnauthorizedAccessException("Only the thesis owner or their team mentor can reject applications.");
+
+            if (app.Status != "Pending")
+                throw new InvalidOperationException("Only Pending applications can be rejected.");
+
+            app.Status = "Rejected";
+            await _appRepo.UpdateAsync(app);
+        }
+    }
+}

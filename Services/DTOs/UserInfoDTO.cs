@@ -13,6 +13,7 @@ namespace Services.DTOs
         public bool HasTeam { get; set; }
         public int? PendingInvitationId { get; set; }
         public bool IsReviewer { get; set; }
+        public int? LecturerId { get; set; }
         public string? PhoneNumber { get; set; }
         public string? GithubLink { get; set; }
         public string? LinkedInLink { get; set; }

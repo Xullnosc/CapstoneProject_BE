@@ -52,6 +52,8 @@ namespace Services
             var user = await _userRepository.GetByEmailAsync(email);
             if (user == null)
                 throw new Exception("User not found");
+            
+            Team? team = null;
 
             // Prevent multiple theses per leader, except for Lecturers.
             // Allow re-proposing if all previous theses are Cancelled or Rejected.
@@ -65,7 +67,7 @@ namespace Services
             // Students must be the team leader and the team must have at least 4 members.
             if (user.Role?.RoleName != CampusConstants.Roles.Lecturer)
             {
-                var team = await _teamRepository.GetActiveTeamByStudentIdAsync(user.UserId);
+                team = await _teamRepository.GetActiveTeamByStudentIdAsync(user.UserId);
                 if (team == null)
                     throw new InvalidOperationException("You must be in an active team to propose a thesis.");
 
@@ -82,6 +84,7 @@ namespace Services
                 fileUrl = await _cloudinaryHelper.UploadFileAsync(req.File);
 
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            var hasAssignedMentor = team?.MentorId.HasValue == true || team?.MentorId2.HasValue == true;
 
             var thesis = new Thesis
             {
@@ -93,8 +96,8 @@ namespace Services
                 UserId = user.UserId,
                 FileUrl = fileUrl,
                 Status = user.Role?.RoleName == CampusConstants.Roles.Lecturer
-                ? "Reviewing"
-                : "On Mentor Inviting",
+                    ? "Reviewing"
+                    : (hasAssignedMentor ? "Reviewing" : "On Mentor Inviting"),
                 SemesterId = currentSemester?.SemesterId,
                 UpDate = DateTime.UtcNow,
                 UpdateDate = DateTime.UtcNow
@@ -103,7 +106,6 @@ namespace Services
             // Set TeamId based on role (Lecturers don't have teams)
             if (user.Role?.RoleName != CampusConstants.Roles.Lecturer)
             {
-                var team = await _teamRepository.GetActiveTeamByStudentIdAsync(user.UserId);
                 if (team != null)
                 {
                     thesis.TeamId = team.TeamId;
@@ -180,7 +182,11 @@ namespace Services
 
                 // Update thesis with new file URL and transition status
                 thesis.FileUrl = newFileUrl;
-                if (thesis.Status == "Need Update" || thesis.Status == "Reviewing")
+                if (thesis.Status == "Need Update")
+                {
+                    thesis.Status = "Reviewing";  // Re-enter review queue
+                }
+                else if (thesis.Status == "Reviewing")
                 {
                     thesis.Status = "Updated";
                 }
