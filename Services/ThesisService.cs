@@ -690,18 +690,20 @@ namespace Services
 
             var dto = _mapper.Map<ThesisDTO>(thesis);
             var reviewStatus = await _thesisReviewRepository.GetReviewStatusAsync(id);
-            dto.Reviews = reviewStatus
-                .Reviewers.Select(r => new ReviewDTO
-                {
-                    ThesisId = id,
-                    ReviewerId = r.UserId,
-                    ReviewerName = r.FullName,
-                    Decision = string.IsNullOrWhiteSpace(r.Decision) ? "Pending" : r.Decision,
-                    Comment = r.Comment,
-                    FileUrl = r.FileUrl,
-                    ReviewedAt = r.ReviewedAt ?? DateTime.MinValue,
-                })
-                .ToList();
+            dto.Reviews = reviewStatus?.Reviewers is null
+                ? new List<ReviewDTO>()
+                : reviewStatus
+                    .Reviewers.Select(r => new ReviewDTO
+                    {
+                        ThesisId = id,
+                        ReviewerId = r.UserId,
+                        ReviewerName = r.FullName,
+                        Decision = string.IsNullOrWhiteSpace(r.Decision) ? "Pending" : r.Decision,
+                        Comment = r.Comment,
+                        FileUrl = r.FileUrl,
+                        ReviewedAt = r.ReviewedAt ?? DateTime.MinValue,
+                    })
+                    .ToList();
 
             return dto;
         }
