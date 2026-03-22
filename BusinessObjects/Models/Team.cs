@@ -29,6 +29,8 @@ public partial class Team
 
     public DateTime? UpdatedAt { get; set; }
 
+    public bool IsSpecial { get; set; }
+
     public virtual User Leader { get; set; } = null!;
 
     public virtual Semester Semester { get; set; } = null!;

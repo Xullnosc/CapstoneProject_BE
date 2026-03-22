@@ -49,6 +49,8 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<Notification> Notifications { get; set; }
 
+    public virtual DbSet<ThesisApplication> ThesisApplications { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("utf8mb4_0900_ai_ci").HasCharSet("utf8mb4");
@@ -803,6 +805,48 @@ public partial class FctmsContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_AccessLogs_Users_UserId");
+        });
+
+        modelBuilder.Entity<ThesisApplication>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("thesis_applications");
+
+            entity
+                .HasIndex(e => new { e.ThesisId, e.TeamId }, "UQ_Application_Thesis_Team")
+                .IsUnique();
+            entity.HasIndex(e => e.ThesisId, "IX_ThesisApplications_ThesisId");
+            entity.HasIndex(e => e.TeamId, "IX_ThesisApplications_TeamId");
+
+            entity
+                .Property(e => e.Status)
+                .HasDefaultValueSql("'Pending'")
+                .HasColumnType("enum('Pending','Approved','Rejected','Cancelled')");
+
+            entity
+                .Property(e => e.ThesisId)
+                .HasMaxLength(36)
+                .HasColumnType("char(36)")
+                .HasConversion(v => Guid.Parse(v), v => v.ToString());
+
+            entity
+                .Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+
+            entity
+                .HasOne(d => d.Thesis)
+                .WithMany()
+                .HasForeignKey(d => d.ThesisId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Applications_Thesis");
+
+            entity
+                .HasOne(d => d.Team)
+                .WithMany()
+                .HasForeignKey(d => d.TeamId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Applications_Teams");
         });
 
         OnModelCreatingPartial(modelBuilder);
