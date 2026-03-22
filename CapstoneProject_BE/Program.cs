@@ -1,5 +1,6 @@
 using System.Text;
 using BusinessObjects.Models;
+using CapstoneProject_BE.Extensions;
 using DataAccess;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,6 @@ using Services;
 using Services.Helpers;
 using Services.Mappings;
 using StackExchange.Redis;
-using CapstoneProject_BE.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,7 +34,12 @@ builder
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.ReferenceHandler = System
+            .Text
+            .Json
+            .Serialization
+            .ReferenceHandler
+            .IgnoreCycles;
     });
 builder.Services.AddDbContext<FctmsContext>(options =>
 {
@@ -167,9 +172,7 @@ var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
 
 builder
-    .Services.AddAuthentication(options =>
-    {
-    })
+    .Services.AddAuthentication(options => { })
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
