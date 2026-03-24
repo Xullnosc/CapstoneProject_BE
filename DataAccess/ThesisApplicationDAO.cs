@@ -42,7 +42,7 @@ namespace DataAccess
                 .ToListAsync();
         }
 
-        public async Task<ThesisApplication?> GetActiveByThesisAndTeamAsync(string thesisId, int teamId)
+        public async Task<BusinessObjects.Models.ThesisApplication?> GetActiveByThesisAndTeamAsync(string thesisId, int teamId)
         {
             return await _context.ThesisApplications
                 .AsNoTracking()
@@ -50,6 +50,12 @@ namespace DataAccess
                     a.ThesisId == thesisId
                     && a.TeamId == teamId
                     && (a.Status == "Pending" || a.Status == "Approved"));
+        }
+
+        public async Task<BusinessObjects.Models.ThesisApplication?> GetByThesisAndTeamAsync(string thesisId, int teamId)
+        {
+            return await _context.ThesisApplications
+                .FirstOrDefaultAsync(a => a.ThesisId == thesisId && a.TeamId == teamId);
         }
 
         public async Task<bool> HasApprovedInSemesterAsync(int teamId, int semesterId)

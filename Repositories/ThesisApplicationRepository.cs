@@ -23,8 +23,11 @@ namespace Repositories
         public async Task<List<ThesisApplication>> GetByTeamIdAsync(int teamId)
             => await _dao.GetByTeamIdAsync(teamId);
 
-        public async Task<ThesisApplication?> GetActiveByThesisAndTeamAsync(string thesisId, int teamId)
-            => await _dao.GetActiveByThesisAndTeamAsync(thesisId, teamId);
+        public Task<BusinessObjects.Models.ThesisApplication?> GetActiveByThesisAndTeamAsync(string thesisId, int teamId)
+            => _dao.GetActiveByThesisAndTeamAsync(thesisId, teamId);
+
+        public Task<BusinessObjects.Models.ThesisApplication?> GetByThesisAndTeamAsync(string thesisId, int teamId)
+            => _dao.GetByThesisAndTeamAsync(thesisId, teamId);
 
         public async Task<bool> HasApprovedInSemesterAsync(int teamId, int semesterId)
             => await _dao.HasApprovedInSemesterAsync(teamId, semesterId);
