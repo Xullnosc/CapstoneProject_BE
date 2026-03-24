@@ -1,10 +1,10 @@
-using BusinessObjects.DTOs;
-using BusinessObjects.Models;
-using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BusinessObjects.DTOs;
+using BusinessObjects.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess;
 
@@ -17,169 +17,236 @@ public class ThesisReviewDAO : IThesisReviewDAO
         _context = context;
     }
 
-
-    public async Task<ThesisReview> UpsertReviewerReviewAsync(string thesisId, int reviewerId, string decision, string? note, string? fileUrl)
+    public async Task UpsertReviewerReviewAsync(
+        string thesisId,
+        int reviewerId,
+        string decision,
+        string? note,
+        string? fileUrl
+    )
     {
-        var existing = await _context.ThesisReviews
-            .FirstOrDefaultAsync(r => r.ThesisId == thesisId);
+        var previous = await GetLatestReviewerDecisionAsync(thesisId, reviewerId);
 
-        if (existing == null)
+        var assignedReviewers = await GetActiveAssignedReviewerIdsAsync(thesisId);
+        if (!assignedReviewers.Contains(reviewerId))
         {
-            // This should normally not happen if reviewers are assigned first, but handle it
-            existing = new ThesisReview { ThesisId = thesisId };
-            _context.ThesisReviews.Add(existing);
-        }
-
-        if (existing.Reviewer1Id == reviewerId)
-        {
-            existing.Reviewer1Decision = decision;
-            existing.Reviewer1Comment = note;
-            existing.Reviewer1FileUrl = fileUrl;
-            existing.Reviewer1Date = DateTime.UtcNow;
-        }
-        else if (existing.Reviewer2Id == reviewerId)
-        {
-            existing.Reviewer2Decision = decision;
-            existing.Reviewer2Comment = note;
-            existing.Reviewer2FileUrl = fileUrl;
-            existing.Reviewer2Date = DateTime.UtcNow;
-        }
-        else
-        {
-            // Fallback: If not assigned to a slot, assign to a free slot or throw
-            if (existing.Reviewer1Id == null)
+            if (assignedReviewers.Count >= 2)
             {
-                existing.Reviewer1Id = reviewerId;
-                existing.Reviewer1Decision = decision;
-                existing.Reviewer1Comment = note;
-                existing.Reviewer1FileUrl = fileUrl;
-                existing.Reviewer1Date = DateTime.UtcNow;
+                throw new InvalidOperationException(
+                    "Two different reviewers have already been assigned for this thesis."
+                );
             }
-            else if (existing.Reviewer2Id == null)
-            {
-                existing.Reviewer2Id = reviewerId;
-                existing.Reviewer2Decision = decision;
-                existing.Reviewer2Comment = note;
-                existing.Reviewer2FileUrl = fileUrl;
-                existing.Reviewer2Date = DateTime.UtcNow;
-            }
-            else
-            {
-                throw new InvalidOperationException("Both reviewer slots are already occupied by different users.");
-            }
+
+            await CreateEventAsync(
+                thesisId,
+                "REVIEWER_ASSIGNED",
+                reviewerId,
+                "REVIEWER",
+                null,
+                null
+            );
+
+            assignedReviewers.Add(reviewerId);
         }
 
-        await _context.SaveChangesAsync();
-        return existing;
-    }
+        var reviewEvent = await CreateEventAsync(
+            thesisId,
+            "REVIEWER_DECISION",
+            reviewerId,
+            "REVIEWER",
+            decision,
+            previous
+        );
 
-    public async Task<List<ThesisReview>> GetReviewsAsync(string thesisId)
-    {
-        var r = await _context.ThesisReviews.AsNoTracking().FirstOrDefaultAsync(x => x.ThesisId == thesisId);
-        if (r == null) return new List<ThesisReview>();
-        return new List<ThesisReview> { r }; // Note: The service might need adjustment if it expects multiple rows
-    }
-
-    public async Task<ThesisHodDecision> UpsertHodDecisionAsync(string thesisId, int hodId, string decision, string? note)
-    {
-        var existing = await _context.ThesisHodDecisions
-            .FirstOrDefaultAsync(d => d.ThesisId == thesisId);
-
-        if (existing == null)
+        ThesisReviewComment? decisionComment = null;
+        if (!string.IsNullOrWhiteSpace(note) || !string.IsNullOrWhiteSpace(fileUrl))
         {
-            var created = new ThesisHodDecision
+            decisionComment = new ThesisReviewComment
             {
+                EventId = reviewEvent.Id,
                 ThesisId = thesisId,
-                HodId = hodId,
-                Decision = decision,
-                Comment = note,
-                DecidedAt = DateTime.UtcNow
+                AuthorUserId = reviewerId,
+                Body = string.IsNullOrWhiteSpace(note)
+                    ? "Review attachment submitted."
+                    : note.Trim(),
+                CommentType = "DECISION_RATIONALE",
+                VisibilityScope = "PUBLIC",
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = false,
             };
-            _context.ThesisHodDecisions.Add(created);
-            await _context.SaveChangesAsync();
-            return created;
+            _context.ThesisReviewComments.Add(decisionComment);
         }
 
-        existing.HodId = hodId;
-        existing.Decision = decision;
-        existing.Comment = note;
-        existing.DecidedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
-        return existing;
+
+        if (!string.IsNullOrWhiteSpace(fileUrl) && decisionComment != null)
+        {
+            var fileName = fileUrl.Split('/').LastOrDefault();
+            _context.ThesisReviewAttachments.Add(
+                new ThesisReviewAttachment
+                {
+                    CommentId = decisionComment.Id,
+                    ThesisId = thesisId,
+                    FileUrl = fileUrl,
+                    FileName = string.IsNullOrWhiteSpace(fileName) ? "review-file" : fileName,
+                    UploadedBy = reviewerId,
+                    UploadedAt = DateTime.UtcNow,
+                    IsDeleted = false,
+                }
+            );
+            await _context.SaveChangesAsync();
+        }
+
+        return;
     }
 
-    public Task<ThesisHodDecision?> GetHodDecisionAsync(string thesisId)
-        => _context.ThesisHodDecisions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.ThesisId == thesisId);
+    public async Task UpsertHodDecisionAsync(
+        string thesisId,
+        int hodId,
+        string decision,
+        string? note
+    )
+    {
+        var previous = await GetLatestHodDecisionAsync(thesisId);
+
+        var hodEvent = await CreateEventAsync(
+            thesisId,
+            "HOD_FINAL_DECISION",
+            hodId,
+            "HOD",
+            decision,
+            previous
+        );
+
+        if (!string.IsNullOrWhiteSpace(note))
+        {
+            _context.ThesisReviewComments.Add(
+                new ThesisReviewComment
+                {
+                    EventId = hodEvent.Id,
+                    ThesisId = thesisId,
+                    AuthorUserId = hodId,
+                    Body = note.Trim(),
+                    CommentType = "DECISION_RATIONALE",
+                    VisibilityScope = "PUBLIC",
+                    CreatedAt = DateTime.UtcNow,
+                    IsDeleted = false,
+                }
+            );
+        }
+
+        await _context.SaveChangesAsync();
+        return;
+    }
 
     public async Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId)
     {
-        var thesis = await _context.Theses.AsNoTracking().FirstOrDefaultAsync(t => t.ThesisId == thesisId);
-        if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
+        var thesis = await _context
+            .Theses.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.ThesisId == thesisId);
+        if (thesis == null)
+            throw new KeyNotFoundException("Thesis not found.");
 
-        var review = await _context.ThesisReviews.AsNoTracking()
-            .FirstOrDefaultAsync(r => r.ThesisId == thesisId);
-
-        var hod = await _context.ThesisHodDecisions.AsNoTracking()
-            .FirstOrDefaultAsync(d => d.ThesisId == thesisId);
-
-        var reviewerIds = new List<int>();
-        if (review?.Reviewer1Id != null) reviewerIds.Add(review.Reviewer1Id.Value);
-        if (review?.Reviewer2Id != null) reviewerIds.Add(review.Reviewer2Id.Value);
+        var reviewerIds = await GetActiveAssignedReviewerIdsAsync(thesisId);
 
         var reviewerUids = reviewerIds.Distinct().ToList();
         var relevantUserIds = new List<int>(reviewerUids);
-        if (hod != null) relevantUserIds.Add(hod.HodId);
 
-        var users = await _context.Users.AsNoTracking()
+        var latestHodDecisionEvent = await _context
+            .ThesisReviewEvents.AsNoTracking()
+            .Where(e =>
+                e.ThesisId == thesisId
+                && e.EventType == "HOD_FINAL_DECISION"
+                && e.ActorRole == "HOD"
+                && !e.IsDeleted
+            )
+            .OrderByDescending(e => e.CreatedAt)
+            .ThenByDescending(e => e.Id)
+            .FirstOrDefaultAsync();
+
+        if (latestHodDecisionEvent != null)
+            relevantUserIds.Add(latestHodDecisionEvent.ActorUserId);
+
+        var users = await _context
+            .Users.AsNoTracking()
             .Where(u => relevantUserIds.Contains(u.UserId))
-            .Select(u => new { u.UserId, u.Email, u.FullName })
+            .Select(u => new
+            {
+                u.UserId,
+                u.Email,
+                u.FullName,
+            })
             .ToListAsync();
 
         var status = new ThesisReviewStatusDTO
         {
             ThesisId = thesisId,
             ThesisStatus = thesis.Status,
-            Reviewers = new List<ReviewerProgressDTO>()
+            Reviewers = new List<ReviewerProgressDTO>(),
         };
 
-        if (review != null)
+        var decisionEvents = await _context
+            .ThesisReviewEvents.AsNoTracking()
+            .Where(e =>
+                e.ThesisId == thesisId
+                && e.EventType == "REVIEWER_DECISION"
+                && e.ActorRole == "REVIEWER"
+                && !e.IsDeleted
+            )
+            .OrderByDescending(e => e.CreatedAt)
+            .ThenByDescending(e => e.Id)
+            .ToListAsync();
+
+        var latestByReviewer = decisionEvents
+            .GroupBy(e => e.ActorUserId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        if (reviewerIds.Count > 0)
         {
-            if (review.Reviewer1Id.HasValue)
+            foreach (var reviewerId in reviewerIds)
             {
-                var u1 = users.FirstOrDefault(x => x.UserId == review.Reviewer1Id.Value);
-                status.Reviewers.Add(new ReviewerProgressDTO
-                {
-                    UserId = review.Reviewer1Id.Value,
-                    Email = u1?.Email,
-                    FullName = u1?.FullName,
-                    Decision = review.Reviewer1Decision,
-                    Comment = review.Reviewer1Comment,
-                    FileUrl = review.Reviewer1FileUrl,
-                    ReviewedAt = review.Reviewer1Date
-                });
-            }
-            if (review.Reviewer2Id.HasValue)
-            {
-                var u2 = users.FirstOrDefault(x => x.UserId == review.Reviewer2Id.Value);
-                status.Reviewers.Add(new ReviewerProgressDTO
-                {
-                    UserId = review.Reviewer2Id.Value,
-                    Email = u2?.Email,
-                    FullName = u2?.FullName,
-                    Decision = review.Reviewer2Decision,
-                    Comment = review.Reviewer2Comment,
-                    FileUrl = review.Reviewer2FileUrl,
-                    ReviewedAt = review.Reviewer2Date
-                });
+                var user = users.FirstOrDefault(x => x.UserId == reviewerId);
+                latestByReviewer.TryGetValue(reviewerId, out var latestDecision);
+                var latestComment = await _context
+                    .ThesisReviewComments.AsNoTracking()
+                    .Where(c =>
+                        c.EventId == (latestDecision != null ? latestDecision.Id : 0)
+                        && !c.IsDeleted
+                    )
+                    .OrderByDescending(c => c.CreatedAt)
+                    .ThenByDescending(c => c.Id)
+                    .FirstOrDefaultAsync();
+
+                var latestAttachmentUrl =
+                    latestComment == null
+                        ? null
+                        : await _context
+                            .ThesisReviewAttachments.AsNoTracking()
+                            .Where(a => a.CommentId == latestComment.Id && !a.IsDeleted)
+                            .OrderByDescending(a => a.UploadedAt)
+                            .ThenByDescending(a => a.Id)
+                            .Select(a => a.FileUrl)
+                            .FirstOrDefaultAsync();
+
+                status.Reviewers.Add(
+                    new ReviewerProgressDTO
+                    {
+                        UserId = reviewerId,
+                        Email = user?.Email,
+                        FullName = user?.FullName,
+                        Decision = latestDecision?.Decision,
+                        Comment = latestComment?.Body,
+                        FileUrl = latestAttachmentUrl,
+                        ReviewedAt = latestDecision?.CreatedAt,
+                    }
+                );
             }
         }
 
         // Compute overall status logic
         var decided = status.Reviewers.Where(x => !string.IsNullOrWhiteSpace(x.Decision)).ToList();
-        
-        if (reviewerIds.Count < 2)
+
+        if (reviewerIds.Distinct().Count() < 2)
         {
             status.OverallStatus = "Pending";
             status.RequiresHodDecision = false;
@@ -191,7 +258,9 @@ public class ThesisReviewDAO : IThesisReviewDAO
         }
         else
         {
-            var passCount = decided.Count(x => string.Equals(x.Decision, "Pass", StringComparison.OrdinalIgnoreCase));
+            var passCount = decided.Count(x =>
+                string.Equals(x.Decision, "Pass", StringComparison.OrdinalIgnoreCase)
+            );
             if (passCount == 2)
             {
                 status.OverallStatus = "Pass";
@@ -207,17 +276,25 @@ public class ThesisReviewDAO : IThesisReviewDAO
             }
         }
 
-        if (hod != null)
+        if (latestHodDecisionEvent != null)
         {
-            var u = users.FirstOrDefault(x => x.UserId == hod.HodId);
+            var u = users.FirstOrDefault(x => x.UserId == latestHodDecisionEvent.ActorUserId);
+
+            var latestHodComment = await _context
+                .ThesisReviewComments.AsNoTracking()
+                .Where(c => c.EventId == latestHodDecisionEvent.Id && !c.IsDeleted)
+                .OrderByDescending(c => c.CreatedAt)
+                .ThenByDescending(c => c.Id)
+                .FirstOrDefaultAsync();
+
             status.HodDecision = new HodDecisionDTO
             {
-                HodId = hod.HodId,
+                HodId = latestHodDecisionEvent.ActorUserId,
                 Email = u?.Email,
                 FullName = u?.FullName,
-                Decision = hod.Decision,
-                Comment = hod.Comment,
-                DecidedAt = hod.DecidedAt
+                Decision = latestHodDecisionEvent.Decision ?? "Fail",
+                Comment = latestHodComment?.Body,
+                DecidedAt = latestHodDecisionEvent.CreatedAt,
             };
             status.OverallStatus = "HodDecided";
             status.RequiresHodDecision = false;
@@ -226,34 +303,326 @@ public class ThesisReviewDAO : IThesisReviewDAO
         return status;
     }
 
-    public async Task InitializeReviewersAsync(string thesisId, int reviewer1Id, int reviewer2Id)
+    public async Task InitializeReviewersAsync(
+        string thesisId,
+        int reviewer1Id,
+        int reviewer2Id,
+        int assignedByUserId
+    )
     {
-        var existing = await _context.ThesisReviews.FirstOrDefaultAsync(r => r.ThesisId == thesisId);
-        if (existing == null)
+        var priorAssignments = await _context
+            .ThesisReviewEvents.Where(e =>
+                e.ThesisId == thesisId && e.EventType == "REVIEWER_ASSIGNED" && !e.IsDeleted
+            )
+            .ToListAsync();
+
+        foreach (var assignment in priorAssignments)
         {
-            existing = new ThesisReview
-            {
-                ThesisId = thesisId,
-                Reviewer1Id = reviewer1Id,
-                Reviewer2Id = reviewer2Id
-            };
-            _context.ThesisReviews.Add(existing);
-        }
-        else
-        {
-            existing.Reviewer1Id = reviewer1Id;
-            existing.Reviewer2Id = reviewer2Id;
-            // Optionally reset decisions if HOD reassigns? Assuming reassign clears old decisions for slots.
-            existing.Reviewer1Decision = null;
-            existing.Reviewer2Decision = null;
-            existing.Reviewer1Comment = null;
-            existing.Reviewer2Comment = null;
-            existing.Reviewer1FileUrl = null;
-            existing.Reviewer2FileUrl = null;
-            existing.Reviewer1Date = null;
-            existing.Reviewer2Date = null;
+            assignment.IsDeleted = true;
+            assignment.UpdatedAt = DateTime.UtcNow;
+            assignment.UpdatedBy = assignedByUserId;
         }
 
         await _context.SaveChangesAsync();
+
+        await CreateEventAsync(thesisId, "REVIEWER_ASSIGNED", reviewer1Id, "REVIEWER", null, null);
+
+        await CreateEventAsync(thesisId, "REVIEWER_ASSIGNED", reviewer2Id, "REVIEWER", null, null);
+
+        var previousHodDecisions = await _context
+            .ThesisReviewEvents.Where(e =>
+                e.ThesisId == thesisId && e.EventType == "HOD_FINAL_DECISION" && !e.IsDeleted
+            )
+            .ToListAsync();
+        foreach (var hodDecision in previousHodDecisions)
+        {
+            hodDecision.IsDeleted = true;
+            hodDecision.UpdatedAt = DateTime.UtcNow;
+            hodDecision.UpdatedBy = assignedByUserId;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<List<ThesisReviewTimelineEventDTO>> GetTimelineAsync(string thesisId)
+    {
+        var thesisExists = await _context
+            .Theses.AsNoTracking()
+            .AnyAsync(t => t.ThesisId == thesisId);
+        if (!thesisExists)
+        {
+            throw new KeyNotFoundException("Thesis not found.");
+        }
+
+        var events = await _context
+            .ThesisReviewEvents.AsNoTracking()
+            .Where(e => e.ThesisId == thesisId && !e.IsDeleted)
+            .Join(
+                _context.Users.AsNoTracking(),
+                e => e.ActorUserId,
+                u => u.UserId,
+                (e, u) =>
+                    new ThesisReviewTimelineEventDTO
+                    {
+                        EventId = e.Id,
+                        ThesisId = e.ThesisId,
+                        EventType = e.EventType,
+                        ActorUserId = e.ActorUserId,
+                        ActorRole = e.ActorRole,
+                        ActorName = u.FullName,
+                        ActorEmail = u.Email,
+                        Decision = e.Decision,
+                        CreatedAt = e.CreatedAt,
+                    }
+            )
+            .OrderBy(e => e.CreatedAt)
+            .ThenBy(e => e.EventId)
+            .ToListAsync();
+
+        if (events.Count == 0)
+        {
+            return events;
+        }
+
+        var eventIds = events.Select(e => e.EventId).ToList();
+        var comments = await _context
+            .ThesisReviewComments.AsNoTracking()
+            .Where(c => c.ThesisId == thesisId && eventIds.Contains(c.EventId) && !c.IsDeleted)
+            .Join(
+                _context.Users.AsNoTracking(),
+                c => c.AuthorUserId,
+                u => u.UserId,
+                (c, u) =>
+                    new ThesisReviewTimelineCommentDTO
+                    {
+                        Id = c.Id,
+                        EventId = c.EventId,
+                        ParentCommentId = c.ParentCommentId,
+                        AuthorUserId = c.AuthorUserId,
+                        AuthorName = u.FullName,
+                        AuthorEmail = u.Email,
+                        Body = c.Body,
+                        CommentType = c.CommentType,
+                        VisibilityScope = c.VisibilityScope,
+                        CreatedAt = c.CreatedAt,
+                    }
+            )
+            .OrderBy(c => c.CreatedAt)
+            .ThenBy(c => c.Id)
+            .ToListAsync();
+
+        var commentById = comments.ToDictionary(c => c.Id);
+        var eventTopLevel = events.ToDictionary(
+            e => e.EventId,
+            _ => new List<ThesisReviewTimelineCommentDTO>()
+        );
+
+        foreach (var comment in comments)
+        {
+            if (
+                comment.ParentCommentId.HasValue
+                && commentById.TryGetValue(comment.ParentCommentId.Value, out var parent)
+            )
+            {
+                parent.Replies.Add(comment);
+            }
+            else if (eventTopLevel.TryGetValue(comment.EventId, out var bucket))
+            {
+                bucket.Add(comment);
+            }
+        }
+
+        foreach (var evt in events)
+        {
+            evt.Comments = eventTopLevel[evt.EventId];
+        }
+
+        return events;
+    }
+
+    public async Task<ThesisReviewTimelineCommentDTO> AddCommentAsync(
+        string thesisId,
+        int authorUserId,
+        string actorRole,
+        CreateThesisReviewCommentDTO dto
+    )
+    {
+        var thesisExists = await _context
+            .Theses.AsNoTracking()
+            .AnyAsync(t => t.ThesisId == thesisId);
+        if (!thesisExists)
+        {
+            throw new KeyNotFoundException("Thesis not found.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.Body))
+        {
+            throw new ArgumentException("Comment body is required.");
+        }
+
+        long targetEventId;
+        long? parentCommentId = dto.ParentCommentId;
+
+        if (parentCommentId.HasValue)
+        {
+            var parent = await _context
+                .ThesisReviewComments.AsNoTracking()
+                .FirstOrDefaultAsync(c =>
+                    c.Id == parentCommentId.Value && c.ThesisId == thesisId && !c.IsDeleted
+                );
+            if (parent == null)
+            {
+                throw new KeyNotFoundException("Parent comment not found.");
+            }
+            targetEventId = parent.EventId;
+        }
+        else if (dto.EventId.HasValue)
+        {
+            var eventExists = await _context
+                .ThesisReviewEvents.AsNoTracking()
+                .AnyAsync(e => e.Id == dto.EventId.Value && e.ThesisId == thesisId && !e.IsDeleted);
+            if (!eventExists)
+            {
+                throw new KeyNotFoundException("Target event not found.");
+            }
+            targetEventId = dto.EventId.Value;
+        }
+        else
+        {
+            var createdEvent = await CreateEventAsync(
+                thesisId,
+                "COMMENT_ADDED",
+                authorUserId,
+                actorRole,
+                null,
+                null
+            );
+            targetEventId = createdEvent.Id;
+        }
+
+        var commentType = string.IsNullOrWhiteSpace(dto.CommentType)
+            ? (parentCommentId.HasValue ? "REPLY" : "FOLLOW_UP")
+            : dto.CommentType.Trim().ToUpperInvariant();
+        var visibility = string.IsNullOrWhiteSpace(dto.VisibilityScope)
+            ? "PUBLIC"
+            : dto.VisibilityScope.Trim().ToUpperInvariant();
+
+        var comment = new ThesisReviewComment
+        {
+            EventId = targetEventId,
+            ThesisId = thesisId,
+            ParentCommentId = parentCommentId,
+            AuthorUserId = authorUserId,
+            Body = dto.Body.Trim(),
+            CommentType = commentType,
+            VisibilityScope = visibility,
+            CreatedAt = DateTime.UtcNow,
+            IsDeleted = false,
+        };
+
+        _context.ThesisReviewComments.Add(comment);
+        await _context.SaveChangesAsync();
+
+        var user = await _context
+            .Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.UserId == authorUserId);
+        return new ThesisReviewTimelineCommentDTO
+        {
+            Id = comment.Id,
+            EventId = comment.EventId,
+            ParentCommentId = comment.ParentCommentId,
+            AuthorUserId = comment.AuthorUserId,
+            AuthorName = user?.FullName,
+            AuthorEmail = user?.Email,
+            Body = comment.Body,
+            CommentType = comment.CommentType,
+            VisibilityScope = comment.VisibilityScope,
+            CreatedAt = comment.CreatedAt,
+        };
+    }
+
+    private async Task<ThesisReviewEvent> CreateEventAsync(
+        string thesisId,
+        string eventType,
+        int actorUserId,
+        string actorRole,
+        string? decision,
+        string? previousDecision
+    )
+    {
+        var nextSequence =
+            (
+                await _context
+                    .ThesisReviewEvents.AsNoTracking()
+                    .Where(e => e.ThesisId == thesisId)
+                    .MaxAsync(e => (int?)e.SequenceNo)
+                ?? 0
+            ) + 1;
+
+        var created = new ThesisReviewEvent
+        {
+            ThesisId = thesisId,
+            EventType = eventType,
+            ActorUserId = actorUserId,
+            ActorRole = actorRole,
+            Decision = decision,
+            PreviousDecision = previousDecision,
+            SequenceNo = nextSequence,
+            CreatedAt = DateTime.UtcNow,
+            IsDeleted = false,
+        };
+
+        _context.ThesisReviewEvents.Add(created);
+        await _context.SaveChangesAsync();
+        return created;
+    }
+
+    private async Task<string?> GetLatestReviewerDecisionAsync(string thesisId, int reviewerId)
+    {
+        return await _context
+            .ThesisReviewEvents.AsNoTracking()
+            .Where(e =>
+                e.ThesisId == thesisId
+                && e.ActorUserId == reviewerId
+                && e.EventType == "REVIEWER_DECISION"
+                && !e.IsDeleted
+            )
+            .OrderByDescending(e => e.CreatedAt)
+            .ThenByDescending(e => e.Id)
+            .Select(e => e.Decision)
+            .FirstOrDefaultAsync();
+    }
+
+    private async Task<List<int>> GetActiveAssignedReviewerIdsAsync(string thesisId)
+    {
+        return await _context
+            .ThesisReviewEvents.AsNoTracking()
+            .Where(e =>
+                e.ThesisId == thesisId
+                && e.EventType == "REVIEWER_ASSIGNED"
+                && e.ActorRole == "REVIEWER"
+                && !e.IsDeleted
+            )
+            .OrderBy(e => e.CreatedAt)
+            .ThenBy(e => e.Id)
+            .Select(e => e.ActorUserId)
+            .Distinct()
+            .ToListAsync();
+    }
+
+    private async Task<string?> GetLatestHodDecisionAsync(string thesisId)
+    {
+        return await _context
+            .ThesisReviewEvents.AsNoTracking()
+            .Where(e =>
+                e.ThesisId == thesisId
+                && e.EventType == "HOD_FINAL_DECISION"
+                && e.ActorRole == "HOD"
+                && !e.IsDeleted
+            )
+            .OrderByDescending(e => e.CreatedAt)
+            .ThenByDescending(e => e.Id)
+            .Select(e => e.Decision)
+            .FirstOrDefaultAsync();
     }
 }

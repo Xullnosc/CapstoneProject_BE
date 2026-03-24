@@ -124,9 +124,12 @@ namespace CapstoneProject_BE.Controllers
                 int? excludeUserId = null;
                 var roleClaim = User.FindFirst(ClaimTypes.Role) ?? User.FindFirst("role");
                 var nameIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-                
+
                 // If it's a lecturer/reviewer, exclude their own proposals from the list
-                if (roleClaim?.Value == BusinessObjects.CampusConstants.Roles.Lecturer && nameIdClaim != null)
+                if (
+                    roleClaim?.Value == BusinessObjects.CampusConstants.Roles.Lecturer
+                    && nameIdClaim != null
+                )
                 {
                     if (int.TryParse(nameIdClaim.Value, out int currentUserId))
                     {
@@ -134,7 +137,15 @@ namespace CapstoneProject_BE.Controllers
                     }
                 }
 
-                var theses = await _thesisService.GetFilteredThesesAsync(status, userId, searchTitle, semesterId, isLocked, lecturerOnly, excludeUserId);
+                var theses = await _thesisService.GetFilteredThesesAsync(
+                    status,
+                    userId,
+                    searchTitle,
+                    semesterId,
+                    isLocked,
+                    lecturerOnly,
+                    excludeUserId
+                );
                 return Ok(theses);
             }
             catch (Exception ex)
@@ -159,6 +170,62 @@ namespace CapstoneProject_BE.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(403, new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// GET /api/thesis/{id}/review-timeline
+        /// Returns review timeline events with nested comments/replies.
+        /// </summary>
+        [HttpGet("{id}/review-timeline")]
+        public async Task<IActionResult> GetReviewTimeline(string id)
+        {
+            try
+            {
+                var timeline = await _thesisService.GetReviewTimelineAsync(id);
+                return Ok(timeline);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// POST /api/thesis/{id}/review-comments
+        /// Create a timeline comment or reply.
+        /// </summary>
+        [HttpPost("{id}/review-comments")]
+        public async Task<IActionResult> AddReviewComment(
+            string id,
+            [FromBody] CreateThesisReviewCommentDTO dto
+        )
+        {
+            try
+            {
+                var userId = GetUserId();
+                var created = await _thesisService.AddReviewCommentAsync(id, userId, dto);
+                return Ok(created);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
             }
             catch (KeyNotFoundException ex)
             {
@@ -208,7 +275,10 @@ namespace CapstoneProject_BE.Controllers
         /// </summary>
         [HttpPut("{id}/reviewers")]
         [Authorize(Policy = "HodOrAdmin")]
-        public async Task<IActionResult> AssignReviewers(string id, [FromBody] AssignThesisReviewersDTO dto)
+        public async Task<IActionResult> AssignReviewers(
+            string id,
+            [FromBody] AssignThesisReviewersDTO dto
+        )
         {
             try
             {
@@ -241,14 +311,21 @@ namespace CapstoneProject_BE.Controllers
         /// </summary>
         [HttpPut("{id}/review")]
         [Authorize] // temporarily allow any authenticated user; policy-level checks moved into service logic
-        public async Task<IActionResult> SubmitReviewerDecision(string id, [FromForm] SubmitThesisDecisionDTO dto)
+        public async Task<IActionResult> SubmitReviewerDecision(
+            string id,
+            [FromForm] SubmitThesisDecisionDTO dto
+        )
         {
             try
             {
                 var userId = GetUserId();
-                Console.WriteLine($"[ThesisReview] SubmitReviewerDecision START - UserId={userId}, ThesisId={id}, Decision={dto?.Decision}");
+                Console.WriteLine(
+                    $"[ThesisReview] SubmitReviewerDecision START - UserId={userId}, ThesisId={id}, Decision={dto?.Decision}"
+                );
                 var status = await _thesisService.SubmitReviewerDecisionAsync(id, userId, dto);
-                Console.WriteLine($"[ThesisReview] SubmitReviewerDecision OK - UserId={userId}, ThesisId={id}, OverallStatus={status.OverallStatus}");
+                Console.WriteLine(
+                    $"[ThesisReview] SubmitReviewerDecision OK - UserId={userId}, ThesisId={id}, OverallStatus={status.OverallStatus}"
+                );
                 return Ok(status);
             }
             catch (UnauthorizedAccessException ex)
@@ -280,7 +357,10 @@ namespace CapstoneProject_BE.Controllers
         /// </summary>
         [HttpPut("{id}/hod-decision")]
         [Authorize(Policy = "HodOrAdmin")]
-        public async Task<IActionResult> SubmitHodDecision(string id, [FromBody] SubmitThesisDecisionDTO dto)
+        public async Task<IActionResult> SubmitHodDecision(
+            string id,
+            [FromBody] SubmitThesisDecisionDTO dto
+        )
         {
             try
             {

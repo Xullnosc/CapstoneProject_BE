@@ -13,6 +13,7 @@ namespace BusinessObjects.DTOs
         public bool IsLocked { get; set; }
         public DateTime? UpDate { get; set; }
         public DateTime? UpdateDate { get; set; }
+        public int? SemesterId { get; set; }
         public int UserId { get; set; }
         public string? OwnerName { get; set; }
         public string? OwnerEmail { get; set; }

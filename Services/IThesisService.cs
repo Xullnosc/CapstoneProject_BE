@@ -1,8 +1,8 @@
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Microsoft.AspNetCore.Http;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace Services
 {
@@ -18,14 +18,45 @@ namespace Services
         // Phase 02: New methods
         Task<ThesisDTO> UpdateThesisAsync(string thesisId, UpdateThesisDTO req, string email);
         Task<ThesisDTO> CancelThesisAsync(string thesisId, string email);
-        Task<IEnumerable<ThesisDTO>> GetMyThesesAsync(string email, string? status = null, string? searchTitle = null);
+        Task<IEnumerable<ThesisDTO>> GetMyThesesAsync(
+            string email,
+            string? status = null,
+            string? searchTitle = null
+        );
         Task<ThesisDTO?> GetThesisDetailAsync(string id);
-        Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(string? status, int? userId, string? searchTitle = null, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false, int? excludeUserId = null);
+        Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(
+            string? status,
+            int? userId,
+            string? searchTitle = null,
+            int? semesterId = null,
+            bool? isLocked = null,
+            bool lecturerOnly = false,
+            int? excludeUserId = null
+        );
         Task<ThesisDTO> ToggleThesisLockAsync(string thesisId, string email);
+
         // Review workflow (multi reviewer + optional HOD final decision)
         Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId);
-        Task<ThesisReviewStatusDTO> AssignReviewersAsync(string thesisId, int[] reviewerIds, int assignedByUserId);
-        Task<ThesisReviewStatusDTO> SubmitReviewerDecisionAsync(string thesisId, int reviewerUserId, SubmitThesisDecisionDTO dto);
-        Task<ThesisReviewStatusDTO> SubmitHodDecisionAsync(string thesisId, int hodUserId, SubmitThesisDecisionDTO dto);
+        Task<List<ThesisReviewTimelineEventDTO>> GetReviewTimelineAsync(string thesisId);
+        Task<ThesisReviewTimelineCommentDTO> AddReviewCommentAsync(
+            string thesisId,
+            int actorUserId,
+            CreateThesisReviewCommentDTO dto
+        );
+        Task<ThesisReviewStatusDTO> AssignReviewersAsync(
+            string thesisId,
+            int[] reviewerIds,
+            int assignedByUserId
+        );
+        Task<ThesisReviewStatusDTO> SubmitReviewerDecisionAsync(
+            string thesisId,
+            int reviewerUserId,
+            SubmitThesisDecisionDTO dto
+        );
+        Task<ThesisReviewStatusDTO> SubmitHodDecisionAsync(
+            string thesisId,
+            int hodUserId,
+            SubmitThesisDecisionDTO dto
+        );
     }
 }

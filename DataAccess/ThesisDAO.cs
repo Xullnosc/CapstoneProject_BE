@@ -1,9 +1,9 @@
-using BusinessObjects.DTOs;
-using BusinessObjects.Models;
-using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BusinessObjects.DTOs;
+using BusinessObjects.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess
 {
@@ -25,18 +25,12 @@ namespace DataAccess
 
         public async Task<IEnumerable<Thesis>> GetAllThesesAsync()
         {
-            return await _context.Theses
-                .AsNoTracking()
-                .Include(t => t.User)
-                .Include(t => t.ThesisReview)
-                .ToListAsync();
+            return await _context.Theses.AsNoTracking().Include(t => t.User).ToListAsync();
         }
 
         public async Task<PagedResult<Thesis>> GetAllThesesAsync(int pageIndex, int pageSize)
         {
-            var query = _context.Theses
-                .AsNoTracking()
-                .Include(t => t.User);
+            var query = _context.Theses.AsNoTracking().Include(t => t.User);
 
             var totalCount = await query.CountAsync();
 
@@ -51,26 +45,29 @@ namespace DataAccess
 
         public async Task<Thesis?> GetThesisByIdAsync(string id)
         {
-            return await _context.Theses
-                .AsNoTracking()
+            return await _context
+                .Theses.AsNoTracking()
                 .Include(t => t.User)
-                .Include(t => t.ThesisReview)
                 .FirstOrDefaultAsync(t => t.ThesisId == id);
         }
 
         public async Task<IEnumerable<Thesis>> GetThesesByUserIdAsync(int userId)
         {
-            return await _context.Theses
-                .AsNoTracking()
+            return await _context
+                .Theses.AsNoTracking()
                 .Include(t => t.User)
                 .Where(t => t.UserId == userId)
                 .ToListAsync();
         }
 
-        public async Task<PagedResult<Thesis>> GetThesesByUserIdAsync(int userId, int pageIndex, int pageSize)
+        public async Task<PagedResult<Thesis>> GetThesesByUserIdAsync(
+            int userId,
+            int pageIndex,
+            int pageSize
+        )
         {
-            var query = _context.Theses
-                .AsNoTracking()
+            var query = _context
+                .Theses.AsNoTracking()
                 .Include(t => t.User)
                 .Where(t => t.UserId == userId);
 
@@ -101,10 +98,17 @@ namespace DataAccess
 
         // ─── Phase 02: New Methods ───────────────────────────────────────────────
 
-        public async Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false, int? excludeUserId = null)
+        public async Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(
+            string? status,
+            int? userId,
+            int? semesterId = null,
+            bool? isLocked = null,
+            bool lecturerOnly = false,
+            int? excludeUserId = null
+        )
         {
-            var query = _context.Theses
-                .AsNoTracking()
+            var query = _context
+                .Theses.AsNoTracking()
                 .Include(t => t.User)
                     .ThenInclude(u => u.Role)
                 .AsQueryable();
@@ -127,32 +131,24 @@ namespace DataAccess
             if (lecturerOnly)
                 query = query.Where(t => t.User.Role != null && t.User.Role.RoleName == "Lecturer");
 
-            return await query
-                .Include(t => t.ThesisReview)
-                    .ThenInclude(r => r.Reviewer1)
-                .Include(t => t.ThesisReview)
-                    .ThenInclude(r => r.Reviewer2)
-                .OrderByDescending(t => t.UpdateDate).ToListAsync();
+            return await query.OrderByDescending(t => t.UpdateDate).ToListAsync();
         }
 
         public async Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id)
         {
-            if (string.IsNullOrEmpty(id)) return null;
+            if (string.IsNullOrEmpty(id))
+                return null;
 
-            var thesis = await _context.Theses
-                .Include(t => t.User)
+            var thesis = await _context
+                .Theses.Include(t => t.User)
                 .Include(t => t.ThesisHistories)
-                .Include(t => t.ThesisReview)
-                    .ThenInclude(r => r.Reviewer1)
-                .Include(t => t.ThesisReview)
-                    .ThenInclude(r => r.Reviewer2)
                 .FirstOrDefaultAsync(t => t.ThesisId == id);
 
             if (thesis != null && thesis.ThesisHistories != null)
             {
                 // EF Core cannot sort inside Include -> sort in memory after loading
-                thesis.ThesisHistories = thesis.ThesisHistories
-                    .OrderByDescending(h => h.VersionNumber)
+                thesis.ThesisHistories = thesis
+                    .ThesisHistories.OrderByDescending(h => h.VersionNumber)
                     .ToList();
             }
 
@@ -165,32 +161,38 @@ namespace DataAccess
             await _context.SaveChangesAsync();
         }
 
-        public async Task<IEnumerable<Thesis>> GetThesesByOwnerOrTeamAsync(IEnumerable<int> ownerIds, IEnumerable<int> teamIds, int? semesterId = null)
+        public async Task<IEnumerable<Thesis>> GetThesesByOwnerOrTeamAsync(
+            IEnumerable<int> ownerIds,
+            IEnumerable<int> teamIds,
+            int? semesterId = null
+        )
         {
-            var query = _context.Theses
-                .AsNoTracking()
+            var query = _context
+                .Theses.AsNoTracking()
                 .Include(t => t.User)
-                .Where(t => ownerIds.Contains(t.UserId) || (t.TeamId.HasValue && teamIds.Contains(t.TeamId.Value)));
+                .Where(t =>
+                    ownerIds.Contains(t.UserId)
+                    || (t.TeamId.HasValue && teamIds.Contains(t.TeamId.Value))
+                );
 
             if (semesterId.HasValue)
             {
                 query = query.Where(t => t.SemesterId == semesterId.Value);
             }
 
-            return await query
-                .Include(t => t.ThesisReview)
-                    .ThenInclude(r => r.Reviewer1)
-                .Include(t => t.ThesisReview)
-                    .ThenInclude(r => r.Reviewer2)
-                .OrderByDescending(t => t.UpdateDate).ToListAsync();
+            return await query.OrderByDescending(t => t.UpdateDate).ToListAsync();
         }
 
-        public async Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId, int? semesterId = null)
+        public async Task<Thesis?> GetApprovedThesisByLeaderIdAsync(
+            int leaderId,
+            int? semesterId = null
+        )
         {
-            var query = _context.Theses
-                .AsNoTracking()
-                .Where(t => t.UserId == leaderId && 
-                           (t.Status == "Approved" || t.Status == "Published"));
+            var query = _context
+                .Theses.AsNoTracking()
+                .Where(t =>
+                    t.UserId == leaderId && (t.Status == "Approved" || t.Status == "Published")
+                );
 
             if (semesterId.HasValue)
             {
@@ -202,10 +204,16 @@ namespace DataAccess
 
         public async Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int? semesterId = null)
         {
-            var query = _context.Theses
-                .AsNoTracking()
-                .Where(t => t.UserId == leaderId && 
-                           (t.Status == "On Mentor Inviting" || t.Status == "Approved" || t.Status == "Published"));
+            var query = _context
+                .Theses.AsNoTracking()
+                .Where(t =>
+                    t.UserId == leaderId
+                    && (
+                        t.Status == "On Mentor Inviting"
+                        || t.Status == "Approved"
+                        || t.Status == "Published"
+                    )
+                );
 
             if (semesterId.HasValue)
             {
