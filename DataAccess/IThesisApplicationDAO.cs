@@ -10,6 +10,7 @@ namespace DataAccess
         Task<ThesisApplication?> GetByIdAsync(int id);
         Task<List<ThesisApplication>> GetByTeamIdAsync(int teamId);
         Task<ThesisApplication?> GetActiveByThesisAndTeamAsync(string thesisId, int teamId);
+        Task<ThesisApplication?> GetByThesisAndTeamAsync(string thesisId, int teamId);
         Task<bool> HasApprovedInSemesterAsync(int teamId, int semesterId);
         Task UpdateAsync(ThesisApplication app);
         Task<(List<ThesisApplication> Items, int TotalCount)> GetByThesisIdPagedAsync(string thesisId, string? status, string? search, int page, int limit);

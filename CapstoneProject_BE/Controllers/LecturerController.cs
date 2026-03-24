@@ -3,19 +3,25 @@ using BusinessObjects.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Services;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
+using BusinessObjects;
+using Microsoft.AspNetCore.Authorization;
 
 namespace CapstoneProject_BE.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Policy = "HodOrAdmin")]
     public class LecturerController : ControllerBase
     {
         private readonly ILecturerService _lecturerService;
+        private readonly IUserService _userService;
 
-        public LecturerController(ILecturerService lecturerService)
+        public LecturerController(ILecturerService lecturerService, IUserService userService)
         {
             _lecturerService = lecturerService;
+            _userService = userService;
         }
 
         [HttpGet]
@@ -58,6 +64,20 @@ namespace CapstoneProject_BE.Controllers
         [HttpPost]
         public async Task<ActionResult<Lecturer>> Create([FromBody] Lecturer lecturer)
         {
+            var roleClaim = User.FindFirst(ClaimTypes.Role) ?? User.FindFirst("role");
+            if (roleClaim?.Value == CampusConstants.Roles.HOD)
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+                if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+                {
+                    var profile = await _userService.GetProfileAsync(userId);
+                    if (profile != null)
+                    {
+                        lecturer.Campus = profile.Campus;
+                    }
+                }
+            }
+
             await _lecturerService.AddLecturerAsync(lecturer);
             return CreatedAtAction(nameof(GetById), new { id = lecturer.LecturerId }, lecturer);
         }

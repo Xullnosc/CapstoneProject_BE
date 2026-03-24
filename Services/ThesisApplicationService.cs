@@ -58,12 +58,32 @@ namespace Services
             if (hasApproved)
                 throw new InvalidOperationException("Your team already has an approved application in this semester.");
 
-            // 6. Validate: no active (Pending/Approved) application for same thesis + team
-            var existing = await _appRepo.GetActiveByThesisAndTeamAsync(thesisId, team.TeamId);
+            // 6. Check if an application already exists (to handle re-applications after Cancelled/Rejected)
+            var existing = await _appRepo.GetByThesisAndTeamAsync(thesisId, team.TeamId);
             if (existing != null)
-                throw new InvalidOperationException("Your team already has an active application for this thesis.");
+            {
+                if (existing.Status == "Pending" || existing.Status == "Approved")
+                    throw new InvalidOperationException("Your team already has an active application for this thesis.");
 
-            // 7. Create
+                // If it was Cancelled or Rejected, we reuse the record to avoid unique constraint issues
+                existing.Status = "Pending";
+                existing.CreatedAt = DateTime.UtcNow;
+                await _appRepo.UpdateAsync(existing);
+
+                return new ThesisApplicationDTO
+                {
+                    Id = existing.Id,
+                    ThesisId = existing.ThesisId,
+                    ThesisTitle = thesis.Title,
+                    ThesisOwnerName = null,
+                    TeamId = team.TeamId,
+                    TeamName = team.TeamName,
+                    Status = existing.Status,
+                    CreatedAt = existing.CreatedAt
+                };
+            }
+
+            // 7. Create if not exists
             var application = new ThesisApplication
             {
                 ThesisId = thesisId,
@@ -256,6 +276,7 @@ namespace Services
 
             // 3. Assign thesis.TeamId
             thesis.TeamId = app.TeamId;
+            thesis.MentorId1 = userId;
 
             // 4. Set thesis status → "Registered"
             thesis.Status = "Registered";

@@ -52,6 +52,12 @@ namespace DataAccess
                     && (a.Status == "Pending" || a.Status == "Approved"));
         }
 
+        public async Task<ThesisApplication?> GetByThesisAndTeamAsync(string thesisId, int teamId)
+        {
+            return await _context.ThesisApplications
+                .FirstOrDefaultAsync(a => a.ThesisId == thesisId && a.TeamId == teamId);
+        }
+
         public async Task<bool> HasApprovedInSemesterAsync(int teamId, int semesterId)
         {
             return await _context.ThesisApplications
