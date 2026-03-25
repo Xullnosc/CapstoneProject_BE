@@ -121,6 +121,7 @@ builder.Services.AddScoped<ILecturerService, LecturerService>();
 builder.Services.AddScoped<IAccessLogService, AccessLogService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IThesisApplicationService, ThesisApplicationService>();
+builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ISystemParameterService, SystemParameterService>();
 
@@ -143,6 +144,7 @@ builder.Services.AddScoped<IAccountDetailDAO, AccountDetailDAO>();
 builder.Services.AddScoped<IImportDAO, ImportDAO>();
 builder.Services.AddScoped<INotificationDAO, NotificationDAO>();
 builder.Services.AddScoped<IThesisApplicationDAO, ThesisApplicationDAO>();
+builder.Services.AddScoped<ISystemSettingDAO, SystemSettingDAO>();
 builder.Services.AddScoped<IDashboardDAO, DashboardDAO>();
 builder.Services.AddScoped<ISystemParameterDAO, SystemParameterDAO>();
 
@@ -165,6 +167,7 @@ builder.Services.AddScoped<IAccountDetailRepository, AccountDetailRepository>();
 builder.Services.AddScoped<IImportRepository, ImportRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<IThesisApplicationRepository, ThesisApplicationRepository>();
+builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<ISystemParameterRepository, SystemParameterRepository>();
 

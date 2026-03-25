@@ -55,7 +55,7 @@ namespace Services
 
             await NotifyActiveSemesterUsersAsync(
                 "Checklist created",
-                $"A new checklist item was added: {entity.Title}",
+                $"A new checklist item was added: {entity.Content}",
                 entity.ChecklistId);
 
             return _mapper.Map<ChecklistDTO>(entity);
@@ -67,14 +67,13 @@ namespace Services
             if (entity == null)
                 throw new KeyNotFoundException($"Checklist with id {id} not found.");
 
-            entity.Title = dto.Title;
             entity.Content = dto.Content;
             entity.UpdatedAt = DateTime.UtcNow;
             await _repository.UpdateAsync(entity);
 
             await NotifyActiveSemesterUsersAsync(
                 "Checklist updated",
-                $"Checklist item was updated: {entity.Title}",
+                $"Checklist item was updated: {entity.Content}",
                 entity.ChecklistId);
         }
 
@@ -87,7 +86,7 @@ namespace Services
 
             await NotifyActiveSemesterUsersAsync(
                 "Checklist removed",
-                $"Checklist item was removed: {entity.Title}",
+                $"Checklist item was removed: {entity.Content}",
                 entity.ChecklistId);
         }
 

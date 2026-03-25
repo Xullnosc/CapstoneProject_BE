@@ -151,6 +151,14 @@ namespace Services.Mappings
                     opt => opt.MapFrom(src => src.User != null ? src.User.Email : null)
                 )
                 .ForMember(dest => dest.Reviews, opt => opt.Ignore())
+                .ForMember(
+                    dest => dest.MentorEmail1,
+                    opt => opt.MapFrom(src => src.Mentor1 != null ? src.Mentor1.Email : null)
+                )
+                .ForMember(
+                    dest => dest.MentorEmail2,
+                    opt => opt.MapFrom(src => src.Mentor2 != null ? src.Mentor2.Email : null)
+                )
                 .ForMember(dest => dest.Histories, opt => opt.MapFrom(src => src.ThesisHistories));
 
             // ThesisHistory → ThesisHistoryDTO
