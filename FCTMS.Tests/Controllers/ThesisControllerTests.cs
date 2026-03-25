@@ -232,5 +232,51 @@ namespace FCTMS.Tests.Controllers
 
             result.Should().BeOfType<NotFoundObjectResult>();
         }
+
+        [Fact]
+        public async Task AssignReviewers_ShouldReturnOk_WhenServiceReturnsStatus()
+        {
+            // Arrange
+            var thesisId = "guid-assign-1";
+            var dto = new AssignThesisReviewersDTO { ReviewerIds = new[] { 10, 20 } };
+
+            var returnedStatus = new ThesisReviewStatusDTO { OverallStatus = "Pass" };
+
+            _mockThesisService
+                .Setup(x => x.AssignReviewersAsync(
+                    thesisId,
+                    It.Is<int[]>(ids => ids.SequenceEqual(new[] { 10, 20 })),
+                    1))
+                .ReturnsAsync(returnedStatus);
+
+            // Act
+            var result = await _controller.AssignReviewers(thesisId, dto);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.Should().Be(returnedStatus);
+            _mockThesisService.Verify(x => x.AssignReviewersAsync(
+                thesisId,
+                It.Is<int[]>(ids => ids.SequenceEqual(new[] { 10, 20 })),
+                1
+            ), Times.Once);
+        }
+
+        [Fact]
+        public async Task AssignReviewers_ShouldReturnBadRequest_WhenReviewerIdsEmpty()
+        {
+            // Arrange
+            var thesisId = "guid-assign-2";
+            var dto = new AssignThesisReviewersDTO { ReviewerIds = Array.Empty<int>() };
+
+            // Act
+            var result = await _controller.AssignReviewers(thesisId, dto);
+
+            // Assert
+            var badRequest = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            badRequest.Value.Should().NotBeNull();
+            badRequest.Value!.GetType().GetProperty("Message")!.GetValue(badRequest.Value, null)
+                .Should().Be("ReviewerIds is required.");
+        }
     }
 }

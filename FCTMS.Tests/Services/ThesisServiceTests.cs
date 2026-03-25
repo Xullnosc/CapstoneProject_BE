@@ -950,5 +950,102 @@ namespace FCTMS.Tests.Services
             capturedThesis.UserId.Should().Be(userId);
             _mockThesisRepository.Verify(x => x.CreateThesisAsync(It.IsAny<Thesis>()), Times.Once);
         }
+
+        [Fact]
+        public async Task AssignReviewersAsync_ShouldThrowArgumentException_WhenReviewerIdsNotExactlyTwo()
+        {
+            // Arrange
+            var thesisId = "thesis-guid-1";
+            var invalidReviewerIds = new[] { 10 }; // not exactly 2
+
+            // Act
+            Func<Task> act = async () =>
+                await _thesisService.AssignReviewersAsync(thesisId, invalidReviewerIds, 99);
+
+            // Assert
+            await act.Should()
+                .ThrowAsync<ArgumentException>()
+                .WithMessage("Exactly 2 reviewers are required.");
+        }
+
+        [Fact]
+        public async Task AssignReviewersAsync_ShouldSetStatusPublished_WhenOverallPass()
+        {
+            // Arrange
+            var thesisId = "thesis-guid-2";
+            var thesis = new Thesis { ThesisId = thesisId, Status = "Need Update" };
+
+            var updatedStatuses = new List<string>();
+
+            _mockThesisRepository
+                .Setup(x => x.GetThesisByIdAsync(thesisId))
+                .ReturnsAsync(thesis);
+
+            _mockThesisRepository
+                .Setup(x => x.UpdateThesisAsync(It.IsAny<Thesis>()))
+                .Callback<Thesis>(t => updatedStatuses.Add(t.Status))
+                .Returns(Task.CompletedTask);
+
+            _mockThesisReviewRepository
+                .Setup(x => x.InitializeReviewersAsync(thesisId, 11, 22, 5))
+                .Returns(Task.CompletedTask);
+
+            _mockThesisReviewRepository
+                .Setup(x => x.GetReviewStatusAsync(thesisId))
+                .ReturnsAsync(new ThesisReviewStatusDTO { OverallStatus = "Pass" });
+
+            // Act
+            var result = await _thesisService.AssignReviewersAsync(thesisId, new[] { 11, 22 }, 5);
+
+            // Assert
+            result.OverallStatus.Should().Be("Pass");
+            updatedStatuses.Should().Equal(new[] { "Reviewing", "Published" });
+
+            _mockThesisReviewRepository.Verify(
+                x => x.InitializeReviewersAsync(thesisId, 11, 22, 5),
+                Times.Once
+            );
+            _mockThesisRepository.Verify(x => x.UpdateThesisAsync(It.IsAny<Thesis>()), Times.Exactly(2));
+        }
+
+        [Fact]
+        public async Task AssignReviewersAsync_ShouldSetStatusNeedUpdate_WhenOverallFail()
+        {
+            // Arrange
+            var thesisId = "thesis-guid-3";
+            var thesis = new Thesis { ThesisId = thesisId, Status = "Reviewing" };
+
+            var updatedStatuses = new List<string>();
+
+            _mockThesisRepository
+                .Setup(x => x.GetThesisByIdAsync(thesisId))
+                .ReturnsAsync(thesis);
+
+            _mockThesisRepository
+                .Setup(x => x.UpdateThesisAsync(It.IsAny<Thesis>()))
+                .Callback<Thesis>(t => updatedStatuses.Add(t.Status))
+                .Returns(Task.CompletedTask);
+
+            _mockThesisReviewRepository
+                .Setup(x => x.InitializeReviewersAsync(thesisId, 31, 41, 7))
+                .Returns(Task.CompletedTask);
+
+            _mockThesisReviewRepository
+                .Setup(x => x.GetReviewStatusAsync(thesisId))
+                .ReturnsAsync(new ThesisReviewStatusDTO { OverallStatus = "Fail" });
+
+            // Act
+            var result = await _thesisService.AssignReviewersAsync(thesisId, new[] { 31, 41 }, 7);
+
+            // Assert
+            result.OverallStatus.Should().Be("Fail");
+            updatedStatuses.Should().Equal(new[] { "Reviewing", "Need Update" });
+
+            _mockThesisReviewRepository.Verify(
+                x => x.InitializeReviewersAsync(thesisId, 31, 41, 7),
+                Times.Once
+            );
+            _mockThesisRepository.Verify(x => x.UpdateThesisAsync(It.IsAny<Thesis>()), Times.Exactly(2));
+        }
     }
 }
