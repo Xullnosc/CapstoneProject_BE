@@ -51,6 +51,8 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<ThesisApplication> ThesisApplications { get; set; }
 
+    public virtual DbSet<SystemParameter> SystemParameters { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("utf8mb4_0900_ai_ci").HasCharSet("utf8mb4");
@@ -847,6 +849,25 @@ public partial class FctmsContext : DbContext
                 .HasForeignKey(d => d.TeamId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_Applications_Teams");
+        });
+
+        modelBuilder.Entity<SystemParameter>(entity =>
+        {
+            entity.HasKey(e => e.Key).HasName("PRIMARY");
+            entity.ToTable("SystemParameters");
+
+            entity.Property(e => e.Key).HasMaxLength(255);
+            entity.Property(e => e.Value).HasColumnType("longtext");
+            entity.Property(e => e.Description).HasMaxLength(1000);
+
+            entity
+                .Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime2");
+
+            entity
+                .Property(e => e.UpdatedAt)
+                .HasColumnType("datetime2");
         });
 
         OnModelCreatingPartial(modelBuilder);
