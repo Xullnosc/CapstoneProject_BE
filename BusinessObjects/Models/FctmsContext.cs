@@ -34,6 +34,7 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<ThesisReviewComment> ThesisReviewComments { get; set; }
 
     public virtual DbSet<ThesisReviewAttachment> ThesisReviewAttachments { get; set; }
+    public virtual DbSet<ThesisReviewChecklistResult> ThesisReviewChecklistResults { get; set; }
 
     public virtual DbSet<Checklist> Checklists { get; set; }
 
@@ -50,6 +51,7 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<Notification> Notifications { get; set; }
 
     public virtual DbSet<ThesisApplication> ThesisApplications { get; set; }
+    public virtual DbSet<SystemSetting> SystemSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -273,7 +275,7 @@ public partial class FctmsContext : DbContext
                 );
             entity
                 .Property(e => e.ActorRole)
-                .HasColumnType("enum('REVIEWER','HOD','MENTOR','SYSTEM')");
+                .HasColumnType("enum('REVIEWER','HOD','MENTOR','AUTHOR','SYSTEM')");
             entity.Property(e => e.Decision).HasColumnType("enum('Pass','Fail')");
             entity.Property(e => e.PreviousDecision).HasColumnType("enum('Pass','Fail')");
             entity.Property(e => e.SequenceNo).HasDefaultValueSql("0");
@@ -847,6 +849,37 @@ public partial class FctmsContext : DbContext
                 .HasForeignKey(d => d.TeamId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_Applications_Teams");
+        });
+
+        modelBuilder.Entity<ThesisReviewChecklistResult>(entity =>
+        {
+            entity.HasKey(e => new { e.EventId, e.ChecklistId }).HasName("PRIMARY");
+            entity.ToTable("thesis_review_checklist_results");
+
+            entity.Property(e => e.IsChecked).HasDefaultValueSql("b'0'");
+
+            entity
+                .HasOne(d => d.Event)
+                .WithMany()
+                .HasForeignKey(d => d.EventId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ChecklistResults_Event");
+
+            entity
+                .HasOne(d => d.Checklist)
+                .WithMany()
+                .HasForeignKey(d => d.ChecklistId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ChecklistResults_Checklist");
+        });
+
+        modelBuilder.Entity<SystemSetting>(entity =>
+        {
+            entity.HasKey(e => e.SettingKey).HasName("PRIMARY");
+            entity.ToTable("system_settings");
+            entity.Property(e => e.SettingKey).HasMaxLength(100).HasColumnName("setting_key");
+            entity.Property(e => e.SettingValue).HasColumnType("text").HasColumnName("setting_value");
+            entity.Property(e => e.Description).HasMaxLength(255).HasColumnName("description");
         });
 
         OnModelCreatingPartial(modelBuilder);

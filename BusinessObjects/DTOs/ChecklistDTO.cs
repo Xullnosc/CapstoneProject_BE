@@ -8,9 +8,6 @@ public class ChecklistDTO
     [JsonPropertyName("checklistId")]
     public int ChecklistId { get; set; }
 
-    [JsonPropertyName("title")]
-    public string Title { get; set; } = null!;
-
     [JsonPropertyName("content")]
     public string Content { get; set; } = null!;
 
@@ -23,18 +20,12 @@ public class ChecklistDTO
 
 public class ChecklistCreateDTO
 {
-    [JsonPropertyName("title")]
-    public string Title { get; set; } = null!;
-
     [JsonPropertyName("content")]
     public string Content { get; set; } = null!;
 }
 
 public class ChecklistUpdateDTO
 {
-    [JsonPropertyName("title")]
-    public string Title { get; set; } = null!;
-
     [JsonPropertyName("content")]
     public string Content { get; set; } = null!;
 }
