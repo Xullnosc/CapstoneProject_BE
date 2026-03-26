@@ -7,5 +7,6 @@ namespace BusinessObjects.DTOs
         public string Status { get; set; } = null!; // "Approve" | "Reject"
         public string? Comment { get; set; }
         public IFormFile? ReviewFile { get; set; }
+        public System.Collections.Generic.List<int>? CheckedChecklistIds { get; set; }
     }
 }

@@ -23,7 +23,7 @@ namespace Services
             string? status = null,
             string? searchTitle = null
         );
-        Task<ThesisDTO?> GetThesisDetailAsync(string id);
+        Task<ThesisDTO?> GetThesisDetailAsync(string id, string? currentUserEmail = null);
         Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(
             string? status,
             int? userId,
@@ -31,7 +31,8 @@ namespace Services
             int? semesterId = null,
             bool? isLocked = null,
             bool lecturerOnly = false,
-            int? excludeUserId = null
+            int? excludeUserId = null,
+            string? currentUserEmail = null
         );
         Task<ThesisDTO> ToggleThesisLockAsync(string thesisId, string email);
 

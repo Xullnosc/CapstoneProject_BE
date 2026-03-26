@@ -17,6 +17,9 @@ namespace BusinessObjects.DTOs
         public int UserId { get; set; }
         public string? OwnerName { get; set; }
         public string? OwnerEmail { get; set; }
+        public string? OwnerAvatar { get; set; }
+        public string? MentorEmail1 { get; set; }
+        public string? MentorEmail2 { get; set; }
 
         public List<ReviewDTO> Reviews { get; set; } = new();
         public List<ThesisHistoryDTO>? Histories { get; set; }
