@@ -194,6 +194,9 @@ namespace Services.Mappings
             // Notification
             CreateMap<Notification, NotificationDTO>()
                 .ForMember(dest => dest.IsRead, opt => opt.MapFrom(src => src.IsRead == true));
+
+            // System Logs
+            CreateMap<SystemErrorLog, SystemErrorLogDTO>().ReverseMap();
         }
     }
 }
