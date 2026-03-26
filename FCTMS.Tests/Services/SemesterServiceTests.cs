@@ -386,5 +386,74 @@ namespace FCTMS.Tests.Services
         }
 
         #endregion
+
+        #region GetOrphanedStudentsAsync
+
+        [Fact]
+        public async Task GetOrphanedStudentsAsync_ShouldThrow_WhenSemesterNotFound()
+        {
+            // Arrange
+            int id = 99;
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync((Semester?)null);
+
+            // Act
+            Func<Task> act = async () => await _semesterService.GetOrphanedStudentsAsync(id);
+
+            // Assert
+            await act.Should().ThrowAsync<KeyNotFoundException>()
+                .WithMessage("Semester 99 not found");
+        }
+
+        [Fact]
+        public async Task GetOrphanedStudentsAsync_ShouldReturnOrphanedStudents()
+        {
+            // Arrange
+            int id = 1;
+            var semester = new Semester { SemesterId = id };
+            var orphanedWhitelists = new List<Whitelist>
+            {
+                new Whitelist { WhitelistId = 1, Email = "orphan@fpt.edu.vn", FullName = "Orphan" }
+            };
+            var orphanedDTOs = new List<WhitelistDTO>
+            {
+                new WhitelistDTO { WhitelistId = 1, Email = "orphan@fpt.edu.vn", FullName = "Orphan" }
+            };
+
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
+            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(id)).ReturnsAsync(orphanedWhitelists);
+            _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(orphanedWhitelists)).Returns(orphanedDTOs);
+            _mockUserRepository.Setup(u => u.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
+                .ReturnsAsync(new List<User> { new User { Email = "orphan@fpt.edu.vn", Avatar = "avatar.png" } });
+
+            // Act
+            var result = await _semesterService.GetOrphanedStudentsAsync(id);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().HaveCount(1);
+            result[0].Email.Should().Be("orphan@fpt.edu.vn");
+            result[0].Avatar.Should().Be("avatar.png");
+        }
+
+        [Fact]
+        public async Task GetOrphanedStudentsAsync_ShouldReturnEmptyList_WhenNoOrphans()
+        {
+            // Arrange
+            int id = 1;
+            var semester = new Semester { SemesterId = id };
+
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
+            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(id)).ReturnsAsync(new List<Whitelist>());
+            _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(It.IsAny<List<Whitelist>>())).Returns(new List<WhitelistDTO>());
+
+            // Act
+            var result = await _semesterService.GetOrphanedStudentsAsync(id);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEmpty();
+        }
+
+        #endregion
     }
 }
