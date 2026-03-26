@@ -336,5 +336,115 @@ namespace FCTMS.Tests.Services
         }
 
         #endregion
+
+        #region ForceCreateTeamAsync Tests
+
+        [Fact]
+        public async Task ForceCreateTeamAsync_ShouldCreateTeam_WhenValid()
+        {
+            // Arrange
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP26" };
+            var student1 = new User { UserId = 100, Email = "s1@fpt.edu.vn", FullName = "Student 1", Role = new Role { RoleName = "Student" } };
+            var student2 = new User { UserId = 101, Email = "s2@fpt.edu.vn", FullName = "Student 2", Role = new Role { RoleName = "Student" } };
+
+            var dto = new ForceCreateTeamDTO
+            {
+                TeamName = "Force Team",
+                SemesterId = 1,
+                LeaderEmail = "s1@fpt.edu.vn",
+                MemberEmails = new List<string> { "s1@fpt.edu.vn", "s2@fpt.edu.vn" }
+            };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(1)).ReturnsAsync(semester);
+            _mockUserRepository.Setup(r => r.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
+                .ReturnsAsync(new List<User> { student1, student2 });
+            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(It.IsAny<int>(), 1)).ReturnsAsync((Team?)null);
+            _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1)).ReturnsAsync(new List<string>());
+            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => { t.TeamId = 1; return t; });
+
+            // Act
+            var result = await _teamService.ForceCreateTeamAsync(hodUserId, dto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.TeamName.Should().Be("Force Team");
+            result.Status.Should().Be("Insufficient"); // 2 members < 3
+            result.MemberCount.Should().Be(2);
+            _mockTeamRepository.Verify(r => r.CreateAsync(It.Is<Team>(t => t.LeaderId == 100)), Times.Once);
+        }
+
+        [Fact]
+        public async Task ForceCreateTeamAsync_ShouldThrow_WhenSemesterNotFound()
+        {
+            // Arrange
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var dto = new ForceCreateTeamDTO { TeamName = "X", SemesterId = 99, LeaderEmail = "a@x.com", MemberEmails = new List<string> { "a@x.com" } };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(99)).ReturnsAsync((Semester?)null);
+
+            // Act & Assert
+            Func<Task> act = () => _teamService.ForceCreateTeamAsync(hodUserId, dto);
+            await act.Should().ThrowAsync<KeyNotFoundException>().WithMessage("*99*");
+        }
+
+        [Fact]
+        public async Task ForceCreateTeamAsync_ShouldThrow_WhenLeaderNotInMembers()
+        {
+            // Arrange
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP26" };
+            var dto = new ForceCreateTeamDTO
+            {
+                TeamName = "X",
+                SemesterId = 1,
+                LeaderEmail = "leader@fpt.edu.vn",
+                MemberEmails = new List<string> { "other@fpt.edu.vn" } // Leader not in list
+            };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(1)).ReturnsAsync(semester);
+
+            // Act & Assert
+            Func<Task> act = () => _teamService.ForceCreateTeamAsync(hodUserId, dto);
+            await act.Should().ThrowAsync<ArgumentException>().WithMessage("*Leader*members*");
+        }
+
+        [Fact]
+        public async Task ForceCreateTeamAsync_ShouldThrow_WhenStudentAlreadyInTeam()
+        {
+            // Arrange
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP26" };
+            var student = new User { UserId = 100, Email = "s1@fpt.edu.vn", FullName = "S1", Role = new Role { RoleName = "Student" } };
+            var existingTeam = new Team { TeamId = 5, TeamName = "Existing Team" };
+
+            var dto = new ForceCreateTeamDTO
+            {
+                TeamName = "New Team",
+                SemesterId = 1,
+                LeaderEmail = "s1@fpt.edu.vn",
+                MemberEmails = new List<string> { "s1@fpt.edu.vn" }
+            };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(1)).ReturnsAsync(semester);
+            _mockUserRepository.Setup(r => r.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
+                .ReturnsAsync(new List<User> { student });
+            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(100, 1)).ReturnsAsync(existingTeam);
+
+            // Act & Assert
+            Func<Task> act = () => _teamService.ForceCreateTeamAsync(hodUserId, dto);
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*already in team*");
+        }
+
+        #endregion
     }
 }
+

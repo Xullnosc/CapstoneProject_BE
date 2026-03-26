@@ -347,5 +347,83 @@ namespace Services
             await _semesterService.InvalidateSemesterCacheAsync();
             return true;
         }
+        public async Task<TeamDTO> ForceCreateTeamAsync(int hodUserId, ForceCreateTeamDTO dto)
+        {
+            // 1. Validate HOD
+            var hodUser = await _userRepository.GetByIdAsync(hodUserId);
+            if (hodUser == null || hodUser.Role?.RoleName != CampusConstants.Roles.HOD)
+                throw new UnauthorizedAccessException("Only Head of Department can force-create teams.");
+
+            // 2. Validate Semester
+            var semester = await _semesterRepository.GetSemesterByIdAsync(dto.SemesterId);
+            if (semester == null)
+                throw new KeyNotFoundException($"Semester {dto.SemesterId} not found.");
+
+            // 3. Validate LeaderEmail is in MemberEmails
+            if (!dto.MemberEmails.Contains(dto.LeaderEmail))
+                throw new ArgumentException("Leader must be included in the members list.");
+
+            // 4. Resolve emails to users and validate
+            var uniqueEmails = dto.MemberEmails.Distinct().ToList();
+            var users = await _userRepository.GetUsersByEmailsAsync(uniqueEmails);
+            
+            foreach (var email in uniqueEmails)
+            {
+                var user = users.FirstOrDefault(u => u.Email == email);
+                if (user == null)
+                    throw new ArgumentException($"User with email '{email}' not found.");
+                if (user.Role?.RoleName != CampusConstants.Roles.Student)
+                    throw new ArgumentException($"User {user.FullName ?? user.Email} is not a student.");
+
+                var existingTeam = await _teamRepository.GetTeamByStudentIdAsync(user.UserId, dto.SemesterId);
+                if (existingTeam != null)
+                    throw new InvalidOperationException($"Student {user.FullName ?? user.Email} is already in team '{existingTeam.TeamName}'.");
+            }
+
+            // 5. Find leader user
+            var leader = users.First(u => u.Email == dto.LeaderEmail);
+
+            // 6. Generate TeamCode
+            string teamCode = await GenerateTeamCodeAsync(dto.SemesterId, semester.SemesterCode);
+
+            // 7. Calculate status
+            string status = uniqueEmails.Count switch
+            {
+                >= 4 => CampusConstants.TeamStatus.Active,
+                3 => CampusConstants.TeamStatus.PendingApproval,
+                _ => CampusConstants.TeamStatus.Insufficient
+            };
+
+            // 8. Create Team
+            var team = new Team
+            {
+                TeamCode = teamCode,
+                TeamName = dto.TeamName,
+                Description = dto.Description ?? "Team created by HOD.",
+                TeamAvatar = "https://ui-avatars.com/api/?name=" + Uri.EscapeDataString(dto.TeamName) + "&background=random&color=fff",
+                SemesterId = dto.SemesterId,
+                LeaderId = leader.UserId,
+                Status = status,
+                IsSpecial = false,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            // 9. Add all members
+            foreach (var user in users)
+            {
+                team.Teammembers.Add(new Teammember
+                {
+                    StudentId = user.UserId,
+                    Role = user.UserId == leader.UserId ? "Leader" : "Member",
+                    JoinedAt = DateTime.UtcNow,
+                    Student = user
+                });
+            }
+
+            var createdTeam = await _teamRepository.CreateAsync(team);
+            await _semesterService.InvalidateSemesterCacheAsync(dto.SemesterId);
+            return MapToDTO(createdTeam);
+        }
     }
 }
