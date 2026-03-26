@@ -1109,5 +1109,105 @@ namespace FCTMS.Tests.Services
             );
             _mockThesisRepository.Verify(x => x.UpdateThesisAsync(It.IsAny<Thesis>()), Times.Exactly(2));
         }
+
+        // ─── F105: ForceAssignThesisAsync Tests ─────────────────────────────────
+
+        [Fact]
+        public async Task ForceAssignThesisAsync_ShouldSucceed_WhenValid()
+        {
+            // Arrange
+            int hodUserId = 100;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var thesis = new Thesis { ThesisId = "t1", Status = "Published", TeamId = null, SemesterId = 1 };
+            var team = new Team { TeamId = 10, TeamName = "Team A", LeaderId = 5 };
+            var expectedDto = new ThesisDTO { ThesisId = "t1", Status = "Registered" };
+
+            _mockUserRepository.Setup(x => x.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync("t1")).ReturnsAsync(thesis);
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(10)).ReturnsAsync(team);
+            _mockThesisRepository.Setup(x => x.GetApprovedThesisByLeaderIdAsync(5, 1)).ReturnsAsync((Thesis?)null);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdWithHistoriesAsync("t1")).ReturnsAsync(thesis);
+            _mockMapper.Setup(m => m.Map<ThesisDTO>(It.IsAny<Thesis>())).Returns(expectedDto);
+
+            // Act
+            var result = await _thesisService.ForceAssignThesisAsync("t1", 10, hodUserId);
+
+            // Assert
+            thesis.TeamId.Should().Be(10);
+            thesis.Status.Should().Be("Registered");
+            result.Status.Should().Be("Registered");
+            _mockThesisRepository.Verify(x => x.UpdateThesisAsync(thesis), Times.Once);
+        }
+
+        [Fact]
+        public async Task ForceAssignThesisAsync_ShouldThrow_WhenThesisNotFound()
+        {
+            // Arrange
+            int hodUserId = 100;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            _mockUserRepository.Setup(x => x.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync("invalid")).ReturnsAsync((Thesis?)null);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.ForceAssignThesisAsync("invalid", 10, hodUserId);
+
+            // Assert
+            await act.Should().ThrowAsync<KeyNotFoundException>();
+        }
+
+        [Fact]
+        public async Task ForceAssignThesisAsync_ShouldThrow_WhenTeamNotFound()
+        {
+            // Arrange
+            int hodUserId = 100;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var thesis = new Thesis { ThesisId = "t1", Status = "Published", TeamId = null };
+            _mockUserRepository.Setup(x => x.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync("t1")).ReturnsAsync(thesis);
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(999)).ReturnsAsync((Team?)null);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.ForceAssignThesisAsync("t1", 999, hodUserId);
+
+            // Assert
+            await act.Should().ThrowAsync<KeyNotFoundException>();
+        }
+
+        [Fact]
+        public async Task ForceAssignThesisAsync_ShouldThrow_WhenThesisNotPublished()
+        {
+            // Arrange
+            int hodUserId = 100;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var thesis = new Thesis { ThesisId = "t1", Status = "Reviewing", TeamId = null };
+            _mockUserRepository.Setup(x => x.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync("t1")).ReturnsAsync(thesis);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.ForceAssignThesisAsync("t1", 10, hodUserId);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*Published*");
+        }
+
+        [Fact]
+        public async Task ForceAssignThesisAsync_ShouldThrow_WhenThesisAlreadyAssigned()
+        {
+            // Arrange
+            int hodUserId = 100;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var thesis = new Thesis { ThesisId = "t1", Status = "Published", TeamId = 5 };
+            _mockUserRepository.Setup(x => x.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync("t1")).ReturnsAsync(thesis);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.ForceAssignThesisAsync("t1", 10, hodUserId);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*already assigned*");
+        }
     }
 }
+

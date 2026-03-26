@@ -14,6 +14,7 @@ namespace BusinessObjects.DTOs
         public DateTime? UpDate { get; set; }
         public DateTime? UpdateDate { get; set; }
         public int? SemesterId { get; set; }
+        public int? TeamId { get; set; }
         public int UserId { get; set; }
         public string? OwnerName { get; set; }
         public string? OwnerEmail { get; set; }
