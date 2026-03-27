@@ -151,39 +151,8 @@ namespace Services
                 // POPULATE AVATARS FOR ALL WHITELISTS
                 if (dto.Whitelists.Any())
                 {
-                    // Normalize emails (Trim)
-                    var emails = dto.Whitelists
-                        .Where(w => !string.IsNullOrWhiteSpace(w.Email))
-                        .Select(w => w.Email.Trim())
-                        .Distinct()
-                        .ToList();
-
-                    var users = await _userRepository.GetUsersByEmailsAsync(emails);
-                    
-                    // Use case-insensitive dictionary to match emails safely
-                    var avatarDict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-                    foreach (var user in users)
-                    {
-                        if (!string.IsNullOrEmpty(user.Email) && !avatarDict.ContainsKey(user.Email.Trim()))
-                        {
-                            avatarDict[user.Email.Trim()] = user.Avatar;
-                        }
-                    }
-
-                    foreach (var wl in dto.Whitelists)
-                    {
-                        if (string.IsNullOrWhiteSpace(wl.Email)) continue;
-                        string emailKey = wl.Email.Trim().ToLower();
-                        bool hasNoAvatar = string.IsNullOrWhiteSpace(wl.Avatar) || wl.Avatar == "N/A";
-
-                        if (hasNoAvatar && avatarDict.TryGetValue(emailKey, out var avatar) && !string.IsNullOrWhiteSpace(avatar))
-                        {
-                            wl.Avatar = avatar;
-                        }
-
-                        // Also ensure campus is mapped to full name for display
-                        wl.Campus = CampusConstants.MapCodeToFullName(wl.Campus);
-                    }
+                    // Populate Avatars and Reviewer status (Directly from database)
+                    await PopulateWhitelistsAvatarsAndReviewersAsync(dto.Whitelists);
                 }
 
                 // 3. Calculate Counts from Live data only
@@ -401,50 +370,9 @@ namespace Services
                     }
                 }
             }
-
-            // 2. Fetch Avatars and Reviewer status for all collected whitelists (Directly from database)
-            var emails = allWhitelists
-                .Where(w => !string.IsNullOrWhiteSpace(w.Email))
-                .Select(w => w.Email.Trim())
-                .Distinct()
-                .ToList();
-
-            if (emails.Any())
-            {
-                var users = await _userRepository.GetUsersByEmailsAsync(emails);
-                // Case-insensitive dictionary to match avatars safely
-                var avatarDict = users
-                    .Where(u => !string.IsNullOrEmpty(u.Email))
-                    .GroupBy(u => u.Email!.Trim(), StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(g => g.Key, g => g.First().Avatar, StringComparer.OrdinalIgnoreCase);
-
-                var lecturers = await _lecturerRepository.GetActiveLecturersAsync();
-                var reviewerDict = lecturers
-                    .Where(l => !string.IsNullOrEmpty(l.Email))
-                    .ToDictionary(l => l.Email.Trim(), l => l.IsReviewer, StringComparer.OrdinalIgnoreCase);
-
-                foreach (var wl in allWhitelists)
-                {
-                    if (!string.IsNullOrWhiteSpace(wl.Email))
-                    {
-                        var trimmedEmail = wl.Email.Trim();
-                        if (avatarDict.TryGetValue(trimmedEmail, out var avatar))
-                        {
-                            wl.Avatar = avatar;
-                        }
-                        if (reviewerDict.TryGetValue(trimmedEmail, out var isReviewer))
-                        {
-                            wl.IsReviewer = isReviewer;
-                        }
-                    }
-                }
-            }
-
-            // Campus mapping is now handled in MappingProfile, but for manual merges we ensure consistency
-            foreach (var wl in allWhitelists)
-            {
-                wl.Campus = CampusConstants.MapCodeToFullName(wl.Campus);
-            }
+            
+            // 2. Fetch Avatars and Reviewer status for all collected whitelists
+            await PopulateWhitelistsAvatarsAndReviewersAsync(allWhitelists);
 
             // 3. Filter
             var filtered = allWhitelists.AsEnumerable();
@@ -488,6 +416,72 @@ namespace Services
                 // but usually after Create, only "all" needs invalidation.
                 // However, following the requirement for prefix based invalidation:
                 await _redisService.RemoveByPrefixAsync("fctms:semester:");
+            }
+        }
+
+        private async Task PopulateWhitelistsAvatarsAndReviewersAsync(List<WhitelistDTO> whitelists)
+        {
+            if (whitelists == null || !whitelists.Any()) return;
+
+            var emails = whitelists
+                .Where(w => !string.IsNullOrWhiteSpace(w.Email))
+                .Select(w => w.Email.Trim().ToLower())
+                .Distinct()
+                .ToList();
+
+            if (!emails.Any()) return;
+
+            // Fetch users for avatars
+            var users = await _userRepository.GetUsersByEmailsAsync(emails);
+            var avatarDict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var user in users)
+            {
+                if (!string.IsNullOrEmpty(user.Email))
+                {
+                    string key = user.Email.Trim().ToLower();
+                    if (!avatarDict.ContainsKey(key))
+                    {
+                        avatarDict[key] = user.Avatar;
+                    }
+                }
+            }
+
+            // Fetch lecturers for reviewer status
+            var lecturers = await _lecturerRepository.GetByEmailsAsync(emails);
+            var reviewerDict = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            foreach (var lecturer in lecturers)
+            {
+                if (!string.IsNullOrEmpty(lecturer.Email))
+                {
+                    string key = lecturer.Email.Trim().ToLower();
+                    if (!reviewerDict.ContainsKey(key))
+                    {
+                        reviewerDict[key] = lecturer.IsReviewer;
+                    }
+                }
+            }
+
+            foreach (var wl in whitelists)
+            {
+                if (string.IsNullOrWhiteSpace(wl.Email)) continue;
+
+                string emailKey = wl.Email.Trim().ToLower();
+                
+                // Only overwrite avatar if current is empty/"N/A" and new one is better
+                bool hasNoAvatar = string.IsNullOrWhiteSpace(wl.Avatar) || wl.Avatar == "N/A";
+                if (hasNoAvatar && avatarDict.TryGetValue(emailKey, out var avatar) && !string.IsNullOrWhiteSpace(avatar))
+                {
+                    wl.Avatar = avatar;
+                }
+
+                // Update Reviewer status
+                if (reviewerDict.TryGetValue(emailKey, out var isReviewer))
+                {
+                    wl.IsReviewer = isReviewer;
+                }
+
+                // Map Campus Code to Name
+                wl.Campus = CampusConstants.MapCodeToFullName(wl.Campus);
             }
         }
     }

@@ -16,5 +16,6 @@ public class SubmitThesisDecisionDTO
     /// Optional review report file
     /// </summary>
     public Microsoft.AspNetCore.Http.IFormFile? ReviewFile { get; set; }
+    public System.Collections.Generic.List<int>? CheckedChecklistIds { get; set; }
 }
 

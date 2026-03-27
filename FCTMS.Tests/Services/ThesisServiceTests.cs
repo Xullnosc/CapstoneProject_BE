@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
+using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using FluentAssertions;
@@ -950,5 +951,68 @@ namespace FCTMS.Tests.Services
             capturedThesis.UserId.Should().Be(userId);
             _mockThesisRepository.Verify(x => x.CreateThesisAsync(It.IsAny<Thesis>()), Times.Once);
         }
+        [Fact]
+        public async Task SubmitReviewerDecisionAsync_ShouldThrow_WhenUserIsProposer()
+        {
+            // Arrange
+            string thesisId = "1";
+            int proposerId = 10;
+            var dto = new SubmitThesisDecisionDTO { Decision = "Pass" };
+            var proposer = new User { UserId = proposerId, Email = "proposer@fpt.edu.vn", Role = new Role { RoleName = CampusConstants.Roles.Lecturer } };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = proposerId };
+
+            _mockUserRepository.Setup(x => x.GetByIdAsync(proposerId)).ReturnsAsync(proposer);
+            _mockLecturerRepository.Setup(x => x.GetByEmailAsync(proposer.Email)).ReturnsAsync(new Lecturer { Email = proposer.Email, IsReviewer = true });
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(thesisId)).ReturnsAsync(thesis);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.SubmitReviewerDecisionAsync(thesisId, proposerId, dto);
+
+            // Assert
+            await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("You cannot review your own thesis proposal.");
+        }
+
+        [Fact]
+        public async Task SubmitReviewerDecisionAsync_ShouldThrow_WhenUserIsNotAssigned()
+        {
+            // Arrange
+            string thesisId = "1";
+            int reviewerId = 20;
+            var dto = new SubmitThesisDecisionDTO { Decision = "Pass" };
+            var reviewer = new User { UserId = reviewerId, Email = "reviewer@fpt.edu.vn", Role = new Role { RoleName = CampusConstants.Roles.Lecturer } };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = 10 };
+            var status = new ThesisReviewStatusDTO { Reviewers = new List<ReviewerProgressDTO> { new ReviewerProgressDTO { UserId = 30 }, new ReviewerProgressDTO { UserId = 40 } } };
+
+            _mockUserRepository.Setup(x => x.GetByIdAsync(reviewerId)).ReturnsAsync(reviewer);
+            _mockLecturerRepository.Setup(x => x.GetByEmailAsync(reviewer.Email)).ReturnsAsync(new Lecturer { Email = reviewer.Email, IsReviewer = true });
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(thesisId)).ReturnsAsync(thesis);
+            _mockThesisReviewRepository.Setup(x => x.GetReviewStatusAsync(thesisId)).ReturnsAsync(status);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.SubmitReviewerDecisionAsync(thesisId, reviewerId, dto);
+
+            // Assert
+            await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("You are not an assigned reviewer for this thesis.");
+        }
+
+        [Fact]
+        public async Task AssignReviewersAsync_ShouldThrow_WhenProposerIsIncluded()
+        {
+            // Arrange
+            string thesisId = "1";
+            int proposerId = 10;
+            int otherReviewerId = 20;
+            var thesis = new Thesis { ThesisId = thesisId, UserId = proposerId };
+
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(thesisId)).ReturnsAsync(thesis);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.AssignReviewersAsync(thesisId, new[] { proposerId, otherReviewerId }, 99);
+
+            // Assert
+            await act.Should().ThrowAsync<ArgumentException>().WithMessage("Thesis proposer cannot be a reviewer for their own thesis.");
+        }
+
+
     }
 }

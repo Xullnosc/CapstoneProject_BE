@@ -92,8 +92,10 @@ namespace DataAccess
         {
             if (emails == null || !emails.Any()) return new List<User>();
 
+            var lowerEmails = emails.Select(e => e.ToLower().Trim()).ToList();
+
             return await _context.Users
-                .Where(u => emails.Contains(u.Email.ToLower()))
+                .Where(u => u.Email != null && lowerEmails.Contains(u.Email.ToLower()))
                 .AsNoTracking()
                 .ToListAsync();
         }
@@ -103,8 +105,10 @@ namespace DataAccess
             if (emails == null || !emails.Any())
                 return new PagedResult<User>(new List<User>(), 0, pageIndex, pageSize);
 
+            var lowerEmails = emails.Select(e => e.ToLower().Trim()).ToList();
+
             var query = _context.Users
-                .Where(u => emails.Contains(u.Email.ToLower()))
+                .Where(u => lowerEmails.Contains(u.Email.ToLower()))
                 .AsNoTracking();
 
             var totalCount = await query.CountAsync();

@@ -13,21 +13,21 @@ public class ThesisReviewRepository : IThesisReviewRepository
     {
         _dao = dao;
     }
-
     public Task UpsertReviewerReviewAsync(
         string thesisId,
         int reviewerId,
         string decision,
         string? note,
-        string? fileUrl
-    ) => _dao.UpsertReviewerReviewAsync(thesisId, reviewerId, decision, note, fileUrl);
+        IEnumerable<int>? checklistIds = null
+    ) => _dao.UpsertReviewerReviewAsync(thesisId, reviewerId, decision, note, checklistIds);
 
     public Task UpsertHodDecisionAsync(
         string thesisId,
         int hodId,
         string decision,
-        string? comment
-    ) => _dao.UpsertHodDecisionAsync(thesisId, hodId, decision, comment);
+        string? comment,
+        IEnumerable<int>? checklistIds = null
+    ) => _dao.UpsertHodDecisionAsync(thesisId, hodId, decision, comment, checklistIds);
 
     public Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId) =>
         _dao.GetReviewStatusAsync(thesisId);

@@ -16,5 +16,6 @@ namespace Repositories
         Task UpdateAsync(Lecturer lecturer);
         Task DeleteAsync(Lecturer lecturer);
         Task<IEnumerable<Lecturer>> SearchAsync(string term);
+        Task<IEnumerable<Lecturer>> GetByEmailsAsync(List<string> emails);
     }
 }

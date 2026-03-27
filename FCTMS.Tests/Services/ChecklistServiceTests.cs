@@ -45,11 +45,11 @@ namespace FCTMS.Tests.Services
         {
             var entities = new List<Checklist>
             {
-                new Checklist { ChecklistId = 1, Title = "A", Content = "Content A" }
+                new Checklist { ChecklistId = 1, Content = "Content A" }
             };
             var dtos = new List<ChecklistDTO>
             {
-                new ChecklistDTO { ChecklistId = 1, Title = "A", Content = "Content A" }
+                new ChecklistDTO { ChecklistId = 1, Content = "Content A" }
             };
             _mockRepository.Setup(x => x.GetAllAsync()).ReturnsAsync(entities);
             _mockMapper.Setup(m => m.Map<List<ChecklistDTO>>(entities)).Returns(dtos);
@@ -57,7 +57,7 @@ namespace FCTMS.Tests.Services
             var result = await _service.GetAllAsync();
 
             result.Should().HaveCount(1);
-            result[0].Title.Should().Be("A");
+            result[0].Content.Should().Be("Content A");
         }
 
         [Fact]
@@ -73,8 +73,8 @@ namespace FCTMS.Tests.Services
         [Fact]
         public async Task GetByIdAsync_ShouldReturnMappedDto_WhenFound()
         {
-            var entity = new Checklist { ChecklistId = 1, Title = "T", Content = "C" };
-            var dto = new ChecklistDTO { ChecklistId = 1, Title = "T", Content = "C" };
+            var entity = new Checklist { ChecklistId = 1, Content = "C" };
+            var dto = new ChecklistDTO { ChecklistId = 1, Content = "C" };
             _mockRepository.Setup(x => x.GetByIdAsync(1)).ReturnsAsync(entity);
             _mockMapper.Setup(m => m.Map<ChecklistDTO>(entity)).Returns(dto);
 
@@ -87,10 +87,10 @@ namespace FCTMS.Tests.Services
         [Fact]
         public async Task CreateAsync_ShouldReturnCreatedDto()
         {
-            var dto = new ChecklistCreateDTO { Title = "New", Content = "New content" };
-            var entity = new Checklist { ChecklistId = 10, Title = "New", Content = "New content" };
-            var mappedDto = new ChecklistDTO { ChecklistId = 10, Title = "New", Content = "New content" };
-            _mockMapper.Setup(m => m.Map<Checklist>(dto)).Returns(new Checklist { Title = dto.Title, Content = dto.Content });
+            var dto = new ChecklistCreateDTO { Content = "New content" };
+            var entity = new Checklist { ChecklistId = 10, Content = "New content" };
+            var mappedDto = new ChecklistDTO { ChecklistId = 10, Content = "New content" };
+            _mockMapper.Setup(m => m.Map<Checklist>(dto)).Returns(new Checklist { Content = dto.Content });
             _mockRepository.Setup(x => x.AddAsync(It.IsAny<Checklist>())).ReturnsAsync(entity);
             _mockMapper.Setup(m => m.Map<ChecklistDTO>(entity)).Returns(mappedDto);
 
@@ -98,21 +98,20 @@ namespace FCTMS.Tests.Services
 
             result.Should().NotBeNull();
             result.ChecklistId.Should().Be(10);
-            result.Title.Should().Be("New");
-            _mockRepository.Verify(x => x.AddAsync(It.Is<Checklist>(e => e.Title == "New" && e.Content == "New content")), Times.Once);
+            result.Content.Should().Be("New content");
+            _mockRepository.Verify(x => x.AddAsync(It.Is<Checklist>(e => e.Content == "New content")), Times.Once);
         }
 
         [Fact]
         public async Task UpdateAsync_ShouldUpdateEntity_WhenFound()
         {
             int id = 1;
-            var entity = new Checklist { ChecklistId = id, Title = "Old", Content = "Old" };
-            var dto = new ChecklistUpdateDTO { Title = "Updated", Content = "Updated content" };
+            var entity = new Checklist { ChecklistId = id, Content = "Old" };
+            var dto = new ChecklistUpdateDTO { Content = "Updated content" };
             _mockRepository.Setup(x => x.GetByIdAsync(id)).ReturnsAsync(entity);
 
             await _service.UpdateAsync(id, dto);
 
-            entity.Title.Should().Be("Updated");
             entity.Content.Should().Be("Updated content");
             _mockRepository.Verify(x => x.UpdateAsync(entity), Times.Once);
         }
@@ -121,7 +120,7 @@ namespace FCTMS.Tests.Services
         public async Task UpdateAsync_ShouldThrowKeyNotFoundException_WhenNotFound()
         {
             _mockRepository.Setup(x => x.GetByIdAsync(999)).ReturnsAsync((Checklist?)null);
-            var dto = new ChecklistUpdateDTO { Title = "X", Content = "Y" };
+            var dto = new ChecklistUpdateDTO { Content = "Y" };
 
             Func<Task> act = async () => await _service.UpdateAsync(999, dto);
 

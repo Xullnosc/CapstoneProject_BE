@@ -31,7 +31,8 @@ namespace Services
             int? semesterId = null,
             bool? isLocked = null,
             bool lecturerOnly = false,
-            int? excludeUserId = null
+            int? excludeUserId = null,
+            string? currentUserEmail = null
         );
         Task<ThesisDTO> ToggleThesisLockAsync(string thesisId, string email);
 

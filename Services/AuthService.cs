@@ -20,6 +20,7 @@ public class AuthService : IAuthService
     private readonly HttpClient _httpClient;
     private readonly IAccessLogRepository _accessLogRepository;
     private readonly ILecturerRepository _lecturerRepository;
+    private readonly ISystemSettingService _systemSettingService;
 
     public AuthService(
         IUserRepository userRepository,
@@ -30,7 +31,8 @@ public class AuthService : IAuthService
         IConfiguration configuration,
         HttpClient httpClient,
         IAccessLogRepository accessLogRepository,
-        ILecturerRepository lecturerRepository
+        ILecturerRepository lecturerRepository,
+        ISystemSettingService systemSettingService
     )
     {
         _userRepository = userRepository;
@@ -42,6 +44,7 @@ public class AuthService : IAuthService
         _httpClient = httpClient;
         _accessLogRepository = accessLogRepository;
         _lecturerRepository = lecturerRepository;
+        _systemSettingService = systemSettingService;
     }
 
     public async Task<LoginResultDTO> GoogleLoginAsync(LoginRequestDTO request)
@@ -185,8 +188,8 @@ public class AuthService : IAuthService
                 // 4. Check authorization
                 if (user.IsAuthorized == false)
                 {
-                    var supportEmail = _configuration["Support:Email"] ?? "N/A";
-                    var supportPhone = _configuration["Support:Phone"] ?? "N/A";
+                    var supportEmail = await _systemSettingService.GetSettingValueAsync("SupportEmail", _configuration["Support:Email"] ?? "N/A");
+                    var supportPhone = await _systemSettingService.GetSettingValueAsync("SupportPhone", _configuration["Support:Phone"] ?? "N/A");
                     throw new UnauthorizedAccessException(
                         $"Bạn chưa được phân quyền vào hệ thống. Vui lòng liên hệ {supportEmail} / {supportPhone}"
                     );
