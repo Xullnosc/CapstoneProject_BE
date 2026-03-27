@@ -709,30 +709,6 @@ namespace Services
             if (thesis == null)
                 return null;
 
-            // Access control for "On Mentor Inviting" status
-            if (string.Equals(thesis.Status, "On Mentor Inviting", StringComparison.OrdinalIgnoreCase) && currentUserId.HasValue)
-            {
-                var user = await _userRepository.GetByIdAsync(currentUserId.Value);
-                if (user != null)
-                {
-                    var roleName = user.Role?.RoleName;
-                    var isHod = string.Equals(roleName, CampusConstants.Roles.HOD, StringComparison.OrdinalIgnoreCase);
-                    var isOwner = thesis.UserId == user.UserId;
-
-                    if (!isHod && !isOwner)
-                    {
-                        var lecturer = await _lecturerRepository.GetByEmailAsync(user.Email);
-                        if (lecturer != null)
-                        {
-                            var isAssignedMentor = thesis.MentorId1 == lecturer.LecturerId || thesis.MentorId2 == lecturer.LecturerId;
-                            if (lecturer.IsReviewer && !isAssignedMentor)
-                            {
-                                throw new UnauthorizedAccessException("Reviewers are not allowed to view theses in 'On Mentor Inviting' status.");
-                            }
-                        }
-                    }
-                }
-            }
  
             var dto = _mapper.Map<ThesisDTO>(thesis);
             
