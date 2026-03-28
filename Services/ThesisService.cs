@@ -554,6 +554,11 @@ namespace Services
             if (thesis.UserId == reviewerUserId)
                 throw new UnauthorizedAccessException("You cannot review your own thesis proposal.");
 
+            if (!isHod && !string.Equals(thesis.Status, "Reviewing", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Cannot submit review decision when thesis is in '{thesis.Status}' state. Decisions are only allowed during 'Reviewing' state.");
+            }
+
             var currentReviewStatus = await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
             var assignedReviewers = currentReviewStatus?.Reviewers ?? new List<ReviewerProgressDTO>();
             bool isAssigned = assignedReviewers.Any(r => r.UserId == reviewerUserId);
