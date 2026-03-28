@@ -141,8 +141,8 @@ namespace Services
                     {
                         // Check search term for Whitelist entries
                         bool matches = string.IsNullOrWhiteSpace(term) || 
-                                       w.Email.Contains(term, StringComparison.OrdinalIgnoreCase) || 
-                                       w.FullName.Contains(term, StringComparison.OrdinalIgnoreCase);
+                                       (w.Email != null && w.Email.Contains(term, StringComparison.OrdinalIgnoreCase)) || 
+                                       (w.FullName != null && w.FullName.Contains(term, StringComparison.OrdinalIgnoreCase));
                                        
                         if (matches && !combinedList.Any(c => c.Email.Equals(w.Email, StringComparison.OrdinalIgnoreCase)))
                         {
