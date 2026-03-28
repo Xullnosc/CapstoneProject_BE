@@ -69,7 +69,7 @@ namespace FCTMS.Tests.Controllers
         {
             // Arrange
             _mockThesisService
-                .Setup(x => x.GetThesisDetailAsync("invalid", It.IsAny<string?>()))
+                .Setup(x => x.GetThesisDetailAsync("invalid"))
                 .ReturnsAsync((ThesisDTO?)null);
 
             // Act
@@ -91,7 +91,7 @@ namespace FCTMS.Tests.Controllers
         {
             // Arrange
             var dto = new ThesisDTO { ThesisId = "1", Title = "Test" };
-            _mockThesisService.Setup(x => x.GetThesisDetailAsync("1", It.IsAny<string?>())).ReturnsAsync(dto);
+            _mockThesisService.Setup(x => x.GetThesisDetailAsync("1")).ReturnsAsync(dto);
 
             // Act
             var result = await _controller.GetThesisDetail("1");

@@ -88,8 +88,7 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
-                var emailClaim = User.FindFirst(ClaimTypes.Email) ?? User.FindFirst("email");
-                var thesis = await _thesisService.GetThesisDetailAsync(id, emailClaim?.Value);
+                var thesis = await _thesisService.GetThesisDetailAsync(id);
                 if (thesis == null)
                     return NotFound(new { Message = $"Thesis with id '{id}' not found." });
 

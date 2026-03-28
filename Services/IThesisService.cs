@@ -23,7 +23,7 @@ namespace Services
             string? status = null,
             string? searchTitle = null
         );
-        Task<ThesisDTO?> GetThesisDetailAsync(string id, string? currentUserEmail = null);
+        Task<ThesisDTO?> GetThesisDetailAsync(string id);
         Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(
             string? status,
             int? userId,

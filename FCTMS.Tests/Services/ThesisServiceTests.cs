@@ -981,7 +981,7 @@ namespace FCTMS.Tests.Services
             var dto = new SubmitThesisDecisionDTO { Decision = "Pass" };
             var reviewer = new User { UserId = reviewerId, Email = "reviewer@fpt.edu.vn", Role = new Role { RoleName = CampusConstants.Roles.Lecturer } };
             var thesis = new Thesis { ThesisId = thesisId, UserId = 10 };
-            var status = new ThesisReviewStatusDTO { Reviewers = new List<ReviewerProgressDTO> { new ReviewerProgressDTO { UserId = 30 } } };
+            var status = new ThesisReviewStatusDTO { Reviewers = new List<ReviewerProgressDTO> { new ReviewerProgressDTO { UserId = 30 }, new ReviewerProgressDTO { UserId = 40 } } };
 
             _mockUserRepository.Setup(x => x.GetByIdAsync(reviewerId)).ReturnsAsync(reviewer);
             _mockLecturerRepository.Setup(x => x.GetByEmailAsync(reviewer.Email)).ReturnsAsync(new Lecturer { Email = reviewer.Email, IsReviewer = true });
