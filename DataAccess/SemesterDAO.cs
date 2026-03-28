@@ -130,6 +130,31 @@ namespace DataAccess
                 (excludeId == null || s.SemesterId != excludeId) &&
                 start.Date <= s.EndDate.Date && end.Date >= s.StartDate.Date);
         }
+
+        public async Task<List<Whitelist>> GetOrphanedStudentsAsync(int semesterId)
+        {
+            var studentRoleId = await GetStudentRoleIdAsync();
+
+            // Emails of students who ARE in a team for this semester
+            var teamedEmails = await _context.Teammembers
+                .Where(tm => tm.Team.SemesterId == semesterId)
+                .Select(tm => tm.Student.Email.ToLower())
+                .Distinct()
+                .ToListAsync();
+
+            var teamedEmailSet = new HashSet<string>(teamedEmails, StringComparer.OrdinalIgnoreCase);
+
+            // Whitelist students for this semester who are NOT in any team
+            var allWhitelistStudents = await _context.Whitelists
+                .Include(w => w.Role)
+                .Where(w => w.SemesterId == semesterId && w.RoleId == studentRoleId)
+                .AsNoTracking()
+                .ToListAsync();
+
+            return allWhitelistStudents
+                .Where(w => !string.IsNullOrEmpty(w.Email) && !teamedEmailSet.Contains(w.Email.Trim()))
+                .ToList();
+        }
     }
 }
 

@@ -403,6 +403,46 @@ namespace Services
             return new PagedResult<WhitelistDTO>(items, total, page, pageSize);
         }
 
+        public async Task<List<WhitelistDTO>> GetOrphanedStudentsAsync(int semesterId)
+        {
+            var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
+            if (semester == null) throw new KeyNotFoundException($"Semester {semesterId} not found");
+
+            var orphaned = await _semesterRepository.GetOrphanedStudentsAsync(semesterId);
+            var dtos = _mapper.Map<List<WhitelistDTO>>(orphaned);
+
+            // Populate avatars (same pattern as GetWhitelistsPaginatedAsync)
+            var emails = dtos
+                .Where(w => !string.IsNullOrWhiteSpace(w.Email))
+                .Select(w => w.Email.Trim())
+                .Distinct()
+                .ToList();
+
+            if (emails.Any())
+            {
+                var users = await _userRepository.GetUsersByEmailsAsync(emails);
+                var avatarDict = users
+                    .Where(u => !string.IsNullOrEmpty(u.Email))
+                    .GroupBy(u => u.Email!.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First().Avatar, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var wl in dtos)
+                {
+                    if (!string.IsNullOrWhiteSpace(wl.Email) && avatarDict.TryGetValue(wl.Email.Trim(), out var avatar))
+                    {
+                        wl.Avatar = avatar;
+                    }
+                }
+            }
+
+            foreach (var wl in dtos)
+            {
+                wl.Campus = CampusConstants.MapCodeToFullName(wl.Campus);
+            }
+
+            return dtos.OrderBy(w => w.FullName ?? w.Email).ToList();
+        }
+
         public async Task InvalidateSemesterCacheAsync(int? id = null)
         {
             await _redisService.DeleteValueAsync("fctms:semester:all");

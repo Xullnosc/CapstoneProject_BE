@@ -54,6 +54,7 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<SystemSetting> SystemSettings { get; set; }
 
     public virtual DbSet<SystemParameter> SystemParameters { get; set; }
+    public virtual DbSet<SystemErrorLog> SystemErrorLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

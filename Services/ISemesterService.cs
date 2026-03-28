@@ -13,6 +13,7 @@ namespace Services
         Task StartSemesterAsync(int id);
         Task EndSemesterAsync(int id);
         Task<PagedResult<WhitelistDTO>> GetWhitelistsPaginatedAsync(int semesterId, int page, int pageSize, string? role = null, string? search = null);
+        Task<List<WhitelistDTO>> GetOrphanedStudentsAsync(int semesterId);
         Task InvalidateSemesterCacheAsync(int? id = null);
     }
 }

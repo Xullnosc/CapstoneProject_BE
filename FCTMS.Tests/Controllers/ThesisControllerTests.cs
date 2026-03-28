@@ -232,5 +232,122 @@ namespace FCTMS.Tests.Controllers
 
             result.Should().BeOfType<NotFoundObjectResult>();
         }
+
+        [Fact]
+        public async Task AssignReviewers_ShouldReturnOk_WhenServiceReturnsStatus()
+        {
+            // Arrange
+            var thesisId = "guid-assign-1";
+            var dto = new AssignThesisReviewersDTO { ReviewerIds = new[] { 10, 20 } };
+
+            var returnedStatus = new ThesisReviewStatusDTO { OverallStatus = "Pass" };
+
+            _mockThesisService
+                .Setup(x => x.AssignReviewersAsync(
+                    thesisId,
+                    It.Is<int[]>(ids => ids.SequenceEqual(new[] { 10, 20 })),
+                    1))
+                .ReturnsAsync(returnedStatus);
+
+            // Act
+            var result = await _controller.AssignReviewers(thesisId, dto);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.Should().Be(returnedStatus);
+            _mockThesisService.Verify(x => x.AssignReviewersAsync(
+                thesisId,
+                It.Is<int[]>(ids => ids.SequenceEqual(new[] { 10, 20 })),
+                1
+            ), Times.Once);
+        }
+
+        [Fact]
+        public async Task AssignReviewers_ShouldReturnBadRequest_WhenReviewerIdsEmpty()
+        {
+            // Arrange
+            var thesisId = "guid-assign-2";
+            var dto = new AssignThesisReviewersDTO { ReviewerIds = Array.Empty<int>() };
+
+            // Act
+            var result = await _controller.AssignReviewers(thesisId, dto);
+
+            // Assert
+            var badRequest = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            badRequest.Value.Should().NotBeNull();
+            badRequest.Value!.GetType().GetProperty("Message")!.GetValue(badRequest.Value, null)
+                .Should().Be("ReviewerIds is required.");
+        }
+
+        // ─── F105: ForceAssignThesis Tests ───────────────────────────────────────
+
+        [Fact]
+        public async Task ForceAssignThesis_ShouldReturnOk_WhenSuccess()
+        {
+            // Arrange
+            var dto = new ForceAssignThesisDTO { TeamId = 10 };
+            var returnedDto = new ThesisDTO { ThesisId = "thesis-1", Status = "Registered" };
+            _mockThesisService
+                .Setup(x => x.ForceAssignThesisAsync("thesis-1", 10, 1))
+                .ReturnsAsync(returnedDto);
+
+            // Act
+            var result = await _controller.ForceAssignThesis("thesis-1", dto);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value!.GetType().GetProperty("Data")!
+                .GetValue(okResult.Value, null).Should().Be(returnedDto);
+        }
+
+        [Fact]
+        public async Task ForceAssignThesis_ShouldReturnNotFound_WhenThesisNotFound()
+        {
+            // Arrange
+            var dto = new ForceAssignThesisDTO { TeamId = 10 };
+            _mockThesisService
+                .Setup(x => x.ForceAssignThesisAsync("missing", 10, 1))
+                .ThrowsAsync(new KeyNotFoundException("Thesis 'missing' not found."));
+
+            // Act
+            var result = await _controller.ForceAssignThesis("missing", dto);
+
+            // Assert
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
+
+        [Fact]
+        public async Task ForceAssignThesis_ShouldReturnForbidden_WhenNotHod()
+        {
+            // Arrange
+            var dto = new ForceAssignThesisDTO { TeamId = 10 };
+            _mockThesisService
+                .Setup(x => x.ForceAssignThesisAsync("thesis-1", 10, 1))
+                .ThrowsAsync(new UnauthorizedAccessException("Only Head of Department can force-assign theses."));
+
+            // Act
+            var result = await _controller.ForceAssignThesis("thesis-1", dto);
+
+            // Assert
+            var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
+            statusResult.StatusCode.Should().Be(403);
+        }
+
+        [Fact]
+        public async Task ForceAssignThesis_ShouldReturnBadRequest_WhenThesisNotPublished()
+        {
+            // Arrange
+            var dto = new ForceAssignThesisDTO { TeamId = 10 };
+            _mockThesisService
+                .Setup(x => x.ForceAssignThesisAsync("thesis-1", 10, 1))
+                .ThrowsAsync(new InvalidOperationException("Thesis must be 'Published' to force-assign."));
+
+            // Act
+            var result = await _controller.ForceAssignThesis("thesis-1", dto);
+
+            // Assert
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
     }
 }
+

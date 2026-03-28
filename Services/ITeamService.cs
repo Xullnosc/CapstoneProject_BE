@@ -17,5 +17,6 @@ namespace Services
         Task<bool> ChangeLeaderAsync(int teamId, int currentLeaderId, int newLeaderId);
         Task<List<TeamDTO>> GetMentorTeamsAsync(int mentorId);
         Task<bool> ToggleSpecialFlagAsync(int teamId, int hodUserId);
+        Task<TeamDTO> ForceCreateTeamAsync(int hodUserId, ForceCreateTeamDTO dto);
     }
 }
