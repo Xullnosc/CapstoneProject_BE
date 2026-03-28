@@ -1014,5 +1014,49 @@ namespace FCTMS.Tests.Services
         }
 
 
+        [Fact]
+        public async Task SubmitReviewerDecisionAsync_ShouldThrow_WhenStatusIsNotReviewingAndUserIsNotHod()
+        {
+            // Arrange
+            string thesisId = "1";
+            int reviewerId = 20;
+            var dto = new SubmitThesisDecisionDTO { Decision = "Pass" };
+            var reviewer = new User { UserId = reviewerId, Email = "reviewer@fpt.edu.vn", Role = new Role { RoleName = CampusConstants.Roles.Lecturer } };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = 10, Status = "Published" }; // Not Reviewing
+
+            _mockUserRepository.Setup(x => x.GetByIdAsync(reviewerId)).ReturnsAsync(reviewer);
+            _mockLecturerRepository.Setup(x => x.GetByEmailAsync(reviewer.Email)).ReturnsAsync(new Lecturer { Email = reviewer.Email, IsReviewer = true });
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(thesisId)).ReturnsAsync(thesis);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.SubmitReviewerDecisionAsync(thesisId, reviewerId, dto);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("Cannot submit review decision when thesis is in 'Published' state. Decisions are only allowed during 'Reviewing' state.");
+        }
+
+        [Fact]
+        public async Task SubmitReviewerDecisionAsync_ShouldSucceed_WhenStatusIsNotReviewingAndUserIsHod()
+        {
+            // Arrange
+            string thesisId = "1";
+            int hodId = 100;
+            var dto = new SubmitThesisDecisionDTO { Decision = "Pass" };
+            var hod = new User { UserId = hodId, Email = "hod@fpt.edu.vn", Role = new Role { RoleName = CampusConstants.Roles.HOD } };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = 10, Status = "Published" }; // Not Reviewing but HOD
+            var status = new ThesisReviewStatusDTO { Reviewers = new List<ReviewerProgressDTO>() };
+
+            _mockUserRepository.Setup(x => x.GetByIdAsync(hodId)).ReturnsAsync(hod);
+            _mockLecturerRepository.Setup(x => x.GetByEmailAsync(hod.Email)).ReturnsAsync(new Lecturer { Email = hod.Email, IsReviewer = true });
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(thesisId)).ReturnsAsync(thesis);
+            _mockThesisReviewRepository.Setup(x => x.GetReviewStatusAsync(thesisId)).ReturnsAsync(status);
+
+            // Act
+            var result = await _thesisService.SubmitReviewerDecisionAsync(thesisId, hodId, dto);
+
+            // Assert
+            _mockThesisReviewRepository.Verify(x => x.UpsertReviewerReviewAsync(thesisId, hodId, "Pass", It.IsAny<string>(), It.IsAny<int[]>()), Times.Once);
+        }
     }
 }
