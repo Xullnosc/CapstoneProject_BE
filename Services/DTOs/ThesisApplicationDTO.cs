@@ -6,6 +6,7 @@ namespace Services.DTOs
         public string ThesisId { get; set; } = null!;
         public string? ThesisTitle { get; set; }
         public string? ThesisOwnerName { get; set; }
+        public string? ThesisOwnerAvatar { get; set; }
         public int TeamId { get; set; }
         public string? TeamName { get; set; }
         public string Status { get; set; } = null!;

@@ -2,6 +2,7 @@
 -- Renamed V42__Remove_Review_Attachments.sql to V43__Remove_Review_Attachments.sql
 
 -- New Migration: V44__Add_System_Settings.sql
+Drop table if exists `system_settings`;
 CREATE TABLE `system_settings` (
     `setting_key` VARCHAR(100) NOT NULL,
     `setting_value` TEXT NOT NULL,

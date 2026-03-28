@@ -10,12 +10,21 @@ namespace Services
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly IRedisService _redisService;
         private readonly ILecturerRepository _lecturerRepository;
+        private readonly IUserRepository _userRepository;
+        private readonly ISystemUserCredentialRepository _credentialRepository;
 
-        public WhitelistService(IWhitelistRepository whitelistRepository, IRedisService redisService, ILecturerRepository lecturerRepository)
+        public WhitelistService(
+            IWhitelistRepository whitelistRepository, 
+            IRedisService redisService, 
+            ILecturerRepository lecturerRepository,
+            IUserRepository userRepository,
+            ISystemUserCredentialRepository credentialRepository)
         {
             _whitelistRepository = whitelistRepository;
             _redisService = redisService;
             _lecturerRepository = lecturerRepository;
+            _userRepository = userRepository;
+            _credentialRepository = credentialRepository;
         }
 
         public async Task<IEnumerable<Whitelist>> GetWhitelistByRoleAsync(int roleId)
@@ -86,6 +95,17 @@ namespace Services
             var whitelist = await _whitelistRepository.GetByIdAsync(id);
             if (whitelist != null)
             {
+                // Delete user's credentials if they exist
+                var user = await _userRepository.GetByEmailAsync(whitelist.Email);
+                if (user != null)
+                {
+                    var credential = await _credentialRepository.GetByUserIdAsync(user.UserId);
+                    if (credential != null)
+                    {
+                        await _credentialRepository.DeleteAsync(credential);
+                    }
+                }
+
                 await _whitelistRepository.DeleteAsync(whitelist);
                 await InvalidateCache(whitelist.SemesterId);
             }

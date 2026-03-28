@@ -221,6 +221,7 @@ namespace DataAccess
             {
                 int? reassignedLeaderId = team.LeaderId == user.UserId ? null : team.LeaderId;
 
+                bool teamRemoved = false;
                 if (team.LeaderId == user.UserId)
                 {
                     var replacementLeader = team.Teammembers
@@ -230,20 +231,25 @@ namespace DataAccess
 
                     if (replacementLeader == null)
                     {
-                        throw new InvalidOperationException($"Cannot delete student {user.Email} because team {team.TeamCode} has no eligible member to receive leadership.");
+                        _context.Teams.Remove(team);
+                        teamRemoved = true;
                     }
-
-                    var currentLeaderMember = team.Teammembers.FirstOrDefault(m => m.StudentId == user.UserId);
-                    if (currentLeaderMember != null)
+                    else
                     {
-                        currentLeaderMember.Role = CampusConstants.TeamRole.Member;
-                    }
+                        var currentLeaderMember = team.Teammembers.FirstOrDefault(m => m.StudentId == user.UserId);
+                        if (currentLeaderMember != null)
+                        {
+                            currentLeaderMember.Role = CampusConstants.TeamRole.Member;
+                        }
 
-                    replacementLeader.Role = CampusConstants.TeamRole.Leader;
-                    team.LeaderId = replacementLeader.StudentId;
-                    team.UpdatedAt = DateTime.UtcNow;
-                    reassignedLeaderId = replacementLeader.StudentId;
+                        replacementLeader.Role = CampusConstants.TeamRole.Leader;
+                        team.LeaderId = replacementLeader.StudentId;
+                        team.UpdatedAt = DateTime.UtcNow;
+                        reassignedLeaderId = replacementLeader.StudentId;
+                    }
                 }
+
+                if (teamRemoved) continue;
 
                 await ReassignStudentArtifactsAsync(user.UserId, team.SemesterId, reassignedLeaderId);
 
@@ -263,6 +269,14 @@ namespace DataAccess
                 }
 
                 int remainingMemberCount = team.Teammembers.Count(m => m.StudentId != user.UserId);
+                
+                // If this was the last member, remove the team
+                if (remainingMemberCount == 0)
+                {
+                    _context.Teams.Remove(team);
+                    continue;
+                }
+
                 team.Status = remainingMemberCount switch
                 {
                     >= 4 => CampusConstants.TeamStatus.Active,

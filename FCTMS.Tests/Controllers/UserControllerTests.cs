@@ -3,12 +3,14 @@ namespace FCTMS.Tests.Controllers
     public class UserControllerTests
     {
         private readonly Mock<IUserService> _mockUserService;
+        private readonly Mock<IAuthService> _mockAuthService;
         private readonly UserController _controller;
 
         public UserControllerTests()
         {
             _mockUserService = new Mock<IUserService>();
-            _controller = new UserController(_mockUserService.Object);
+            _mockAuthService = new Mock<IAuthService>();
+            _controller = new UserController(_mockUserService.Object, _mockAuthService.Object);
         }
 
         // --- GetProfileByUserId ---

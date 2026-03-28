@@ -142,6 +142,7 @@ namespace DataAccess
             var thesis = await _context
                 .Theses.Include(t => t.User)
                 .Include(t => t.ThesisHistories)
+                    .ThenInclude(h => h.UploadedByUser)
                 .FirstOrDefaultAsync(t => t.ThesisId == id);
 
             if (thesis != null && thesis.ThesisHistories != null)
