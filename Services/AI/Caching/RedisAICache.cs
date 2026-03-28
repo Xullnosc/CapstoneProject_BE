@@ -44,7 +44,12 @@ internal sealed class RedisAICache : IAICache
         }
     }
 
-    public async Task SetAsync(string key, string value, TimeSpan ttl, CancellationToken cancellationToken = default)
+    public async Task SetAsync(
+        string key,
+        string value,
+        TimeSpan ttl,
+        CancellationToken cancellationToken = default
+    )
     {
         var redisKey = BuildKey(key);
         try
@@ -54,7 +59,11 @@ internal sealed class RedisAICache : IAICache
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "AI cache SET failed for key {Key}. Response will not be cached.", redisKey);
+            _logger.LogWarning(
+                ex,
+                "AI cache SET failed for key {Key}. Response will not be cached.",
+                redisKey
+            );
         }
     }
 
@@ -69,16 +78,19 @@ internal sealed class RedisAICache : IAICache
         string model,
         IEnumerable<(string role, string content)> messages,
         float temperature,
-        int maxTokens)
+        int maxTokens
+    )
     {
-        var payload = JsonSerializer.Serialize(new
-        {
-            p = provider,
-            m = model,
-            msgs = messages.Select(x => new { r = x.role, c = x.content }),
-            t = temperature,
-            mt = maxTokens
-        });
+        var payload = JsonSerializer.Serialize(
+            new
+            {
+                p = provider,
+                m = model,
+                msgs = messages.Select(x => new { r = x.role, c = x.content }),
+                t = temperature,
+                mt = maxTokens,
+            }
+        );
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
         return Convert.ToHexString(hash).ToLowerInvariant();
     }

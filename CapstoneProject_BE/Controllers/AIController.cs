@@ -1,10 +1,10 @@
+using System.Security.Claims;
 using BusinessObjects;
 using BusinessObjects.AI.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Services;
 using Services.AI.Configuration;
-using System.Security.Claims;
 
 namespace CapstoneProject_BE.Controllers;
 
@@ -26,7 +26,11 @@ public sealed class AIController : ControllerBase
     private readonly IUserAISettingsService _userAiSettings;
     private readonly ILogger<AIController> _logger;
 
-    public AIController(IAIService aiService, IUserAISettingsService userAiSettings, ILogger<AIController> logger)
+    public AIController(
+        IAIService aiService,
+        IUserAISettingsService userAiSettings,
+        ILogger<AIController> logger
+    )
     {
         _aiService = aiService;
         _userAiSettings = userAiSettings;
@@ -51,7 +55,8 @@ public sealed class AIController : ControllerBase
     [HttpPost("chat")]
     public async Task<IActionResult> Chat(
         [FromBody] AIChatRequestDto dto,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         if (!_aiService.IsEnabled)
             return StatusCode(503, new { message = "AI features are currently disabled." });
@@ -62,14 +67,17 @@ public sealed class AIController : ControllerBase
 
             var request = new AIRequest
             {
-                Messages = dto.Messages.Select(m => new AIMessage(
-                    m.Role.ToLower() switch
-                    {
-                        "system"    => AIMessageRole.System,
-                        "assistant" => AIMessageRole.Assistant,
-                        _           => AIMessageRole.User
-                    },
-                    m.Content)).ToArray(),
+                Messages = dto
+                    .Messages.Select(m => new AIMessage(
+                        m.Role.ToLower() switch
+                        {
+                            "system" => AIMessageRole.System,
+                            "assistant" => AIMessageRole.Assistant,
+                            _ => AIMessageRole.User,
+                        },
+                        m.Content
+                    ))
+                    .ToArray(),
                 SystemPrompt = dto.SystemPrompt,
                 Temperature = dto.Temperature ?? 0.7f,
                 MaxTokens = dto.MaxTokens ?? 1024,
@@ -87,26 +95,28 @@ public sealed class AIController : ControllerBase
                         DeploymentName = dto.ProviderSettings.DeploymentName,
                         TimeoutSeconds = dto.ProviderSettings.TimeoutSeconds,
                         MaxRetries = dto.ProviderSettings.MaxRetries,
-                    }
+                    },
             };
 
             var response = await _aiService.ChatAsync(request, cancellationToken);
 
-            return Ok(new
-            {
-                content = response.Content,
-                provider = response.Provider,
-                model = response.Model,
-                fromCache = response.FromCache,
-                latencyMs = (int)response.Latency.TotalMilliseconds,
-                usage = new
+            return Ok(
+                new
                 {
-                    promptTokens = response.Usage.PromptTokens,
-                    completionTokens = response.Usage.CompletionTokens,
-                    totalTokens = response.Usage.TotalTokens,
-                    estimatedCostUsd = response.Usage.EstimatedCostUsd
+                    content = response.Content,
+                    provider = response.Provider,
+                    model = response.Model,
+                    fromCache = response.FromCache,
+                    latencyMs = (int)response.Latency.TotalMilliseconds,
+                    usage = new
+                    {
+                        promptTokens = response.Usage.PromptTokens,
+                        completionTokens = response.Usage.CompletionTokens,
+                        totalTokens = response.Usage.TotalTokens,
+                        estimatedCostUsd = response.Usage.EstimatedCostUsd,
+                    },
                 }
-            });
+            );
         }
         catch (AIException ex)
         {
@@ -146,7 +156,8 @@ public sealed class AIController : ControllerBase
     [HttpPut("user-settings")]
     public async Task<IActionResult> SaveUserSettings(
         [FromBody] SaveUserAISettingsRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         if (!TryGetCurrentUserId(out var userId))
             return Unauthorized(new { message = "User identity is invalid." });
@@ -163,31 +174,136 @@ public sealed class AIController : ControllerBase
         }
     }
 
-    [HttpDelete("user-settings/{provider}")]
-    public async Task<IActionResult> DeleteUserProvider(string provider, CancellationToken cancellationToken)
+    [HttpPost("user-settings/entry")]
+    public async Task<IActionResult> AddUserEntry(
+        [FromBody] SaveUserAIProviderDto dto,
+        CancellationToken cancellationToken
+    )
     {
         if (!TryGetCurrentUserId(out var userId))
             return Unauthorized(new { message = "User identity is invalid." });
 
-        await _userAiSettings.DeleteProviderAsync(userId, provider, cancellationToken);
+        try
+        {
+            var entryKey = await _userAiSettings.AddEntryAsync(userId, dto, cancellationToken);
+            return Ok(new { entryKey, message = "AI provider entry added." });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to add AI entry for user {UserId}.", userId);
+            return StatusCode(500, new { message = "Failed to add the AI provider entry." });
+        }
+    }
+
+    [HttpPatch("user-settings/default")]
+    public async Task<IActionResult> SetDefaultEntry(
+        [FromBody] SetDefaultEntryRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!TryGetCurrentUserId(out var userId))
+            return Unauthorized(new { message = "User identity is invalid." });
+
+        try
+        {
+            await _userAiSettings.SetDefaultEntryAsync(userId, request.EntryKey, cancellationToken);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to set default AI entry for user {UserId}.", userId);
+            return StatusCode(500, new { message = "Failed to update the default AI entry." });
+        }
+    }
+
+    [HttpDelete("user-settings/{entryKey}")]
+    public async Task<IActionResult> DeleteUserProvider(
+        string entryKey,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!TryGetCurrentUserId(out var userId))
+            return Unauthorized(new { message = "User identity is invalid." });
+
+        await _userAiSettings.DeleteProviderAsync(userId, entryKey, cancellationToken);
         return NoContent();
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────
 
-    private IActionResult MapAIException(AIException ex) => ex.Code switch
-    {
-        AIErrorCode.Disabled          => StatusCode(503, new { message = ex.Message, code = ex.Code.ToString() }),
-        AIErrorCode.RateLimited       => StatusCode(429, new { message = ex.Message, code = ex.Code.ToString(), retryAfterSeconds = 60 }),
-        AIErrorCode.InvalidApiKey     => StatusCode(502, new { message = "AI provider configuration error. Please contact an administrator.", code = ex.Code.ToString() }),
-        AIErrorCode.QuotaExceeded     => StatusCode(402, new { message = "AI provider quota exceeded. Please contact an administrator.", code = ex.Code.ToString() }),
-        AIErrorCode.ContentFiltered   => StatusCode(400, new { message = ex.Message, code = ex.Code.ToString() }),
-        AIErrorCode.InvalidRequest    => StatusCode(400, new { message = ex.Message, code = ex.Code.ToString() }),
-        AIErrorCode.Timeout           => StatusCode(504, new { message = "AI provider request timed out. Please try again.", code = ex.Code.ToString() }),
-        AIErrorCode.ProviderUnavailable => StatusCode(503, new { message = "AI provider is temporarily unavailable.", code = ex.Code.ToString() }),
-        AIErrorCode.Unknown           => StatusCode(502, new { message = ex.Message, code = ex.Code.ToString() }),
-        _                             => StatusCode(500, new { message = "An unexpected AI error occurred.", code = ex.Code.ToString() })
-    };
+    private IActionResult MapAIException(AIException ex) =>
+        ex.Code switch
+        {
+            AIErrorCode.Disabled => StatusCode(
+                503,
+                new { message = ex.Message, code = ex.Code.ToString() }
+            ),
+            AIErrorCode.RateLimited => StatusCode(
+                429,
+                new
+                {
+                    message = ex.Message,
+                    code = ex.Code.ToString(),
+                    retryAfterSeconds = 60,
+                }
+            ),
+            AIErrorCode.InvalidApiKey => StatusCode(
+                502,
+                new
+                {
+                    message = "AI provider configuration error. Please contact an administrator.",
+                    code = ex.Code.ToString(),
+                }
+            ),
+            AIErrorCode.QuotaExceeded => StatusCode(
+                402,
+                new
+                {
+                    message = "AI provider quota exceeded. Please contact an administrator.",
+                    code = ex.Code.ToString(),
+                }
+            ),
+            AIErrorCode.ContentFiltered => StatusCode(
+                400,
+                new { message = ex.Message, code = ex.Code.ToString() }
+            ),
+            AIErrorCode.InvalidRequest => StatusCode(
+                400,
+                new { message = ex.Message, code = ex.Code.ToString() }
+            ),
+            AIErrorCode.Timeout => StatusCode(
+                504,
+                new
+                {
+                    message = "AI provider request timed out. Please try again.",
+                    code = ex.Code.ToString(),
+                }
+            ),
+            AIErrorCode.ProviderUnavailable => StatusCode(
+                503,
+                new
+                {
+                    message = "AI provider is temporarily unavailable.",
+                    code = ex.Code.ToString(),
+                }
+            ),
+            AIErrorCode.Unknown => StatusCode(
+                502,
+                new { message = ex.Message, code = ex.Code.ToString() }
+            ),
+            _ => StatusCode(
+                500,
+                new { message = "An unexpected AI error occurred.", code = ex.Code.ToString() }
+            ),
+        };
 
     private bool TryGetCurrentUserId(out int userId)
     {
@@ -197,6 +313,11 @@ public sealed class AIController : ControllerBase
 }
 
 // ─── Request DTOs ─────────────────────────────────────────────────────────────
+
+public sealed class SetDefaultEntryRequest
+{
+    public required string EntryKey { get; init; }
+}
 
 public sealed class AIChatRequestDto
 {

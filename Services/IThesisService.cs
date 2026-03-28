@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
@@ -60,8 +61,13 @@ namespace Services
             SubmitThesisDecisionDTO dto
         );
 
+        Task<ThesisAIReviewPreviewDTO> GetAIReviewPreviewAsync(
+            string thesisId,
+            int actorUserId,
+            CancellationToken cancellationToken = default
+        );
+
         // F105: Force Assign Thesis
         Task<ThesisDTO> ForceAssignThesisAsync(string thesisId, int teamId, int hodUserId);
     }
 }
-

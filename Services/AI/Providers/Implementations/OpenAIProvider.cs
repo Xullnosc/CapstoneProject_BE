@@ -20,14 +20,15 @@ internal sealed class OpenAIProvider : IAIProvider
     private static readonly JsonSerializerOptions _json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
     private readonly ProviderSettings _settings;
     private readonly IHttpClientFactory _httpClientFactory;
 
     public AIProviderType ProviderType => AIProviderType.OpenAI;
-    public string ModelName => string.IsNullOrWhiteSpace(_settings.Model) ? DefaultModel : _settings.Model;
+    public string ModelName =>
+        string.IsNullOrWhiteSpace(_settings.Model) ? DefaultModel : _settings.Model;
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_settings.ApiKey);
 
     public OpenAIProvider(ProviderSettings settings, IHttpClientFactory httpClientFactory)
@@ -36,10 +37,17 @@ internal sealed class OpenAIProvider : IAIProvider
         _httpClientFactory = httpClientFactory;
     }
 
-    public async Task<AIResponse> CallAsync(AIRequest request, CancellationToken cancellationToken = default)
+    public async Task<AIResponse> CallAsync(
+        AIRequest request,
+        CancellationToken cancellationToken = default
+    )
     {
         if (!IsConfigured)
-            throw new AIException(AIErrorCode.InvalidApiKey, "OpenAI API key is not configured.", "OpenAI");
+            throw new AIException(
+                AIErrorCode.InvalidApiKey,
+                "OpenAI API key is not configured.",
+                "OpenAI"
+            );
 
         var start = DateTime.UtcNow;
         using var client = BuildClient();
@@ -48,16 +56,28 @@ internal sealed class OpenAIProvider : IAIProvider
         var json = JsonSerializer.Serialize(body, _json);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var baseUrl = string.IsNullOrWhiteSpace(_settings.BaseUrl) ? DefaultBaseUrl : _settings.BaseUrl.TrimEnd('/');
+        var baseUrl = string.IsNullOrWhiteSpace(_settings.BaseUrl)
+            ? DefaultBaseUrl
+            : _settings.BaseUrl.TrimEnd('/');
         HttpResponseMessage response;
 
         try
         {
-            response = await client.PostAsync($"{baseUrl}/v1/chat/completions", content, cancellationToken);
+            response = await client.PostAsync(
+                $"{baseUrl}/v1/chat/completions",
+                content,
+                cancellationToken
+            );
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new AIException(AIErrorCode.Timeout, "OpenAI request timed out.", "OpenAI", isRetryable: true, ex);
+            throw new AIException(
+                AIErrorCode.Timeout,
+                "OpenAI request timed out.",
+                "OpenAI",
+                isRetryable: true,
+                ex
+            );
         }
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -65,10 +85,16 @@ internal sealed class OpenAIProvider : IAIProvider
         if (!response.IsSuccessStatusCode)
             MapErrorResponse(response.StatusCode, responseJson);
 
-        var parsed = JsonSerializer.Deserialize<OpenAIChatResponse>(responseJson, _json)
-            ?? throw new AIException(AIErrorCode.Unknown, "Failed to parse OpenAI response.", "OpenAI");
+        var parsed =
+            JsonSerializer.Deserialize<OpenAIChatResponse>(responseJson, _json)
+            ?? throw new AIException(
+                AIErrorCode.Unknown,
+                "Failed to parse OpenAI response.",
+                "OpenAI"
+            );
 
-        var choice = parsed.Choices?.FirstOrDefault()
+        var choice =
+            parsed.Choices?.FirstOrDefault()
             ?? throw new AIException(AIErrorCode.Unknown, "OpenAI returned no choices.", "OpenAI");
 
         return new AIResponse
@@ -85,8 +111,9 @@ internal sealed class OpenAIProvider : IAIProvider
                 EstimatedCostUsd = EstimateCost(
                     parsed.Usage?.PromptTokens ?? 0,
                     parsed.Usage?.CompletionTokens ?? 0,
-                    ModelName)
-            }
+                    ModelName
+                ),
+            },
         };
     }
 
@@ -96,8 +123,10 @@ internal sealed class OpenAIProvider : IAIProvider
     {
         var client = _httpClientFactory.CreateClient("AI_OpenAI");
         client.Timeout = TimeSpan.FromSeconds(_settings.TimeoutSeconds);
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", _settings.ApiKey);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            _settings.ApiKey
+        );
         return client;
     }
 
@@ -110,16 +139,18 @@ internal sealed class OpenAIProvider : IAIProvider
 
         foreach (var m in request.Messages)
         {
-            messages.Add(new
-            {
-                role = m.Role switch
+            messages.Add(
+                new
                 {
-                    AIMessageRole.System    => "system",
-                    AIMessageRole.Assistant => "assistant",
-                    _                       => "user"
-                },
-                content = m.Content
-            });
+                    role = m.Role switch
+                    {
+                        AIMessageRole.System => "system",
+                        AIMessageRole.Assistant => "assistant",
+                        _ => "user",
+                    },
+                    content = m.Content,
+                }
+            );
         }
 
         return new
@@ -127,7 +158,7 @@ internal sealed class OpenAIProvider : IAIProvider
             model = ModelName,
             messages,
             temperature = request.Temperature,
-            max_tokens = request.MaxTokens
+            max_tokens = request.MaxTokens,
         };
     }
 
@@ -137,12 +168,29 @@ internal sealed class OpenAIProvider : IAIProvider
 
         throw status switch
         {
-            HttpStatusCode.Unauthorized  => new AIException(AIErrorCode.InvalidApiKey, $"OpenAI: {msg}", "OpenAI"),
-            HttpStatusCode.TooManyRequests => new AIException(AIErrorCode.RateLimited, $"OpenAI: {msg}", "OpenAI", isRetryable: true),
-            HttpStatusCode.PaymentRequired => new AIException(AIErrorCode.QuotaExceeded, $"OpenAI: {msg}", "OpenAI"),
-            >= HttpStatusCode.InternalServerError =>
-                new AIException(AIErrorCode.ProviderUnavailable, $"OpenAI server error: {msg}", "OpenAI", isRetryable: true),
-            _ => new AIException(AIErrorCode.InvalidRequest, $"OpenAI: {msg}", "OpenAI")
+            HttpStatusCode.Unauthorized => new AIException(
+                AIErrorCode.InvalidApiKey,
+                $"OpenAI: {msg}",
+                "OpenAI"
+            ),
+            HttpStatusCode.TooManyRequests => new AIException(
+                AIErrorCode.RateLimited,
+                $"OpenAI: {msg}",
+                "OpenAI",
+                isRetryable: true
+            ),
+            HttpStatusCode.PaymentRequired => new AIException(
+                AIErrorCode.QuotaExceeded,
+                $"OpenAI: {msg}",
+                "OpenAI"
+            ),
+            >= HttpStatusCode.InternalServerError => new AIException(
+                AIErrorCode.ProviderUnavailable,
+                $"OpenAI server error: {msg}",
+                "OpenAI",
+                isRetryable: true
+            ),
+            _ => new AIException(AIErrorCode.InvalidRequest, $"OpenAI: {msg}", "OpenAI"),
         };
     }
 
@@ -151,11 +199,15 @@ internal sealed class OpenAIProvider : IAIProvider
         try
         {
             using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("error", out var err)
-                && err.TryGetProperty("message", out var msgEl))
+            if (
+                doc.RootElement.TryGetProperty("error", out var err)
+                && err.TryGetProperty("message", out var msgEl)
+            )
                 return msgEl.GetString();
         }
-        catch { /* ignore */ }
+        catch
+        { /* ignore */
+        }
         return null;
     }
 
@@ -165,10 +217,10 @@ internal sealed class OpenAIProvider : IAIProvider
         var (inputPer1M, outputPer1M) = model.ToLowerInvariant() switch
         {
             var m when m.Contains("gpt-4o-mini") => (0.15m, 0.60m),
-            var m when m.Contains("gpt-4o")      => (2.50m, 10.00m),
+            var m when m.Contains("gpt-4o") => (2.50m, 10.00m),
             var m when m.Contains("gpt-4-turbo") => (10.00m, 30.00m),
-            var m when m.Contains("gpt-3.5")     => (0.50m, 1.50m),
-            _ => (2.50m, 10.00m)
+            var m when m.Contains("gpt-3.5") => (0.50m, 1.50m),
+            _ => (2.50m, 10.00m),
         };
         return (prompt / 1_000_000m * inputPer1M) + (completion / 1_000_000m * outputPer1M);
     }

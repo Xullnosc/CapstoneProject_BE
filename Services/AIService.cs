@@ -25,7 +25,7 @@ internal sealed class AIService : IAIService
 {
     private static readonly JsonSerializerOptions _json = new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
     private readonly IOptionsMonitor<AIConfig> _configMonitor;
@@ -44,7 +44,8 @@ internal sealed class AIService : IAIService
         IAICache cache,
         IAIRateLimiter rateLimiter,
         IAIMetricsCollector metrics,
-        ILogger<AIService> logger)
+        ILogger<AIService> logger
+    )
     {
         _configMonitor = config;
         _factory = factory;
@@ -58,11 +59,17 @@ internal sealed class AIService : IAIService
     // Public API
     // ─────────────────────────────────────────────────────────────────────────
 
-    public async Task<AIResponse> ChatAsync(AIRequest request, CancellationToken cancellationToken = default)
+    public async Task<AIResponse> ChatAsync(
+        AIRequest request,
+        CancellationToken cancellationToken = default
+    )
     {
         if (!_config.Enabled)
-            throw new AIException(AIErrorCode.Disabled,
-                "AI features are currently disabled.", "AIService");
+            throw new AIException(
+                AIErrorCode.Disabled,
+                "AI features are currently disabled.",
+                "AIService"
+            );
 
         // 1. Validate input
         PromptValidator.Validate(request);
@@ -84,7 +91,14 @@ internal sealed class AIService : IAIService
                 if (hit is not null)
                 {
                     var cachedResponse = hit with { FromCache = true, Latency = TimeSpan.Zero };
-                    _metrics.RecordCall(hit.Provider, hit.Model, success: true, fromCache: true, TimeSpan.Zero, hit.Usage);
+                    _metrics.RecordCall(
+                        hit.Provider,
+                        hit.Model,
+                        success: true,
+                        fromCache: true,
+                        TimeSpan.Zero,
+                        hit.Usage
+                    );
                     return cachedResponse;
                 }
             }
@@ -96,11 +110,25 @@ internal sealed class AIService : IAIService
         // 5. Store in cache
         if (_config.Cache.Enabled && request.UseCache && cacheKey is not null)
         {
-            var ttl = TimeSpan.FromSeconds(request.CacheTtlSeconds ?? _config.Cache.DefaultTtlSeconds);
-            await _cache.SetAsync(cacheKey, JsonSerializer.Serialize(response, _json), ttl, cancellationToken);
+            var ttl = TimeSpan.FromSeconds(
+                request.CacheTtlSeconds ?? _config.Cache.DefaultTtlSeconds
+            );
+            await _cache.SetAsync(
+                cacheKey,
+                JsonSerializer.Serialize(response, _json),
+                ttl,
+                cancellationToken
+            );
         }
 
-        _metrics.RecordCall(response.Provider, response.Model, success: true, fromCache: false, response.Latency, response.Usage);
+        _metrics.RecordCall(
+            response.Provider,
+            response.Model,
+            success: true,
+            fromCache: false,
+            response.Latency,
+            response.Usage
+        );
         return response;
     }
 
@@ -110,7 +138,8 @@ internal sealed class AIService : IAIService
         float temperature = 0.7f,
         int maxTokens = 1024,
         string? userId = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var request = new AIRequest
         {
@@ -118,7 +147,7 @@ internal sealed class AIService : IAIService
             SystemPrompt = systemPrompt,
             Temperature = temperature,
             MaxTokens = maxTokens,
-            UserId = userId
+            UserId = userId,
         };
 
         var response = await ChatAsync(request, cancellationToken);
@@ -134,7 +163,8 @@ internal sealed class AIService : IAIService
     private async Task<AIResponse> CallWithRetryAndFallbackAsync(
         IAIProvider provider,
         AIRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         var maxRetries = GetMaxRetries(provider);
 
@@ -149,14 +179,25 @@ internal sealed class AIService : IAIService
                 var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt) * 0.5); // 0.5s, 1s, 2s
                 _logger.LogWarning(
                     "AI call to {Provider} failed (attempt {Attempt}/{Max}): {Message}. Retrying in {Delay}s.",
-                    ex.ProviderName, attempt + 1, maxRetries + 1, ex.Message, delay.TotalSeconds);
+                    ex.ProviderName,
+                    attempt + 1,
+                    maxRetries + 1,
+                    ex.Message,
+                    delay.TotalSeconds
+                );
 
                 await Task.Delay(delay, cancellationToken);
             }
             catch (AIException ex)
             {
-                _metrics.RecordCall(ex.ProviderName, provider.ModelName, success: false,
-                    fromCache: false, TimeSpan.Zero, null);
+                _metrics.RecordCall(
+                    ex.ProviderName,
+                    provider.ModelName,
+                    success: false,
+                    fromCache: false,
+                    TimeSpan.Zero,
+                    null
+                );
 
                 // Try fallback provider on non-recoverable primary failure
                 var fallback = _factory.TryGetFallback(request);
@@ -164,9 +205,19 @@ internal sealed class AIService : IAIService
                 {
                     _logger.LogWarning(
                         "Primary AI provider '{Primary}' failed: {Message}. Trying fallback '{Fallback}'.",
-                        ex.ProviderName, ex.Message, fallback.ProviderType);
+                        ex.ProviderName,
+                        ex.Message,
+                        fallback.ProviderType
+                    );
 
-                    return await CallWithRetryAndFallbackAsync(fallback, request with { UseCache = false }, cancellationToken);
+                    return await CallWithRetryAndFallbackAsync(
+                        fallback,
+                        request with
+                        {
+                            UseCache = false,
+                        },
+                        cancellationToken
+                    );
                 }
 
                 throw;
@@ -174,9 +225,11 @@ internal sealed class AIService : IAIService
         }
 
         // Exhausted retries
-        throw new AIException(AIErrorCode.ProviderUnavailable,
+        throw new AIException(
+            AIErrorCode.ProviderUnavailable,
             $"AI provider '{provider.ProviderType}' failed after {maxRetries + 1} attempt(s).",
-            provider.ProviderType.ToString());
+            provider.ProviderType.ToString()
+        );
     }
 
     private async Task EnforceRateLimitAsync(string? userId, CancellationToken cancellationToken)
@@ -184,15 +237,23 @@ internal sealed class AIService : IAIService
         var result = await _rateLimiter.CheckAsync(userId, cancellationToken);
         if (!result.IsAllowed)
         {
-            _metrics.RecordCall("RateLimiter", "n/a", success: false, fromCache: false, TimeSpan.Zero, null);
+            _metrics.RecordCall(
+                "RateLimiter",
+                "n/a",
+                success: false,
+                fromCache: false,
+                TimeSpan.Zero,
+                null
+            );
             throw new AIException(AIErrorCode.RateLimited, result.Reason, "RateLimiter");
         }
     }
 
     private static string BuildCacheKey(IAIProvider provider, AIRequest request)
     {
-        var messageTuples = request.Messages
-            .Select(m => (m.Role.ToString().ToLowerInvariant(), m.Content));
+        var messageTuples = request.Messages.Select(m =>
+            (m.Role.ToString().ToLowerInvariant(), m.Content)
+        );
 
         if (!string.IsNullOrWhiteSpace(request.SystemPrompt))
             messageTuples = messageTuples.Prepend(("system", request.SystemPrompt));
@@ -202,7 +263,8 @@ internal sealed class AIService : IAIService
             provider.ModelName,
             messageTuples,
             request.Temperature,
-            request.MaxTokens);
+            request.MaxTokens
+        );
     }
 
     private static int GetMaxRetries(IAIProvider provider)

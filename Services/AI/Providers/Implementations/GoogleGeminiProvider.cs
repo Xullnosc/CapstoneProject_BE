@@ -21,7 +21,7 @@ internal sealed class GoogleGeminiProvider : IAIProvider
     private static readonly JsonSerializerOptions _json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
     private readonly ProviderSettings _settings;
@@ -40,7 +40,7 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         "gemini-3.1-pro-preview",
         "gemini-3.1-flash-lite-preview",
         "gemini-pro",
-        "gemini-pro-vision"
+        "gemini-pro-vision",
     };
 
     public AIProviderType ProviderType => AIProviderType.GoogleGemini;
@@ -53,10 +53,17 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         _httpClientFactory = httpClientFactory;
     }
 
-    public async Task<AIResponse> CallAsync(AIRequest request, CancellationToken cancellationToken = default)
+    public async Task<AIResponse> CallAsync(
+        AIRequest request,
+        CancellationToken cancellationToken = default
+    )
     {
         if (!IsConfigured)
-            throw new AIException(AIErrorCode.InvalidApiKey, "Google Gemini API key is not configured.", "GoogleGemini");
+            throw new AIException(
+                AIErrorCode.InvalidApiKey,
+                "Google Gemini API key is not configured.",
+                "GoogleGemini"
+            );
 
         var start = DateTime.UtcNow;
         using var client = BuildClient();
@@ -66,8 +73,12 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         var response = await PostGenerateContentAsync(client, model, body, cancellationToken);
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        if ((response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.BadRequest)
-            && LooksLikeModelUnavailable(responseJson))
+        if (
+            (
+                response.StatusCode == HttpStatusCode.NotFound
+                || response.StatusCode == HttpStatusCode.BadRequest
+            ) && LooksLikeModelUnavailable(responseJson)
+        )
         {
             // Some model IDs are disabled/deprecated per API version; discover an available model first.
             var discoveredModel = await TryGetSupportedModelAsync(client, cancellationToken);
@@ -82,9 +93,14 @@ internal sealed class GoogleGeminiProvider : IAIProvider
             }
         }
 
-        if ((response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.BadRequest)
+        if (
+            (
+                response.StatusCode == HttpStatusCode.NotFound
+                || response.StatusCode == HttpStatusCode.BadRequest
+            )
             && LooksLikeModelUnavailable(responseJson)
-            && !model.Equals(FallbackModel, StringComparison.OrdinalIgnoreCase))
+            && !model.Equals(FallbackModel, StringComparison.OrdinalIgnoreCase)
+        )
         {
             // Final defensive retry on fixed fallback if discovery failed or returned an unsupported ID.
             model = FallbackModel;
@@ -96,8 +112,13 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         if (!response.IsSuccessStatusCode)
             MapErrorResponse(response.StatusCode, responseJson);
 
-        var parsed = JsonSerializer.Deserialize<GeminiResponse>(responseJson, _json)
-            ?? throw new AIException(AIErrorCode.Unknown, "Failed to parse Gemini response.", "GoogleGemini");
+        var parsed =
+            JsonSerializer.Deserialize<GeminiResponse>(responseJson, _json)
+            ?? throw new AIException(
+                AIErrorCode.Unknown,
+                "Failed to parse Gemini response.",
+                "GoogleGemini"
+            );
 
         if (!string.IsNullOrWhiteSpace(parsed.PromptFeedback?.BlockReason))
         {
@@ -108,33 +129,40 @@ internal sealed class GoogleGeminiProvider : IAIProvider
                 string.IsNullOrWhiteSpace(blockDetail)
                     ? $"Gemini blocked the prompt ({blockReason})."
                     : $"Gemini blocked the prompt ({blockReason}): {blockDetail}",
-                "GoogleGemini");
+                "GoogleGemini"
+            );
         }
 
-        var text = parsed.Candidates?
-            .SelectMany(c => c.Content?.Parts ?? Enumerable.Empty<GeminiPart>())
+        var text = parsed
+            .Candidates?.SelectMany(c => c.Content?.Parts ?? Enumerable.Empty<GeminiPart>())
             .Select(p => p.Text)
             .FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
 
         if (string.IsNullOrWhiteSpace(text))
         {
             var finishReason = parsed.Candidates?.FirstOrDefault()?.FinishReason;
-            if (!string.IsNullOrWhiteSpace(finishReason)
-                && (finishReason.Equals("SAFETY", StringComparison.OrdinalIgnoreCase)
+            if (
+                !string.IsNullOrWhiteSpace(finishReason)
+                && (
+                    finishReason.Equals("SAFETY", StringComparison.OrdinalIgnoreCase)
                     || finishReason.Equals("BLOCKLIST", StringComparison.OrdinalIgnoreCase)
                     || finishReason.Equals("PROHIBITED_CONTENT", StringComparison.OrdinalIgnoreCase)
-                    || finishReason.Equals("RECITATION", StringComparison.OrdinalIgnoreCase)))
+                    || finishReason.Equals("RECITATION", StringComparison.OrdinalIgnoreCase)
+                )
+            )
             {
                 throw new AIException(
                     AIErrorCode.ContentFiltered,
                     $"Gemini blocked the response ({finishReason}).",
-                    "GoogleGemini");
+                    "GoogleGemini"
+                );
             }
 
             throw new AIException(
                 AIErrorCode.InvalidRequest,
                 $"Gemini returned no text content (finishReason: {finishReason ?? "unknown"}).",
-                "GoogleGemini");
+                "GoogleGemini"
+            );
         }
 
         return new AIResponse
@@ -151,8 +179,9 @@ internal sealed class GoogleGeminiProvider : IAIProvider
                 EstimatedCostUsd = EstimateCost(
                     parsed.UsageMetadata?.PromptTokenCount ?? 0,
                     parsed.UsageMetadata?.CandidatesTokenCount ?? 0,
-                    model)
-            }
+                    model
+                ),
+            },
         };
     }
 
@@ -169,10 +198,14 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         HttpClient client,
         string model,
         object body,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         using var content = new StringContent(
-            JsonSerializer.Serialize(body, _json), Encoding.UTF8, "application/json");
+            JsonSerializer.Serialize(body, _json),
+            Encoding.UTF8,
+            "application/json"
+        );
 
         var endpoint = $"{BaseUrl}/v1beta/models/{model}:generateContent?key={_settings.ApiKey}";
 
@@ -182,33 +215,40 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new AIException(AIErrorCode.Timeout, "Google Gemini request timed out.", "GoogleGemini", isRetryable: true, ex);
+            throw new AIException(
+                AIErrorCode.Timeout,
+                "Google Gemini request timed out.",
+                "GoogleGemini",
+                isRetryable: true,
+                ex
+            );
         }
     }
 
     private static object BuildRequestBody(AIRequest req)
     {
         // Gemini uses "user"/"model" roles (not "assistant")
-        var contents = req.Messages
-            .Where(m => m.Role != AIMessageRole.System)
+        var contents = req
+            .Messages.Where(m => m.Role != AIMessageRole.System)
             .Select(m => new
             {
                 role = m.Role == AIMessageRole.Assistant ? "model" : "user",
-                parts = new[] { new { text = m.Content } }
+                parts = new[] { new { text = m.Content } },
             })
             .ToList<object>();
 
         // Merge system prompt sources
-        var systemParts = req.Messages
-            .Where(m => m.Role == AIMessageRole.System)
+        var systemParts = req
+            .Messages.Where(m => m.Role == AIMessageRole.System)
             .Select(m => m.Content)
             .ToList();
         if (!string.IsNullOrWhiteSpace(req.SystemPrompt))
             systemParts.Insert(0, req.SystemPrompt);
 
-        object? systemInstruction = systemParts.Count > 0
-            ? new { parts = systemParts.Select(t => new { text = t }).ToArray() }
-            : null;
+        object? systemInstruction =
+            systemParts.Count > 0
+                ? new { parts = systemParts.Select(t => new { text = t }).ToArray() }
+                : null;
 
         return new
         {
@@ -217,8 +257,8 @@ internal sealed class GoogleGeminiProvider : IAIProvider
             generationConfig = new
             {
                 temperature = req.Temperature,
-                maxOutputTokens = req.MaxTokens
-            }
+                maxOutputTokens = req.MaxTokens,
+            },
         };
     }
 
@@ -227,14 +267,34 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         var msg = TryExtractMessage(body) ?? $"HTTP {(int)status}";
         throw status switch
         {
-            HttpStatusCode.Unauthorized  => new AIException(AIErrorCode.InvalidApiKey, $"Gemini: {msg}", "GoogleGemini"),
-            HttpStatusCode.Forbidden     => new AIException(AIErrorCode.InvalidApiKey, $"Gemini: {msg}", "GoogleGemini"),
-            HttpStatusCode.TooManyRequests when LooksLikeQuotaExceeded(msg)
-                => new AIException(AIErrorCode.QuotaExceeded, $"Gemini: {msg}", "GoogleGemini"),
-            HttpStatusCode.TooManyRequests => new AIException(AIErrorCode.RateLimited, $"Gemini: {msg}", "GoogleGemini", isRetryable: true),
-            >= HttpStatusCode.InternalServerError =>
-                new AIException(AIErrorCode.ProviderUnavailable, $"Gemini server error: {msg}", "GoogleGemini", isRetryable: true),
-            _ => new AIException(AIErrorCode.InvalidRequest, $"Gemini: {msg}", "GoogleGemini")
+            HttpStatusCode.Unauthorized => new AIException(
+                AIErrorCode.InvalidApiKey,
+                $"Gemini: {msg}",
+                "GoogleGemini"
+            ),
+            HttpStatusCode.Forbidden => new AIException(
+                AIErrorCode.InvalidApiKey,
+                $"Gemini: {msg}",
+                "GoogleGemini"
+            ),
+            HttpStatusCode.TooManyRequests when LooksLikeQuotaExceeded(msg) => new AIException(
+                AIErrorCode.QuotaExceeded,
+                $"Gemini: {msg}",
+                "GoogleGemini"
+            ),
+            HttpStatusCode.TooManyRequests => new AIException(
+                AIErrorCode.RateLimited,
+                $"Gemini: {msg}",
+                "GoogleGemini",
+                isRetryable: true
+            ),
+            >= HttpStatusCode.InternalServerError => new AIException(
+                AIErrorCode.ProviderUnavailable,
+                $"Gemini server error: {msg}",
+                "GoogleGemini",
+                isRetryable: true
+            ),
+            _ => new AIException(AIErrorCode.InvalidRequest, $"Gemini: {msg}", "GoogleGemini"),
         };
     }
 
@@ -243,15 +303,22 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         try
         {
             using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("error", out var err)
-                && err.TryGetProperty("message", out var m))
+            if (
+                doc.RootElement.TryGetProperty("error", out var err)
+                && err.TryGetProperty("message", out var m)
+            )
                 return m.GetString();
         }
-        catch { /* ignore */ }
+        catch
+        { /* ignore */
+        }
         return null;
     }
 
-    private async Task<string?> TryGetSupportedModelAsync(HttpClient client, CancellationToken cancellationToken)
+    private async Task<string?> TryGetSupportedModelAsync(
+        HttpClient client,
+        CancellationToken cancellationToken
+    )
     {
         try
         {
@@ -262,10 +329,13 @@ internal sealed class GoogleGeminiProvider : IAIProvider
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             var list = JsonSerializer.Deserialize<GeminiModelListResponse>(json, _json);
-            var candidates = list?.Models
-                ?.Where(m => m.SupportedGenerationMethods is not null
+            var candidates = list
+                ?.Models?.Where(m =>
+                    m.SupportedGenerationMethods is not null
                     && m.SupportedGenerationMethods.Any(x =>
-                        string.Equals(x, "generateContent", StringComparison.OrdinalIgnoreCase)))
+                        string.Equals(x, "generateContent", StringComparison.OrdinalIgnoreCase)
+                    )
+                )
                 .Select(m => NormalizeModelName(m.Name))
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -276,7 +346,9 @@ internal sealed class GoogleGeminiProvider : IAIProvider
 
             foreach (var preferred in _preferredModels)
             {
-                var hit = candidates.FirstOrDefault(c => c.Equals(preferred, StringComparison.OrdinalIgnoreCase));
+                var hit = candidates.FirstOrDefault(c =>
+                    c.Equals(preferred, StringComparison.OrdinalIgnoreCase)
+                );
                 if (!string.IsNullOrWhiteSpace(hit))
                     return hit;
             }
@@ -333,10 +405,10 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         // Gemini 1.5 pricing per 1M tokens (2025, ≤128K context)
         var (inputPer1M, outputPer1M) = model.ToLowerInvariant() switch
         {
-            var m when m.Contains("gemini-1.5-pro")   => (1.25m, 5.00m),
-            var m when m.Contains("gemini-1.5-flash")  => (0.075m, 0.30m),
-            var m when m.Contains("gemini-2.0-flash")  => (0.10m, 0.40m),
-            _ => (1.25m, 5.00m)
+            var m when m.Contains("gemini-1.5-pro") => (1.25m, 5.00m),
+            var m when m.Contains("gemini-1.5-flash") => (0.075m, 0.30m),
+            var m when m.Contains("gemini-2.0-flash") => (0.10m, 0.40m),
+            _ => (1.25m, 5.00m),
         };
         return (prompt / 1_000_000m * inputPer1M) + (completion / 1_000_000m * outputPer1M);
     }

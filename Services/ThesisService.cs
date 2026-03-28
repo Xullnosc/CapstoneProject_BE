@@ -1,13 +1,24 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
 using BusinessObjects;
+using BusinessObjects.AI.Models;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Wordprocessing;
+using Microsoft.Extensions.Logging;
 using Repositories;
+using Services.AI.Configuration;
 using Services.Helpers;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 
 namespace Services
 {
@@ -22,6 +33,13 @@ namespace Services
         private readonly ILecturerRepository _lecturerRepository;
         private readonly ITeamInvitationRepository _teamInvitationRepository;
         private readonly IMapper _mapper;
+        private readonly IChecklistRepository? _checklistRepository;
+        private readonly IAIService? _aiService;
+        private readonly IUserAISettingsService? _userAiSettingsService;
+        private readonly IHttpClientFactory? _httpClientFactory;
+        private readonly ILogger<ThesisService>? _logger;
+
+        private const int MaxExtractedChars = 24000;
 
         public ThesisService(
             IThesisRepository thesisRepository,
@@ -32,7 +50,12 @@ namespace Services
             ISemesterRepository semesterRepository,
             ILecturerRepository lecturerRepository,
             ITeamInvitationRepository teamInvitationRepository,
-            IMapper mapper
+            IMapper mapper,
+            IChecklistRepository? checklistRepository = null,
+            IAIService? aiService = null,
+            IUserAISettingsService? userAiSettingsService = null,
+            IHttpClientFactory? httpClientFactory = null,
+            ILogger<ThesisService>? logger = null
         )
         {
             _thesisRepository = thesisRepository;
@@ -44,9 +67,14 @@ namespace Services
             _lecturerRepository = lecturerRepository;
             _teamInvitationRepository = teamInvitationRepository;
             _mapper = mapper;
+            _checklistRepository = checklistRepository;
+            _aiService = aiService;
+            _userAiSettingsService = userAiSettingsService;
+            _httpClientFactory = httpClientFactory;
+            _logger = logger;
         }
 
-        // â”€â”€â”€ Existing (not modified) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        #region Core Thesis Lifecycle
 
         public async Task<Thesis> ProposeThesisAsync(ProposeThesisDTO req, string email)
         {
@@ -151,7 +179,9 @@ namespace Services
             await _thesisRepository.UpdateThesisAsync(thesis);
         }
 
-        // â”€â”€â”€ Phase 02: New Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        #endregion
+
+        #region Owner Thesis Management
 
         /// <summary>
         /// Upload a new file version for a thesis.
@@ -387,14 +417,18 @@ namespace Services
             return _mapper.Map<IEnumerable<ThesisDTO>>(theses);
         }
 
-        // â”€â”€â”€ Review workflow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        #endregion
+
+        #region Review Workflow
 
         public async Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId)
         {
             return await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
         }
 
-        public async Task<List<ThesisReviewTimelineEventDTO>> GetReviewTimelineAsync(string thesisId)
+        public async Task<List<ThesisReviewTimelineEventDTO>> GetReviewTimelineAsync(
+            string thesisId
+        )
         {
             var timeline = await _thesisReviewRepository.GetTimelineAsync(thesisId);
 
@@ -402,7 +436,8 @@ namespace Services
             var emails = timeline
                 .Select(e => e.ActorEmail)
                 .Concat(timeline.SelectMany(e => e.Comments).Select(c => c.AuthorEmail))
-                .Where(e => !string.IsNullOrEmpty(e))
+                .Where(e => !string.IsNullOrWhiteSpace(e))
+                .Select(e => e!.Trim())
                 .Distinct()
                 .ToList();
 
@@ -440,8 +475,6 @@ namespace Services
 
             return timeline;
         }
-
-
 
         public async Task<ThesisReviewTimelineCommentDTO> AddReviewCommentAsync(
             string thesisId,
@@ -490,7 +523,9 @@ namespace Services
                 throw new KeyNotFoundException("Thesis not found.");
 
             if (distinct.Contains(thesis.UserId))
-                throw new ArgumentException("Thesis proposer cannot be a reviewer for their own thesis.");
+                throw new ArgumentException(
+                    "Thesis proposer cannot be a reviewer for their own thesis."
+                );
 
             // Reset status to Reviewing when (re)assigning reviewers
             thesis.Status = "Reviewing";
@@ -552,21 +587,31 @@ namespace Services
                 throw new KeyNotFoundException("Thesis not found.");
 
             if (thesis.UserId == reviewerUserId)
-                throw new UnauthorizedAccessException("You cannot review your own thesis proposal.");
+                throw new UnauthorizedAccessException(
+                    "You cannot review your own thesis proposal."
+                );
 
-            if (!isHod && !string.Equals(thesis.Status, "Reviewing", StringComparison.OrdinalIgnoreCase))
+            if (
+                !isHod
+                && !string.Equals(thesis.Status, "Reviewing", StringComparison.OrdinalIgnoreCase)
+            )
             {
-                throw new InvalidOperationException($"Cannot submit review decision when thesis is in '{thesis.Status}' state. Decisions are only allowed during 'Reviewing' state.");
+                throw new InvalidOperationException(
+                    $"Cannot submit review decision when thesis is in '{thesis.Status}' state. Decisions are only allowed during 'Reviewing' state."
+                );
             }
 
             var currentReviewStatus = await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
-            var assignedReviewers = currentReviewStatus?.Reviewers ?? new List<ReviewerProgressDTO>();
+            var assignedReviewers =
+                currentReviewStatus?.Reviewers ?? new List<ReviewerProgressDTO>();
             bool isAssigned = assignedReviewers.Any(r => r.UserId == reviewerUserId);
 
             // Auto-assignment happens in the DAO. Only block if they aren't assigned AND slots are full.
             if (!isHod && assignedReviewers.Count >= 2)
             {
-                throw new UnauthorizedAccessException("You are not an assigned reviewer for this thesis.");
+                throw new UnauthorizedAccessException(
+                    "You are not an assigned reviewer for this thesis."
+                );
             }
 
             await _thesisReviewRepository.UpsertReviewerReviewAsync(
@@ -668,8 +713,16 @@ namespace Services
         private async Task<string> ResolveTimelineActorRoleAsync(User user, Thesis thesis)
         {
             var roleName = user.Role?.RoleName;
-            var isLecturerRole = string.Equals(roleName, CampusConstants.Roles.Lecturer, StringComparison.OrdinalIgnoreCase);
-            var isHodRole = string.Equals(roleName, CampusConstants.Roles.HOD, StringComparison.OrdinalIgnoreCase);
+            var isLecturerRole = string.Equals(
+                roleName,
+                CampusConstants.Roles.Lecturer,
+                StringComparison.OrdinalIgnoreCase
+            );
+            var isHodRole = string.Equals(
+                roleName,
+                CampusConstants.Roles.HOD,
+                StringComparison.OrdinalIgnoreCase
+            );
 
             // 1. Check if HOD
             if (isHodRole)
@@ -689,10 +742,14 @@ namespace Services
                 var lecturer = await _lecturerRepository.GetByEmailAsync(user.Email);
                 if (lecturer != null)
                 {
-                    if (lecturer.IsReviewer) return "REVIEWER";
+                    if (lecturer.IsReviewer)
+                        return "REVIEWER";
 
-                    var isMentor = thesis.MentorId1 == lecturer.LecturerId || thesis.MentorId2 == lecturer.LecturerId;
-                    if (isMentor) return "MENTOR";
+                    var isMentor =
+                        thesis.MentorId1 == lecturer.LecturerId
+                        || thesis.MentorId2 == lecturer.LecturerId;
+                    if (isMentor)
+                        return "MENTOR";
                 }
             }
 
@@ -701,6 +758,10 @@ namespace Services
                 "Only assigned mentor/reviewer, HOD, or a lecturer who proposed the thesis can interact with the timeline."
             );
         }
+
+        #endregion
+
+        #region Thesis Query and Filters
 
         /// <summary>
         /// Get full thesis detail including version history.
@@ -714,9 +775,8 @@ namespace Services
             if (thesis == null)
                 return null;
 
- 
             var dto = _mapper.Map<ThesisDTO>(thesis);
-            
+
             // Populate Owner Avatar
             if (!string.IsNullOrEmpty(dto.OwnerEmail))
             {
@@ -750,86 +810,705 @@ namespace Services
 
             if (reviewStatus?.HodDecision != null)
             {
-                dto.Reviews.Add(new ReviewDTO
-                {
-                    ThesisId = id,
-                    ReviewerId = reviewStatus.HodDecision.HodId,
-                    ReviewerName = reviewStatus.HodDecision.FullName + " (HOD)",
-                    Decision = reviewStatus.HodDecision.Decision,
-                    Comment = reviewStatus.HodDecision.Comment,
-                    ReviewedAt = reviewStatus.HodDecision.DecidedAt
-                });
+                dto.Reviews.Add(
+                    new ReviewDTO
+                    {
+                        ThesisId = id,
+                        ReviewerId = reviewStatus.HodDecision.HodId,
+                        ReviewerName = reviewStatus.HodDecision.FullName + " (HOD)",
+                        Decision = reviewStatus.HodDecision.Decision,
+                        Comment = reviewStatus.HodDecision.Comment,
+                        ReviewedAt = reviewStatus.HodDecision.DecidedAt,
+                    }
+                );
             }
 
             return dto;
         }
 
-
-
         /// <summary>
         /// Get filtered list of theses. All filters are optional.
         /// </summary>
         public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(
-             string? status,
-             int? userId,
-             string? searchTitle = null,
-             int? semesterId = null,
-             bool? isLocked = null,
-             bool lecturerOnly = false,
-             int? excludeUserId = null,
-             string? currentUserEmail = null
-         )
-          {
-              var user = await _userRepository.GetByEmailAsync(currentUserEmail ?? "");
-              bool isHodOrAdmin = user != null && user.Role != null && (
-                  string.Equals(user.Role.RoleName, CampusConstants.Roles.HOD, StringComparison.OrdinalIgnoreCase) ||
-                  string.Equals(user.Role.RoleName, CampusConstants.Roles.Admin, StringComparison.OrdinalIgnoreCase)
-              );
+            string? status,
+            int? userId,
+            string? searchTitle = null,
+            int? semesterId = null,
+            bool? isLocked = null,
+            bool lecturerOnly = false,
+            int? excludeUserId = null,
+            string? currentUserEmail = null
+        )
+        {
+            var user = await _userRepository.GetByEmailAsync(currentUserEmail ?? "");
+            bool isHodOrAdmin =
+                user != null
+                && user.Role != null
+                && (
+                    string.Equals(
+                        user.Role.RoleName,
+                        CampusConstants.Roles.HOD,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                    || string.Equals(
+                        user.Role.RoleName,
+                        CampusConstants.Roles.Admin,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
 
-              if (semesterId == null || !isHodOrAdmin)
-              {
-                  var currentSem = await _semesterRepository.GetCurrentSemesterAsync();
-                  semesterId = currentSem?.SemesterId;
-              }
+            if (semesterId == null || !isHodOrAdmin)
+            {
+                var currentSem = await _semesterRepository.GetCurrentSemesterAsync();
+                semesterId = currentSem?.SemesterId;
+            }
 
-              var theses = await _thesisRepository.GetAllThesesFilteredAsync(
-                 status,
-                 userId,
-                 semesterId,
-                 isLocked,
-                 lecturerOnly,
-                 excludeUserId
-             );
-             var dtos = _mapper.Map<IEnumerable<ThesisDTO>>(theses);
- 
-             // Apply Reviewer restriction for "On Mentor Inviting"
-             if (!string.IsNullOrEmpty(currentUserEmail))
-             {
-                  // user already fetched at line 840
-                 if (user != null && !string.Equals(user.Role?.RoleName, CampusConstants.Roles.HOD, StringComparison.OrdinalIgnoreCase))
-                 {
-                     var lecturer = await _lecturerRepository.GetByEmailAsync(currentUserEmail);
-                     if (lecturer != null && lecturer.IsReviewer)
-                     {
-                         // Filter out "On Mentor Inviting" (unless they are the owner, but excludeUserId already handled their own proposals if requested)
-                         // Actually, let's strictly filter it for any reviewer who isn't the owner
-                         dtos = dtos.Where(d => 
-                             !string.Equals(d.Status, "On Mentor Inviting", StringComparison.OrdinalIgnoreCase) || 
-                             d.UserId == user.UserId // Owner exception
-                         );
-                     }
-                 }
-             }
- 
-             if (!string.IsNullOrWhiteSpace(searchTitle))
-             {
-                 dtos = dtos.Where(d =>
-                     d.Title != null
-                     && d.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase)
-                 );
-             }
-             return dtos;
-         }
+            var theses = await _thesisRepository.GetAllThesesFilteredAsync(
+                status,
+                userId,
+                semesterId,
+                isLocked,
+                lecturerOnly,
+                excludeUserId
+            );
+            var dtos = _mapper.Map<IEnumerable<ThesisDTO>>(theses);
+
+            // Apply Reviewer restriction for "On Mentor Inviting"
+            if (!string.IsNullOrEmpty(currentUserEmail))
+            {
+                // user already fetched at line 840
+                if (
+                    user != null
+                    && !string.Equals(
+                        user.Role?.RoleName,
+                        CampusConstants.Roles.HOD,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    var lecturer = await _lecturerRepository.GetByEmailAsync(currentUserEmail);
+                    if (lecturer != null && lecturer.IsReviewer)
+                    {
+                        // Filter out "On Mentor Inviting" (unless they are the owner, but excludeUserId already handled their own proposals if requested)
+                        // Actually, let's strictly filter it for any reviewer who isn't the owner
+                        dtos = dtos.Where(d =>
+                            !string.Equals(
+                                d.Status,
+                                "On Mentor Inviting",
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                            || d.UserId == user.UserId // Owner exception
+                        );
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchTitle))
+            {
+                dtos = dtos.Where(d =>
+                    d.Title != null
+                    && d.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase)
+                );
+            }
+            return dtos;
+        }
+
+        #endregion
+
+        #region AI Review Preview
+
+        public async Task<ThesisAIReviewPreviewDTO> GetAIReviewPreviewAsync(
+            string thesisId,
+            int actorUserId,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (
+                _aiService is null
+                || _checklistRepository is null
+                || _httpClientFactory is null
+                || _userAiSettingsService is null
+            )
+                throw new InvalidOperationException("AI review dependencies are not configured.");
+
+            if (!_aiService.IsEnabled)
+                throw new InvalidOperationException("AI review is currently disabled.");
+
+            var actor = await _userRepository.GetByIdAsync(actorUserId);
+            var isAllowed =
+                actor?.Role?.RoleName == CampusConstants.Roles.HOD
+                || actor?.Role?.RoleName == CampusConstants.Roles.Admin;
+            if (!isAllowed)
+                throw new UnauthorizedAccessException("Only HOD or Admin can use AI review.");
+
+            var thesis = await _thesisRepository.GetThesisByIdAsync(thesisId);
+            if (thesis == null)
+                throw new KeyNotFoundException("Thesis not found.");
+
+            var checklistItems = (await _checklistRepository.GetAllAsync())
+                .OrderBy(x => x.ChecklistId)
+                .ToList();
+
+            if (!checklistItems.Any())
+                throw new InvalidOperationException("Checklist criteria is empty.");
+
+            var warnings = new List<string>();
+            var extraction = await TryExtractThesisTextAsync(thesis.FileUrl, cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(extraction.Warning))
+                warnings.Add(extraction.Warning);
+
+            var sourceText = extraction.Text;
+            var usedMetadataFallback = extraction.UsedMetadataFallback;
+
+            if (string.IsNullOrWhiteSpace(sourceText))
+            {
+                sourceText = BuildThesisMetadataContext(thesis);
+                usedMetadataFallback = true;
+                warnings.Add(
+                    "AI review used thesis metadata because PDF text could not be extracted."
+                );
+            }
+
+            if (sourceText.Length > MaxExtractedChars)
+            {
+                sourceText = sourceText[..MaxExtractedChars];
+                warnings.Add("Thesis content was truncated to keep AI review responsive.");
+            }
+
+            var userProviderSettings =
+                await _userAiSettingsService.GetEffectiveProviderSettingsAsync(
+                    actorUserId,
+                    cancellationToken
+                );
+            if (userProviderSettings is null)
+                throw new InvalidOperationException(
+                    "Cannot retrieve API key from Redis. Configure your AI provider key in AI Settings first."
+                );
+
+            var prompt = BuildAiReviewPrompt(thesis, checklistItems, sourceText);
+
+            var aiRequest = new AIRequest
+            {
+                Messages = new[] { new AIMessage(AIMessageRole.User, prompt) },
+                SystemPrompt = "You are a strict thesis evaluator. Return valid JSON only.",
+                Temperature = 0.1f,
+                MaxTokens = 10000,
+                UseCache = false,
+                UserId = actorUserId.ToString(),
+                Provider = userProviderSettings.Provider,
+                ProviderSettings = new AIProviderRequestSettings
+                {
+                    ApiKey = userProviderSettings.ApiKey,
+                    Model = userProviderSettings.Model,
+                    BaseUrl = userProviderSettings.BaseUrl,
+                    ApiVersion = userProviderSettings.ApiVersion,
+                    DeploymentName = userProviderSettings.DeploymentName,
+                    TimeoutSeconds = userProviderSettings.TimeoutSeconds,
+                    MaxRetries = userProviderSettings.MaxRetries,
+                },
+            };
+
+            AIResponse response;
+            try
+            {
+                response = await _aiService.ChatAsync(aiRequest, cancellationToken);
+            }
+            catch (AIException ex) when (IsGeminiMaxTokensError(ex))
+            {
+                warnings.Add(
+                    "AI response hit a token limit. Retried with a larger response token budget."
+                );
+                response = await _aiService.ChatAsync(
+                    aiRequest with
+                    {
+                        MaxTokens = 6000,
+                    },
+                    cancellationToken
+                );
+            }
+
+            var parsed = ParseAiReviewContent(response.Content, checklistItems, warnings);
+
+            return new ThesisAIReviewPreviewDTO
+            {
+                SuggestedDecision = parsed.SuggestedDecision,
+                Feedback = parsed.Feedback,
+                Checklist = parsed.Checklist,
+                Warnings = warnings,
+                UsedMetadataFallback = usedMetadataFallback,
+                Provider = response.Provider,
+                Model = response.Model,
+                GeneratedAtUtc = DateTime.UtcNow,
+            };
+        }
+
+        private static string BuildThesisMetadataContext(Thesis thesis)
+        {
+            return $"Title: {thesis.Title}\nStatus: {thesis.Status}\nShort Description: {thesis.ShortDescription}";
+        }
+
+        private static string BuildAiReviewPrompt(
+            Thesis thesis,
+            IReadOnlyList<Checklist> checklistItems,
+            string thesisText
+        )
+        {
+            var criteriaJson = string.Join(
+                ",\n",
+                checklistItems.Select(c =>
+                    $"  {{ \"checklistId\": {c.ChecklistId}, \"content\": {JsonSerializer.Serialize(c.Content)} }}"
+                )
+            );
+
+            return $@"Evaluate this thesis against each checklist criterion and produce a strict JSON response.
+
+Return ONLY valid JSON with this exact shape:
+{{
+  ""suggestedDecision"": ""OK"" | ""Consider"",
+  ""feedback"": ""string"",
+  ""checklist"": [
+    {{ ""checklistId"": 1, ""checked"": true, ""reason"": ""short reason"" }}
+  ]
+}}
+
+Rules:
+- Every checklistId from input must be present exactly once.
+- Mark checked=true only if criterion is clearly satisfied by thesis content.
+- feedback should be concise actionable feedback (max 900 chars).
+- If evidence is weak, prefer suggestedDecision=""Consider"".
+- Never include markdown, code fences, or extra text.
+
+Thesis:
+- ThesisId: {thesis.ThesisId}
+- Title: {thesis.Title}
+- ShortDescription: {thesis.ShortDescription}
+
+Checklist:
+[
+{criteriaJson}
+]
+
+Thesis content:
+{thesisText}";
+        }
+
+        private static (
+            string SuggestedDecision,
+            string Feedback,
+            List<ThesisAIReviewChecklistItemDTO> Checklist
+        ) ParseAiReviewContent(
+            string raw,
+            IReadOnlyList<Checklist> checklistItems,
+            List<string> warnings
+        )
+        {
+            var clean = StripCodeFence(raw).Trim();
+            var checklistById = checklistItems.ToDictionary(x => x.ChecklistId, _ => false);
+            var reasons = new Dictionary<int, string?>();
+            var suggestedDecision = "Consider";
+            var feedback = "AI could not produce detailed feedback. Please review manually.";
+
+            try
+            {
+                using var document = JsonDocument.Parse(clean);
+                var root = document.RootElement;
+
+                if (root.TryGetProperty("suggestedDecision", out var decisionProp))
+                    suggestedDecision = NormalizeDecision(decisionProp.GetString());
+
+                if (
+                    root.TryGetProperty("feedback", out var feedbackProp)
+                    && feedbackProp.ValueKind == JsonValueKind.String
+                )
+                    feedback = feedbackProp.GetString() ?? feedback;
+
+                if (
+                    root.TryGetProperty("checklist", out var checklistProp)
+                    && checklistProp.ValueKind == JsonValueKind.Array
+                )
+                {
+                    foreach (var item in checklistProp.EnumerateArray())
+                    {
+                        if (
+                            !item.TryGetProperty("checklistId", out var idProp)
+                            || idProp.ValueKind != JsonValueKind.Number
+                            || !idProp.TryGetInt32(out var id)
+                            || !checklistById.ContainsKey(id)
+                        )
+                        {
+                            continue;
+                        }
+
+                        var isChecked = false;
+                        if (item.TryGetProperty("checked", out var checkedProp))
+                        {
+                            isChecked = checkedProp.ValueKind switch
+                            {
+                                JsonValueKind.True => true,
+                                JsonValueKind.False => false,
+                                JsonValueKind.String => string.Equals(
+                                    checkedProp.GetString(),
+                                    "true",
+                                    StringComparison.OrdinalIgnoreCase
+                                ),
+                                _ => false,
+                            };
+                        }
+
+                        checklistById[id] = isChecked;
+
+                        if (
+                            item.TryGetProperty("reason", out var reasonProp)
+                            && reasonProp.ValueKind == JsonValueKind.String
+                        )
+                        {
+                            reasons[id] = reasonProp.GetString();
+                        }
+                    }
+                }
+                else
+                {
+                    warnings.Add(
+                        "AI response did not include checklist results. All criteria left unchecked."
+                    );
+                }
+            }
+            catch (JsonException)
+            {
+                warnings.Add("AI response was not valid JSON. Manual review is recommended.");
+            }
+
+            var normalizedChecklist = checklistItems
+                .Select(c => new ThesisAIReviewChecklistItemDTO
+                {
+                    ChecklistId = c.ChecklistId,
+                    Checked = checklistById[c.ChecklistId],
+                    Reason = reasons.TryGetValue(c.ChecklistId, out var reason) ? reason : null,
+                })
+                .ToList();
+
+            return (suggestedDecision, feedback, normalizedChecklist);
+        }
+
+        private static string NormalizeDecision(string? decision)
+        {
+            if (string.IsNullOrWhiteSpace(decision))
+                return "Consider";
+
+            var normalized = decision.Trim();
+            if (
+                string.Equals(normalized, "OK", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "Pass", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "Published", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                return "OK";
+            }
+
+            return "Consider";
+        }
+
+        private static bool IsGeminiMaxTokensError(AIException ex)
+        {
+            if (ex.Code != AIErrorCode.InvalidRequest)
+                return false;
+
+            if (!ex.ProviderName.Contains("Gemini", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return ex.Message.Contains("MAX_TOKENS", StringComparison.OrdinalIgnoreCase)
+                || ex.Message.Contains("max tokens", StringComparison.OrdinalIgnoreCase)
+                || ex.Message.Contains("max_tokens", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task<(
+            string Text,
+            bool UsedMetadataFallback,
+            string? Warning
+        )> TryExtractThesisTextAsync(string? fileUrl, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(fileUrl))
+                return (string.Empty, true, "No thesis file found. Using metadata-only AI review.");
+
+            // Determine file type from the URL path (strip query string first)
+            var urlPath = fileUrl.Contains('?') ? fileUrl[..fileUrl.IndexOf('?')] : fileUrl;
+            var ext = System.IO.Path.GetExtension(urlPath).ToLowerInvariant();
+            var isDocx = ext is ".docx" or ".doc";
+
+            try
+            {
+                var client = _httpClientFactory!.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(20);
+
+                using var response = await client.GetAsync(
+                    fileUrl,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken
+                );
+                response.EnsureSuccessStatusCode();
+
+                // Also check Content-Type if extension was not conclusive
+                if (!isDocx)
+                {
+                    var contentType =
+                        response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+                    isDocx =
+                        contentType.Contains("wordprocessingml", StringComparison.OrdinalIgnoreCase)
+                        || contentType.Contains("msword", StringComparison.OrdinalIgnoreCase);
+                }
+
+                await using var responseStream = await response.Content.ReadAsStreamAsync(
+                    cancellationToken
+                );
+                using var memory = new MemoryStream();
+                await responseStream.CopyToAsync(memory, cancellationToken);
+                memory.Position = 0;
+
+                string rawText;
+                if (isDocx)
+                {
+                    rawText = ExtractDocxText(memory);
+                }
+                else
+                {
+                    using var document = PdfDocument.Open(memory);
+                    var sb = new StringBuilder();
+
+                    foreach (var page in document.GetPages())
+                    {
+                        var pageText = ExtractPageTextWithTableHeuristics(page);
+                        if (string.IsNullOrWhiteSpace(pageText))
+                            pageText = page.Text;
+
+                        sb.AppendLine(pageText);
+                        if (sb.Length >= MaxExtractedChars * 2)
+                            break;
+                    }
+
+                    rawText = sb.ToString();
+                }
+
+                var extracted = NormalizeWhitespace(rawText);
+                if (string.IsNullOrWhiteSpace(extracted))
+                    return (
+                        string.Empty,
+                        true,
+                        isDocx
+                            ? "Thesis Word document text extraction returned empty content."
+                            : "Thesis PDF text extraction returned empty content."
+                    );
+
+                return (extracted, false, null);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(
+                    ex,
+                    "Failed to extract thesis file text from URL for thesis AI review."
+                );
+                return (
+                    string.Empty,
+                    true,
+                    isDocx
+                        ? "Could not extract text from thesis Word document. Using metadata-only AI review."
+                        : "Could not extract text from thesis PDF. Using metadata-only AI review."
+                );
+            }
+        }
+
+        private static string ExtractDocxText(MemoryStream stream)
+        {
+            using var wordDoc = WordprocessingDocument.Open(stream, isEditable: false);
+            var body = wordDoc.MainDocumentPart?.Document?.Body;
+            if (body is null)
+                return string.Empty;
+
+            var sb = new StringBuilder();
+
+            foreach (var element in body.ChildElements)
+            {
+                if (element is DocumentFormat.OpenXml.Wordprocessing.Table table)
+                {
+                    // Render table rows as pipe-delimited lines
+                    foreach (var row in table.Elements<TableRow>())
+                    {
+                        var cells = row.Elements<TableCell>()
+                            .Select(tc => tc.InnerText.Trim())
+                            .ToList();
+
+                        if (cells.Count >= 2)
+                            sb.AppendLine(string.Join(" | ", cells));
+                        else if (cells.Count == 1 && !string.IsNullOrWhiteSpace(cells[0]))
+                            sb.AppendLine(cells[0]);
+                    }
+                }
+                else if (element is DocumentFormat.OpenXml.Wordprocessing.Paragraph para)
+                {
+                    var text = para.InnerText;
+                    if (!string.IsNullOrWhiteSpace(text))
+                        sb.AppendLine(text);
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        private static string ExtractPageTextWithTableHeuristics(Page page)
+        {
+            var letters = page
+                .Letters.Where(l => !string.IsNullOrEmpty(l.Value))
+                .Where(l => !string.IsNullOrWhiteSpace(l.Value) || l.GlyphRectangle.Width > 0)
+                .ToList();
+
+            if (letters.Count < 20)
+                return page.Text;
+
+            var heights = letters
+                .Select(l => Math.Abs(l.GlyphRectangle.Top - l.GlyphRectangle.Bottom))
+                .Where(h => h > 0)
+                .OrderBy(h => h)
+                .ToList();
+            var medianHeight = heights.Count == 0 ? 8d : heights[heights.Count / 2];
+            var rowTolerance = Math.Max(2d, medianHeight * 0.6d);
+
+            var lineBuckets = new List<List<Letter>>();
+            var lineCenters = new List<double>();
+
+            foreach (
+                var letter in letters
+                    .OrderByDescending(l => (l.GlyphRectangle.Top + l.GlyphRectangle.Bottom) / 2d)
+                    .ThenBy(l => l.GlyphRectangle.Left)
+            )
+            {
+                var centerY = (letter.GlyphRectangle.Top + letter.GlyphRectangle.Bottom) / 2d;
+                var assigned = false;
+
+                for (var i = 0; i < lineCenters.Count; i++)
+                {
+                    if (Math.Abs(lineCenters[i] - centerY) <= rowTolerance)
+                    {
+                        lineBuckets[i].Add(letter);
+                        lineCenters[i] = (lineCenters[i] + centerY) / 2d;
+                        assigned = true;
+                        break;
+                    }
+                }
+
+                if (!assigned)
+                {
+                    lineBuckets.Add(new List<Letter> { letter });
+                    lineCenters.Add(centerY);
+                }
+            }
+
+            var rows = lineBuckets
+                .Select(bucket =>
+                {
+                    var ordered = bucket.OrderBy(l => l.GlyphRectangle.Left).ToList();
+                    return BuildRowText(ordered);
+                })
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .ToList();
+
+            if (!rows.Any())
+                return page.Text;
+
+            return string.Join('\n', rows);
+        }
+
+        private static string BuildRowText(IReadOnlyList<Letter> letters)
+        {
+            if (letters.Count == 0)
+                return string.Empty;
+
+            var gaps = new List<double>();
+            for (var i = 1; i < letters.Count; i++)
+            {
+                var gap = letters[i].GlyphRectangle.Left - letters[i - 1].GlyphRectangle.Right;
+                if (gap > 0)
+                    gaps.Add(gap);
+            }
+
+            var positiveGaps = gaps.OrderBy(g => g).ToList();
+            var medianGap = positiveGaps.Count == 0 ? 2d : positiveGaps[positiveGaps.Count / 2];
+            var tableSplitGap = Math.Max(12d, medianGap * 2.2d);
+            var wordSplitGap = Math.Max(1.5d, medianGap * 0.9d);
+
+            var cells = new List<string>();
+            var currentCell = new StringBuilder();
+
+            currentCell.Append(letters[0].Value);
+            for (var i = 1; i < letters.Count; i++)
+            {
+                var gap = letters[i].GlyphRectangle.Left - letters[i - 1].GlyphRectangle.Right;
+
+                if (gap >= tableSplitGap)
+                {
+                    cells.Add(currentCell.ToString().Trim());
+                    currentCell.Clear();
+                    currentCell.Append(letters[i].Value);
+                    continue;
+                }
+
+                if (gap >= wordSplitGap && currentCell.Length > 0)
+                {
+                    currentCell.Append(' ');
+                }
+
+                currentCell.Append(letters[i].Value);
+            }
+
+            cells.Add(currentCell.ToString().Trim());
+            cells = cells.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+
+            if (cells.Count >= 3)
+            {
+                return string.Join(" | ", cells);
+            }
+
+            return cells.Count == 0 ? string.Empty : cells[0];
+        }
+
+        private static string NormalizeWhitespace(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            var normalizedLines = text.Replace("\r", string.Empty)
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line =>
+                    string.Join(
+                        " ",
+                        line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+                    )
+                )
+                .Where(line => !string.IsNullOrWhiteSpace(line));
+
+            return string.Join('\n', normalizedLines);
+        }
+
+        private static string StripCodeFence(string input)
+        {
+            var trimmed = input.Trim();
+            if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+                return trimmed;
+
+            var firstLineEnd = trimmed.IndexOf('\n');
+            if (firstLineEnd < 0)
+                return trimmed;
+
+            var content = trimmed[(firstLineEnd + 1)..];
+            var fenceEnd = content.LastIndexOf("```", StringComparison.Ordinal);
+            if (fenceEnd >= 0)
+                content = content[..fenceEnd];
+
+            return content.Trim();
+        }
+
+        #endregion
+
+        #region Locking and Assignment
 
         /// <summary>
         /// Toggle the locked state of a lecturer-proposed thesis.
@@ -873,12 +1552,18 @@ namespace Services
 
         // ─── F105: Force Assign Thesis ───────────────────────────────────────────
 
-        public async Task<ThesisDTO> ForceAssignThesisAsync(string thesisId, int teamId, int hodUserId)
+        public async Task<ThesisDTO> ForceAssignThesisAsync(
+            string thesisId,
+            int teamId,
+            int hodUserId
+        )
         {
             // 1. Validate HOD role
             var hodUser = await _userRepository.GetByIdAsync(hodUserId);
             if (hodUser == null || hodUser.Role?.RoleName != CampusConstants.Roles.HOD)
-                throw new UnauthorizedAccessException("Only Head of Department can force-assign theses.");
+                throw new UnauthorizedAccessException(
+                    "Only Head of Department can force-assign theses."
+                );
 
             // 2. Get thesis
             var thesis = await _thesisRepository.GetThesisByIdAsync(thesisId);
@@ -887,7 +1572,9 @@ namespace Services
 
             // 3. Thesis must be Published
             if (thesis.Status != "Published")
-                throw new InvalidOperationException($"Thesis must be 'Published' to force-assign. Current status: '{thesis.Status}'.");
+                throw new InvalidOperationException(
+                    $"Thesis must be 'Published' to force-assign. Current status: '{thesis.Status}'."
+                );
 
             // 4. Thesis must not already be assigned
             if (thesis.TeamId != null)
@@ -901,9 +1588,14 @@ namespace Services
             // 6. Team must not already have a thesis in this semester
             if (thesis.SemesterId.HasValue)
             {
-                var existingThesis = await _thesisRepository.GetApprovedThesisByLeaderIdAsync(team.LeaderId, thesis.SemesterId);
+                var existingThesis = await _thesisRepository.GetApprovedThesisByLeaderIdAsync(
+                    team.LeaderId,
+                    thesis.SemesterId
+                );
                 if (existingThesis != null)
-                    throw new InvalidOperationException($"Team '{team.TeamName}' already has thesis '{existingThesis.Title}' in this semester.");
+                    throw new InvalidOperationException(
+                        $"Team '{team.TeamName}' already has thesis '{existingThesis.Title}' in this semester."
+                    );
             }
 
             // 7. Assign
@@ -916,6 +1608,7 @@ namespace Services
             var updated = await _thesisRepository.GetThesisByIdWithHistoriesAsync(thesisId);
             return _mapper.Map<ThesisDTO>(updated!);
         }
+
+        #endregion
     }
 }
-
