@@ -54,38 +54,53 @@ namespace Services
             if (user == null)
                 throw new Exception("User not found");
 
+            // Resolve target user (HOD can propose for another lecturer)
+            User targetUser = user;
+            bool isHodActing = (user.Role?.RoleName == CampusConstants.Roles.HOD || user.Role?.RoleName == CampusConstants.Roles.Admin) && req.AuthorId.HasValue;
+            
+            if (isHodActing)
+            {
+                var author = await _userRepository.GetByIdAsync(req.AuthorId!.Value);
+                if (author == null) throw new Exception("Author user not found.");
+                targetUser = author;
+            }
+
             Team? team = null;
 
             // Prevent multiple theses per leader, except for Lecturers.
             // Allow re-proposing if all previous theses are Cancelled or Rejected.
-            var existingTheses = await _thesisRepository.GetThesesByUserIdAsync(user.UserId);
+            var existingTheses = await _thesisRepository.GetThesesByUserIdAsync(targetUser.UserId);
             var hasActiveThesis = existingTheses.Any(t =>
                 t.Status != "Cancelled" && t.Status != "Rejected"
             );
-            if (hasActiveThesis && user.Role?.RoleName != CampusConstants.Roles.Lecturer)
+            
+            // Skip multiple-check for HOD-submitted topics or if target is Lecturer
+            bool isTargetLecturer = targetUser.Role?.RoleName == CampusConstants.Roles.Lecturer;
+            
+            if (hasActiveThesis && !isTargetLecturer)
             {
                 throw new InvalidOperationException(
-                    "You have already proposed a thesis. You cannot propose more than one."
+                    "This user has already proposed a thesis. They cannot propose more than one."
                 );
             }
 
             // Students must be the team leader and the team must have at least 4 members.
-            if (user.Role?.RoleName != CampusConstants.Roles.Lecturer)
+            if (!isTargetLecturer)
             {
-                team = await _teamRepository.GetActiveTeamByStudentIdAsync(user.UserId);
+                team = await _teamRepository.GetActiveTeamByStudentIdAsync(targetUser.UserId);
                 if (team == null)
                     throw new InvalidOperationException(
-                        "You must be in an active team to propose a thesis."
+                        "Target user must be in an active team to propose a thesis."
                     );
 
-                if (team.LeaderId != user.UserId)
+                if (team.LeaderId != targetUser.UserId)
                     throw new InvalidOperationException(
                         "Only the team leader can propose a thesis."
                     );
 
                 if (!team.IsSpecial && team.Teammembers.Count < 4)
                     throw new InvalidOperationException(
-                        $"Your team must have at least 4 members to propose a thesis unless marked as special. Current members: {team.Teammembers.Count}."
+                        $"Target team must have at least 4 members to propose a thesis unless marked as special. Current members: {team.Teammembers.Count}."
                     );
             }
 
@@ -108,19 +123,27 @@ namespace Services
                     )
                     : req.Title.Trim(),
                 ShortDescription = req.ShortDescription,
-                UserId = user.UserId,
+                UserId = targetUser.UserId,
                 FileUrl = fileUrl,
                 Status =
-                    user.Role?.RoleName == CampusConstants.Roles.Lecturer
+                    isTargetLecturer || isHodActing
                         ? "Reviewing"
                         : (hasAssignedMentor ? "Reviewing" : "On Mentor Inviting"),
                 SemesterId = currentSemester?.SemesterId,
                 UpDate = DateTime.UtcNow,
                 UpdateDate = DateTime.UtcNow,
+
+                ThesisNameEn = req.ThesisNameEn,
+                ThesisNameVi = req.ThesisNameVi,
+                Abbreviation = req.Abbreviation,
+                IsFromEnterprise = req.IsFromEnterprise,
+                EnterpriseName = req.IsFromEnterprise ? req.EnterpriseName : null,
+                IsApplied = req.IsApplied,
+                IsAppUsed = req.IsAppUsed,
             };
 
             // Set TeamId based on role (Lecturers don't have teams)
-            if (user.Role?.RoleName != CampusConstants.Roles.Lecturer)
+            if (!isTargetLecturer)
             {
                 if (team != null)
                 {
@@ -179,6 +202,12 @@ namespace Services
                     "You are not authorized to update this thesis."
                 );
 
+            // Only allow updates when status is 'Need Update'
+            if (!string.Equals(thesis.Status, "Need Update", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Cannot update thesis when it is in '{thesis.Status}' state. Updates are only allowed during 'Need Update' state.");
+            }
+
             // Upload new file to Cloudinary (if provided)
             if (req.File != null)
             {
@@ -204,14 +233,13 @@ namespace Services
 
                 // Update thesis with new file URL and transition status
                 thesis.FileUrl = newFileUrl;
-                if (thesis.Status == "Need Update")
-                {
-                    thesis.Status = "Reviewing"; // Re-enter review queue
-                }
-                else if (thesis.Status == "Reviewing")
-                {
-                    thesis.Status = "Updated";
-                }
+                thesis.Status = "Reviewing"; // Re-enter review queue
+            }
+            else
+            {
+                // If it was metadata-only update while in Need Update, we still move it to Reviewing 
+                // because the author signals they have addressed the "Need Update" feedback.
+                thesis.Status = "Reviewing";
             }
 
             // Update optional metadata fields
@@ -227,6 +255,16 @@ namespace Services
 
             if (req.ShortDescription != null)
                 thesis.ShortDescription = req.ShortDescription.Trim();
+
+            // Update new reporting fields
+            if (req.ThesisNameEn != null) thesis.ThesisNameEn = req.ThesisNameEn.Trim();
+            if (req.ThesisNameVi != null) thesis.ThesisNameVi = req.ThesisNameVi.Trim();
+            if (req.Abbreviation != null) thesis.Abbreviation = req.Abbreviation.Trim();
+            if (req.IsFromEnterprise.HasValue) thesis.IsFromEnterprise = req.IsFromEnterprise.Value;
+            if (req.IsFromEnterprise == true) thesis.EnterpriseName = req.EnterpriseName?.Trim();
+            else if (req.IsFromEnterprise == false) thesis.EnterpriseName = null;
+            if (req.IsApplied.HasValue) thesis.IsApplied = req.IsApplied.Value;
+            if (req.IsAppUsed.HasValue) thesis.IsAppUsed = req.IsAppUsed.Value;
 
             thesis.UpdateDate = DateTime.UtcNow;
             await _thesisRepository.UpdateThesisAsync(thesis);
@@ -379,8 +417,8 @@ namespace Services
             if (!string.IsNullOrWhiteSpace(searchTitle))
             {
                 theses = theses.Where(t =>
-                    t.Title != null
-                    && t.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase)
+                    (t.Title != null && t.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase)) ||
+                    (t.User != null && t.User.FullName != null && t.User.FullName.Contains(searchTitle, StringComparison.OrdinalIgnoreCase))
                 );
             }
 
@@ -824,8 +862,8 @@ namespace Services
              if (!string.IsNullOrWhiteSpace(searchTitle))
              {
                  dtos = dtos.Where(d =>
-                     d.Title != null
-                     && d.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase)
+                     (d.Title != null && d.Title.Contains(searchTitle, StringComparison.OrdinalIgnoreCase)) ||
+                     (d.OwnerName != null && d.OwnerName.Contains(searchTitle, StringComparison.OrdinalIgnoreCase))
                  );
              }
              return dtos;

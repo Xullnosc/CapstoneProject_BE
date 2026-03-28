@@ -57,7 +57,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet("search-mentors")]
-        [Authorize(Roles = "Student")]
+        [Authorize(Roles = "Student,Lecturer,HOD,Admin")]
         public async Task<IActionResult> SearchMentors([FromQuery] string? term, [FromQuery] int? teamId = null)
         {
             try

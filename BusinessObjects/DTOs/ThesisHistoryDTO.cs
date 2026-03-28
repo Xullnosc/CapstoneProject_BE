@@ -11,5 +11,6 @@ namespace BusinessObjects.DTOs
         public DateTime CreatedAt { get; set; }
         public int UploadedBy { get; set; }
         public string? UploaderName { get; set; }
+        public string? UploaderAvatar { get; set; }
     }
 }

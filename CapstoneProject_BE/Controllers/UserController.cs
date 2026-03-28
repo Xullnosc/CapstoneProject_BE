@@ -15,10 +15,12 @@ namespace CapstoneProject_BE.Controllers
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly IAuthService _authService;
 
-        public UserController(IUserService userService)
+        public UserController(IUserService userService, IAuthService authService)
         {
             _userService = userService;
+            _authService = authService;
         }
 
         [HttpGet("profile")]
@@ -70,7 +72,7 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
-                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+                var userIdClaim = User.FindFirst("id") ?? User.FindFirst(ClaimTypes.NameIdentifier);
                 if (userIdClaim == null) return Unauthorized();
                 var userId = int.Parse(userIdClaim.Value);
 
@@ -82,6 +84,27 @@ namespace CapstoneProject_BE.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An internal server error occurred.", details = "An error occurred while updating the profile." });
+            }
+        }
+
+        [HttpPut("profile/password")]
+        public async Task<IActionResult> UpdatePassword([FromBody] UpdatePasswordDTO passwordDto)
+        {
+            try
+            {
+                if (passwordDto == null || string.IsNullOrWhiteSpace(passwordDto.NewPassword))
+                    return BadRequest(new { message = "Mật khẩu mới là bắt buộc." });
+
+                var userIdClaim = User.FindFirst("id") ?? User.FindFirst(ClaimTypes.NameIdentifier);
+                if (userIdClaim == null) return Unauthorized();
+                var userId = int.Parse(userIdClaim.Value);
+
+                await _authService.UpdatePasswordAsync(userId, passwordDto.NewPassword);
+                return Ok(new { message = "Cập nhật mật khẩu thành công." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = $"Lỗi hệ thống: {ex.Message}" });
             }
         }
     }

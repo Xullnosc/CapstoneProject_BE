@@ -130,13 +130,19 @@ namespace Services
             var team = await _teamRepository.GetByIdAsync(teamId);
             if (team == null) return null;
 
-            // Allow access if user is a member OR the Mentor
+            // 1. Check if user is a member
             bool isMember = team.Teammembers.Any(tm => tm.StudentId == userId);
+            
+            // 2. Check if user is a Mentor
             bool isMentor = team.MentorId == userId || team.MentorId2 == userId;
             
-            if (!isMember && !isMentor)
+            // 3. Check if user is HOD
+            var user = await _userRepository.GetByIdAsync(userId);
+            bool isHod = user?.Role != null && string.Equals(user.Role.RoleName, CampusConstants.Roles.HOD, StringComparison.OrdinalIgnoreCase);
+
+            if (!isMember && !isMentor && !isHod)
             {
-                throw new UnauthorizedAccessException("You are not authorized to view this team.");
+                throw new UnauthorizedAccessException("You are not authorized to view this team details.");
             }
 
             return MapToDTO(team);

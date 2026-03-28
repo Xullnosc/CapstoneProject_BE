@@ -49,6 +49,13 @@ namespace Services
             if (thesis == null)
                 throw new KeyNotFoundException("Thesis not found.");
 
+            // 3.5. Validate: team must have exactly 5 members OR be a special team
+            int memberCount = team.Teammembers?.Count ?? 0;
+            if (memberCount < 5 && !team.IsSpecial)
+            {
+                throw new InvalidOperationException("Nhóm của bạn phải có đủ 5 thành viên hoặc là nhóm đặc biệt (Special Team) mới có thể đăng ký đề tài.");
+            }
+
             // 4. Validate: thesis must be Published
             if (thesis.Status != "Published")
                 throw new InvalidOperationException("Only theses with 'Published' status can be applied for.");
@@ -75,7 +82,8 @@ namespace Services
                     Id = existing.Id,
                     ThesisId = existing.ThesisId,
                     ThesisTitle = thesis.Title,
-                    ThesisOwnerName = null,
+                    ThesisOwnerName = thesis.User?.FullName,
+                    ThesisOwnerAvatar = thesis.User?.Avatar,
                     TeamId = team.TeamId,
                     TeamName = team.TeamName,
                     Status = existing.Status,
@@ -99,7 +107,8 @@ namespace Services
                 Id = created.Id,
                 ThesisId = created.ThesisId,
                 ThesisTitle = thesis.Title,
-                ThesisOwnerName = null,
+                ThesisOwnerName = thesis.User?.FullName,
+                ThesisOwnerAvatar = thesis.User?.Avatar,
                 TeamId = team.TeamId,
                 TeamName = team.TeamName,
                 Status = created.Status,
@@ -155,6 +164,7 @@ namespace Services
                 ThesisId = a.ThesisId,
                 ThesisTitle = a.Thesis?.Title,
                 ThesisOwnerName = a.Thesis?.User?.FullName,
+                ThesisOwnerAvatar = a.Thesis?.User?.Avatar,
                 TeamId = a.TeamId,
                 TeamName = a.Team?.TeamName,
                 Status = a.Status,

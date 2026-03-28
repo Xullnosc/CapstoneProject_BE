@@ -244,7 +244,7 @@ public class AuthService : IAuthService
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
             throw new UnauthorizedAccessException("Username and password are required.");
 
-        var credential = await _credentialRepository.GetByUsernameAsync(request.Username.Trim());
+        var credential = await _credentialRepository.GetByIdentifierAsync(request.Username.Trim());
         if (credential == null || credential.User?.Role == null)
             throw new UnauthorizedAccessException("Invalid username or password.");
 
@@ -379,6 +379,32 @@ public class AuthService : IAuthService
                     Description = "User logged out successfully"
                 });
             }
+        }
+    }
+
+    public async Task UpdatePasswordAsync(int userId, string newPassword)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null) throw new KeyNotFoundException("User not found.");
+
+        var credential = await _credentialRepository.GetByUserIdAsync(userId);
+        if (credential == null)
+        {
+            credential = new SystemUserCredential
+            {
+                UserId = userId,
+                Username = user.Email, // Use email as default for Google users
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword),
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await _credentialRepository.AddAsync(credential);
+        }
+        else
+        {
+            credential.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            credential.UpdatedAt = DateTime.UtcNow;
+            await _credentialRepository.UpdateAsync(credential);
         }
     }
 

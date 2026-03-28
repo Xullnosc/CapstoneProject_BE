@@ -20,6 +20,14 @@ public class SystemUserCredentialDAO : ISystemUserCredentialDAO
             .FirstOrDefaultAsync(c => c.Username == username);
     }
 
+    public async Task<SystemUserCredential?> GetByIdentifierAsync(string identifier)
+    {
+        return await _context.SystemUserCredentials
+            .Include(c => c.User)
+            .ThenInclude(u => u!.Role)
+            .FirstOrDefaultAsync(c => c.Username == identifier || (c.User != null && c.User.Email == identifier));
+    }
+
     public async Task<SystemUserCredential?> GetByUserIdAsync(int userId)
     {
         return await _context.SystemUserCredentials

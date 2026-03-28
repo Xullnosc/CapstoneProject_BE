@@ -150,6 +150,10 @@ namespace Services.Mappings
                     dest => dest.OwnerEmail,
                     opt => opt.MapFrom(src => src.User != null ? src.User.Email : null)
                 )
+                .ForMember(
+                    dest => dest.OwnerAvatar,
+                    opt => opt.MapFrom(src => src.User != null ? src.User.Avatar : null)
+                )
                 .ForMember(dest => dest.Reviews, opt => opt.Ignore())
                 .ForMember(
                     dest => dest.MentorEmail1,
@@ -168,6 +172,13 @@ namespace Services.Mappings
                     opt =>
                         opt.MapFrom(src =>
                             src.UploadedByUser != null ? src.UploadedByUser.FullName : null
+                        )
+                )
+                .ForMember(
+                    dest => dest.UploaderAvatar,
+                    opt =>
+                        opt.MapFrom(src =>
+                            src.UploadedByUser != null ? src.UploadedByUser.Avatar : null
                         )
                 );
 

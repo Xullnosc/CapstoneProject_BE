@@ -20,6 +20,13 @@ namespace BusinessObjects.DTOs
         public string? OwnerAvatar { get; set; }
         public string? MentorEmail1 { get; set; }
         public string? MentorEmail2 { get; set; }
+        public string? ThesisNameEn { get; set; }
+        public string? ThesisNameVi { get; set; }
+        public string? Abbreviation { get; set; }
+        public bool IsFromEnterprise { get; set; }
+        public string? EnterpriseName { get; set; }
+        public bool IsApplied { get; set; }
+        public bool IsAppUsed { get; set; }
 
         public List<ReviewDTO> Reviews { get; set; } = new();
         public List<ThesisHistoryDTO>? Histories { get; set; }
