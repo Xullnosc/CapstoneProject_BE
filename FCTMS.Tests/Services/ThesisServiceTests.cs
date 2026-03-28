@@ -258,6 +258,7 @@ namespace FCTMS.Tests.Services
                 ThesisId = thesisId,
                 UserId = ownerId,
                 Title = "Old Title",
+                Status = "Need Update",
                 ThesisHistories = new List<ThesisHistory>(),
             };
 
@@ -303,6 +304,7 @@ namespace FCTMS.Tests.Services
                 ThesisId = thesisId,
                 UserId = ownerId,
                 FileUrl = "old_url",
+                Status = "Need Update",
                 ThesisHistories = new List<ThesisHistory>
                 {
                     new ThesisHistory { VersionNumber = 1 },
@@ -480,6 +482,7 @@ namespace FCTMS.Tests.Services
                 ThesisId = thesisId,
                 UserId = ownerId,
                 Title = "Old Title",
+                Status = "Need Update",
                 ThesisHistories = new List<ThesisHistory>(),
             };
 
@@ -751,7 +754,7 @@ namespace FCTMS.Tests.Services
             // Assert
             await act.Should()
                 .ThrowAsync<InvalidOperationException>()
-                .WithMessage("You must be in an active team to propose a thesis.");
+                .WithMessage("Target user must be in an active team to propose a thesis.");
         }
 
         [Fact]
@@ -834,7 +837,7 @@ namespace FCTMS.Tests.Services
             await act.Should()
                 .ThrowAsync<InvalidOperationException>()
                 .WithMessage(
-                    "Your team must have at least 4 members to propose a thesis unless marked as special. Current members: 3."
+                    "Target team must have at least 4 members to propose a thesis unless marked as special. Current members: 3."
                 );
         }
 
