@@ -959,7 +959,7 @@ namespace FCTMS.Tests.Services
             int proposerId = 10;
             var dto = new SubmitThesisDecisionDTO { Decision = "Pass" };
             var proposer = new User { UserId = proposerId, Email = "proposer@fpt.edu.vn", Role = new Role { RoleName = CampusConstants.Roles.Lecturer } };
-            var thesis = new Thesis { ThesisId = thesisId, UserId = proposerId };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = proposerId, Status = "Reviewing" };
 
             _mockUserRepository.Setup(x => x.GetByIdAsync(proposerId)).ReturnsAsync(proposer);
             _mockLecturerRepository.Setup(x => x.GetByEmailAsync(proposer.Email)).ReturnsAsync(new Lecturer { Email = proposer.Email, IsReviewer = true });
@@ -980,7 +980,7 @@ namespace FCTMS.Tests.Services
             int reviewerId = 20;
             var dto = new SubmitThesisDecisionDTO { Decision = "Pass" };
             var reviewer = new User { UserId = reviewerId, Email = "reviewer@fpt.edu.vn", Role = new Role { RoleName = CampusConstants.Roles.Lecturer } };
-            var thesis = new Thesis { ThesisId = thesisId, UserId = 10 };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = 10, Status = "Reviewing" };
             var status = new ThesisReviewStatusDTO { Reviewers = new List<ReviewerProgressDTO> { new ReviewerProgressDTO { UserId = 30 }, new ReviewerProgressDTO { UserId = 40 } } };
 
             _mockUserRepository.Setup(x => x.GetByIdAsync(reviewerId)).ReturnsAsync(reviewer);
