@@ -387,6 +387,43 @@ namespace CapstoneProject_BE.Controllers
             }
         }
 
+        /// <summary>
+        /// POST /api/thesis/{id}/ai-review-preview
+        /// HOD/Admin: generate AI checklist prefill and feedback preview.
+        /// This endpoint does not persist any decision.
+        /// </summary>
+        [HttpPost("{id}/ai-review-preview")]
+        [Authorize(Policy = "HodOrAdmin")]
+        public async Task<IActionResult> GetAiReviewPreview(string id)
+        {
+            try
+            {
+                var userId = GetUserId();
+                var preview = await _thesisService.GetAIReviewPreviewAsync(
+                    id,
+                    userId,
+                    HttpContext.RequestAborted
+                );
+                return Ok(preview);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+
         private int GetUserId()
         {
             var idClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
@@ -467,7 +504,10 @@ namespace CapstoneProject_BE.Controllers
         /// </summary>
         [HttpPost("{id}/force-assign")]
         [Authorize(Policy = "HodOrAdmin")]
-        public async Task<IActionResult> ForceAssignThesis(string id, [FromBody] ForceAssignThesisDTO dto)
+        public async Task<IActionResult> ForceAssignThesis(
+            string id,
+            [FromBody] ForceAssignThesisDTO dto
+        )
         {
             try
             {
@@ -494,4 +534,3 @@ namespace CapstoneProject_BE.Controllers
         }
     }
 }
-
