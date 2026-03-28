@@ -185,6 +185,7 @@ public sealed class AIController : ControllerBase
         AIErrorCode.InvalidRequest    => StatusCode(400, new { message = ex.Message, code = ex.Code.ToString() }),
         AIErrorCode.Timeout           => StatusCode(504, new { message = "AI provider request timed out. Please try again.", code = ex.Code.ToString() }),
         AIErrorCode.ProviderUnavailable => StatusCode(503, new { message = "AI provider is temporarily unavailable.", code = ex.Code.ToString() }),
+        AIErrorCode.Unknown           => StatusCode(502, new { message = ex.Message, code = ex.Code.ToString() }),
         _                             => StatusCode(500, new { message = "An unexpected AI error occurred.", code = ex.Code.ToString() })
     };
 

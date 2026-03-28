@@ -16,7 +16,8 @@ namespace Services.AI.Providers.Implementations;
 internal sealed class GoogleGeminiProvider : IAIProvider
 {
     private const string BaseUrl = "https://generativelanguage.googleapis.com";
-    private const string DefaultModel = "gemini-1.5-pro";
+    private const string DefaultModel = "gemini-2.5-pro";
+    private const string FallbackModel = "gemini-2.5-flash";
     private static readonly JsonSerializerOptions _json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -25,9 +26,25 @@ internal sealed class GoogleGeminiProvider : IAIProvider
 
     private readonly ProviderSettings _settings;
     private readonly IHttpClientFactory _httpClientFactory;
+    private static readonly string[] _preferredModels =
+    {
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash",
+        "gemini-3-pro-preview",
+        "gemini-3-flash-preview",
+        "gemini-3.1-pro-preview",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-pro",
+        "gemini-pro-vision"
+    };
 
     public AIProviderType ProviderType => AIProviderType.GoogleGemini;
-    public string ModelName => string.IsNullOrWhiteSpace(_settings.Model) ? DefaultModel : _settings.Model;
+    public string ModelName => NormalizeModelName(_settings.Model);
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_settings.ApiKey);
 
     public GoogleGeminiProvider(ProviderSettings settings, IHttpClientFactory httpClientFactory)
@@ -45,22 +62,36 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         using var client = BuildClient();
 
         var body = BuildRequestBody(request);
-        using var content = new StringContent(
-            JsonSerializer.Serialize(body, _json), Encoding.UTF8, "application/json");
-
-        var endpoint = $"{BaseUrl}/v1beta/models/{ModelName}:generateContent?key={_settings.ApiKey}";
-
-        HttpResponseMessage response;
-        try
-        {
-            response = await client.PostAsync(endpoint, content, cancellationToken);
-        }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new AIException(AIErrorCode.Timeout, "Google Gemini request timed out.", "GoogleGemini", isRetryable: true, ex);
-        }
-
+        var model = ModelName;
+        var response = await PostGenerateContentAsync(client, model, body, cancellationToken);
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if ((response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.BadRequest)
+            && LooksLikeModelUnavailable(responseJson))
+        {
+            // Some model IDs are disabled/deprecated per API version; discover an available model first.
+            var discoveredModel = await TryGetSupportedModelAsync(client, cancellationToken);
+            var retryModel = discoveredModel ?? FallbackModel;
+
+            if (!retryModel.Equals(model, StringComparison.OrdinalIgnoreCase))
+            {
+                model = retryModel;
+                response.Dispose();
+                response = await PostGenerateContentAsync(client, model, body, cancellationToken);
+                responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+            }
+        }
+
+        if ((response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.BadRequest)
+            && LooksLikeModelUnavailable(responseJson)
+            && !model.Equals(FallbackModel, StringComparison.OrdinalIgnoreCase))
+        {
+            // Final defensive retry on fixed fallback if discovery failed or returned an unsupported ID.
+            model = FallbackModel;
+            response.Dispose();
+            response = await PostGenerateContentAsync(client, model, body, cancellationToken);
+            responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+        }
 
         if (!response.IsSuccessStatusCode)
             MapErrorResponse(response.StatusCode, responseJson);
@@ -68,16 +99,49 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         var parsed = JsonSerializer.Deserialize<GeminiResponse>(responseJson, _json)
             ?? throw new AIException(AIErrorCode.Unknown, "Failed to parse Gemini response.", "GoogleGemini");
 
+        if (!string.IsNullOrWhiteSpace(parsed.PromptFeedback?.BlockReason))
+        {
+            var blockReason = parsed.PromptFeedback.BlockReason;
+            var blockDetail = parsed.PromptFeedback.BlockReasonMessage;
+            throw new AIException(
+                AIErrorCode.ContentFiltered,
+                string.IsNullOrWhiteSpace(blockDetail)
+                    ? $"Gemini blocked the prompt ({blockReason})."
+                    : $"Gemini blocked the prompt ({blockReason}): {blockDetail}",
+                "GoogleGemini");
+        }
+
         var text = parsed.Candidates?
-            .FirstOrDefault()?.Content?.Parts?
-            .FirstOrDefault(p => p.Text != null)?.Text
-            ?? throw new AIException(AIErrorCode.Unknown, "Gemini returned no text content.", "GoogleGemini");
+            .SelectMany(c => c.Content?.Parts ?? Enumerable.Empty<GeminiPart>())
+            .Select(p => p.Text)
+            .FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            var finishReason = parsed.Candidates?.FirstOrDefault()?.FinishReason;
+            if (!string.IsNullOrWhiteSpace(finishReason)
+                && (finishReason.Equals("SAFETY", StringComparison.OrdinalIgnoreCase)
+                    || finishReason.Equals("BLOCKLIST", StringComparison.OrdinalIgnoreCase)
+                    || finishReason.Equals("PROHIBITED_CONTENT", StringComparison.OrdinalIgnoreCase)
+                    || finishReason.Equals("RECITATION", StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new AIException(
+                    AIErrorCode.ContentFiltered,
+                    $"Gemini blocked the response ({finishReason}).",
+                    "GoogleGemini");
+            }
+
+            throw new AIException(
+                AIErrorCode.InvalidRequest,
+                $"Gemini returned no text content (finishReason: {finishReason ?? "unknown"}).",
+                "GoogleGemini");
+        }
 
         return new AIResponse
         {
             Content = text,
             Provider = "GoogleGemini",
-            Model = ModelName,
+            Model = model,
             FromCache = false,
             Latency = DateTime.UtcNow - start,
             Usage = new AIUsage
@@ -87,7 +151,7 @@ internal sealed class GoogleGeminiProvider : IAIProvider
                 EstimatedCostUsd = EstimateCost(
                     parsed.UsageMetadata?.PromptTokenCount ?? 0,
                     parsed.UsageMetadata?.CandidatesTokenCount ?? 0,
-                    ModelName)
+                    model)
             }
         };
     }
@@ -99,6 +163,27 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         var client = _httpClientFactory.CreateClient("AI_GoogleGemini");
         client.Timeout = TimeSpan.FromSeconds(_settings.TimeoutSeconds);
         return client;
+    }
+
+    private async Task<HttpResponseMessage> PostGenerateContentAsync(
+        HttpClient client,
+        string model,
+        object body,
+        CancellationToken cancellationToken)
+    {
+        using var content = new StringContent(
+            JsonSerializer.Serialize(body, _json), Encoding.UTF8, "application/json");
+
+        var endpoint = $"{BaseUrl}/v1beta/models/{model}:generateContent?key={_settings.ApiKey}";
+
+        try
+        {
+            return await client.PostAsync(endpoint, content, cancellationToken);
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new AIException(AIErrorCode.Timeout, "Google Gemini request timed out.", "GoogleGemini", isRetryable: true, ex);
+        }
     }
 
     private static object BuildRequestBody(AIRequest req)
@@ -144,6 +229,8 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         {
             HttpStatusCode.Unauthorized  => new AIException(AIErrorCode.InvalidApiKey, $"Gemini: {msg}", "GoogleGemini"),
             HttpStatusCode.Forbidden     => new AIException(AIErrorCode.InvalidApiKey, $"Gemini: {msg}", "GoogleGemini"),
+            HttpStatusCode.TooManyRequests when LooksLikeQuotaExceeded(msg)
+                => new AIException(AIErrorCode.QuotaExceeded, $"Gemini: {msg}", "GoogleGemini"),
             HttpStatusCode.TooManyRequests => new AIException(AIErrorCode.RateLimited, $"Gemini: {msg}", "GoogleGemini", isRetryable: true),
             >= HttpStatusCode.InternalServerError =>
                 new AIException(AIErrorCode.ProviderUnavailable, $"Gemini server error: {msg}", "GoogleGemini", isRetryable: true),
@@ -162,6 +249,83 @@ internal sealed class GoogleGeminiProvider : IAIProvider
         }
         catch { /* ignore */ }
         return null;
+    }
+
+    private async Task<string?> TryGetSupportedModelAsync(HttpClient client, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var endpoint = $"{BaseUrl}/v1beta/models?key={_settings.ApiKey}";
+            var response = await client.GetAsync(endpoint, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            var list = JsonSerializer.Deserialize<GeminiModelListResponse>(json, _json);
+            var candidates = list?.Models
+                ?.Where(m => m.SupportedGenerationMethods is not null
+                    && m.SupportedGenerationMethods.Any(x =>
+                        string.Equals(x, "generateContent", StringComparison.OrdinalIgnoreCase)))
+                .Select(m => NormalizeModelName(m.Name))
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (candidates is null || candidates.Count == 0)
+                return null;
+
+            foreach (var preferred in _preferredModels)
+            {
+                var hit = candidates.FirstOrDefault(c => c.Equals(preferred, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrWhiteSpace(hit))
+                    return hit;
+            }
+
+            return candidates[0];
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string NormalizeModelName(string? model)
+    {
+        var normalized = string.IsNullOrWhiteSpace(model) ? DefaultModel : model.Trim();
+
+        if (normalized.StartsWith("models/", StringComparison.OrdinalIgnoreCase))
+            normalized = normalized["models/".Length..];
+
+        const string generateContentSuffix = ":generateContent";
+        if (normalized.EndsWith(generateContentSuffix, StringComparison.OrdinalIgnoreCase))
+            normalized = normalized[..^generateContentSuffix.Length];
+
+        return normalized;
+    }
+
+    private static bool LooksLikeModelUnavailable(string json)
+    {
+        var message = TryExtractMessage(json);
+        if (string.IsNullOrWhiteSpace(message))
+            return false;
+
+        return message.Contains("not found", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("not supported", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("no longer available", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("closed to new users", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("deprecated", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("ListModels", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeQuotaExceeded(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return false;
+
+        return message.Contains("quota exceeded", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("check your plan and billing", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("free_tier", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("limit: 0", StringComparison.OrdinalIgnoreCase);
     }
 
     private static decimal EstimateCost(int prompt, int completion, string model)
@@ -183,11 +347,30 @@ internal sealed class GoogleGeminiProvider : IAIProvider
     {
         public List<GeminiCandidate>? Candidates { get; set; }
         public GeminiUsageMetadata? UsageMetadata { get; set; }
+        public GeminiPromptFeedback? PromptFeedback { get; set; }
+    }
+
+    private sealed class GeminiModelListResponse
+    {
+        public List<GeminiModelInfo>? Models { get; set; }
+    }
+
+    private sealed class GeminiModelInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public List<string>? SupportedGenerationMethods { get; set; }
     }
 
     private sealed class GeminiCandidate
     {
         public GeminiContent? Content { get; set; }
+        public string? FinishReason { get; set; }
+    }
+
+    private sealed class GeminiPromptFeedback
+    {
+        public string? BlockReason { get; set; }
+        public string? BlockReasonMessage { get; set; }
     }
 
     private sealed class GeminiContent
