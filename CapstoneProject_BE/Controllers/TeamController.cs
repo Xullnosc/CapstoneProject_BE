@@ -304,6 +304,41 @@ namespace CapstoneProject_BE.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+        [HttpPost("force-create")]
+        [Authorize(Roles = CampusConstants.Roles.HOD)]
+        public async Task<IActionResult> ForceCreateTeam([FromBody] ForceCreateTeamDTO dto)
+        {
+            try
+            {
+                if (!int.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
+
+                var createdTeam = await _teamService.ForceCreateTeamAsync(userId, dto);
+                return CreatedAtAction(nameof(GetTeamById), new { id = createdTeam.TeamId }, createdTeam);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new { message = "An error occurred while creating the team." });
+            }
+        }
     }
 }
 

@@ -870,5 +870,52 @@ namespace Services
 
             return _mapper.Map<ThesisDTO>(thesis);
         }
+
+        // ─── F105: Force Assign Thesis ───────────────────────────────────────────
+
+        public async Task<ThesisDTO> ForceAssignThesisAsync(string thesisId, int teamId, int hodUserId)
+        {
+            // 1. Validate HOD role
+            var hodUser = await _userRepository.GetByIdAsync(hodUserId);
+            if (hodUser == null || hodUser.Role?.RoleName != CampusConstants.Roles.HOD)
+                throw new UnauthorizedAccessException("Only Head of Department can force-assign theses.");
+
+            // 2. Get thesis
+            var thesis = await _thesisRepository.GetThesisByIdAsync(thesisId);
+            if (thesis == null)
+                throw new KeyNotFoundException($"Thesis '{thesisId}' not found.");
+
+            // 3. Thesis must be Published
+            if (thesis.Status != "Published")
+                throw new InvalidOperationException($"Thesis must be 'Published' to force-assign. Current status: '{thesis.Status}'.");
+
+            // 4. Thesis must not already be assigned
+            if (thesis.TeamId != null)
+                throw new InvalidOperationException("This thesis is already assigned to a team.");
+
+            // 5. Get team
+            var team = await _teamRepository.GetByIdAsync(teamId);
+            if (team == null)
+                throw new KeyNotFoundException($"Team {teamId} not found.");
+
+            // 6. Team must not already have a thesis in this semester
+            if (thesis.SemesterId.HasValue)
+            {
+                var existingThesis = await _thesisRepository.GetApprovedThesisByLeaderIdAsync(team.LeaderId, thesis.SemesterId);
+                if (existingThesis != null)
+                    throw new InvalidOperationException($"Team '{team.TeamName}' already has thesis '{existingThesis.Title}' in this semester.");
+            }
+
+            // 7. Assign
+            thesis.TeamId = teamId;
+            thesis.Status = "Registered";
+            thesis.UpdateDate = DateTime.UtcNow;
+            await _thesisRepository.UpdateThesisAsync(thesis);
+
+            // Reload for mapper
+            var updated = await _thesisRepository.GetThesisByIdWithHistoriesAsync(thesisId);
+            return _mapper.Map<ThesisDTO>(updated!);
+        }
     }
 }
+

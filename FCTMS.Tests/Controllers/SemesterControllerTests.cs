@@ -221,5 +221,60 @@ namespace FCTMS.Tests.Controllers
             var badRequestResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
             badRequestResult.Value!.ToString().Should().Contain("Semester code 'SP26' already exists.");
         }
+
+        // --- Orphaned Students ---
+
+        [Fact]
+        public async Task GetOrphanedStudents_ValidSemester_ReturnsOk()
+        {
+            // Arrange
+            int id = 1;
+            var orphaned = new List<WhitelistDTO>
+            {
+                new WhitelistDTO { WhitelistId = 1, Email = "orphan@fpt.edu.vn", FullName = "Orphan Student" }
+            };
+
+            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id))
+                .ReturnsAsync(orphaned);
+
+            // Act
+            var result = await _controller.GetOrphanedStudents(id);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.Should().BeEquivalentTo(orphaned);
+        }
+
+        [Fact]
+        public async Task GetOrphanedStudents_SemesterNotFound_ReturnsNotFound()
+        {
+            // Arrange
+            int id = 99;
+            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id))
+                .ThrowsAsync(new KeyNotFoundException("Semester 99 not found"));
+
+            // Act
+            var result = await _controller.GetOrphanedStudents(id);
+
+            // Assert
+            var notFoundResult = result.Should().BeOfType<NotFoundObjectResult>().Subject;
+            notFoundResult.Value.Should().BeEquivalentTo(new { message = "Semester 99 not found" });
+        }
+
+        [Fact]
+        public async Task GetOrphanedStudents_ServiceThrows_Returns500()
+        {
+            // Arrange
+            int id = 1;
+            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id))
+                .ThrowsAsync(new Exception("DB error"));
+
+            // Act
+            var result = await _controller.GetOrphanedStudents(id);
+
+            // Assert
+            var serverError = result.Should().BeOfType<ObjectResult>().Subject;
+            serverError.StatusCode.Should().Be(500);
+        }
     }
 }

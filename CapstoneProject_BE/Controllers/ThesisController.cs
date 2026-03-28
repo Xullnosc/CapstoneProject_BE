@@ -460,5 +460,38 @@ namespace CapstoneProject_BE.Controllers
                 return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
             }
         }
+
+        /// <summary>
+        /// POST /api/thesis/{id}/force-assign
+        /// HOD: force-assign a Published thesis to a team, bypassing application process.
+        /// </summary>
+        [HttpPost("{id}/force-assign")]
+        [Authorize(Policy = "HodOrAdmin")]
+        public async Task<IActionResult> ForceAssignThesis(string id, [FromBody] ForceAssignThesisDTO dto)
+        {
+            try
+            {
+                var userId = GetUserId();
+                var result = await _thesisService.ForceAssignThesisAsync(id, dto.TeamId, userId);
+                return Ok(new { Message = "Thesis assigned successfully.", Data = result });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { Message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
     }
 }
+

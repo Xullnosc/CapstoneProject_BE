@@ -59,5 +59,9 @@ namespace Services
             int hodUserId,
             SubmitThesisDecisionDTO dto
         );
+
+        // F105: Force Assign Thesis
+        Task<ThesisDTO> ForceAssignThesisAsync(string thesisId, int teamId, int hodUserId);
     }
 }
+

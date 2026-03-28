@@ -342,6 +342,78 @@ namespace FCTMS.Tests.Controllers
             var notFoundResult = result.Should().BeOfType<NotFoundObjectResult>().Subject;
             notFoundResult.Value!.ToString().Should().Contain("Team not found");
         }
+        // --- ForceCreateTeam Tests ---
+
+        [Fact]
+        public async Task ForceCreateTeam_ValidRequest_ReturnsCreated()
+        {
+            // Arrange
+            var dto = new ForceCreateTeamDTO
+            {
+                TeamName = "Forced Team",
+                SemesterId = 1,
+                LeaderEmail = "leader@fpt.edu.vn",
+                MemberEmails = new List<string> { "leader@fpt.edu.vn", "member@fpt.edu.vn" }
+            };
+            var createdTeam = new TeamDTO { TeamId = 10, TeamName = "Forced Team" };
+            _mockTeamService.Setup(x => x.ForceCreateTeamAsync(1, dto)).ReturnsAsync(createdTeam);
+
+            // Act
+            var result = await _controller.ForceCreateTeam(dto);
+
+            // Assert
+            var createdResult = result.Should().BeOfType<CreatedAtActionResult>().Subject;
+            createdResult.StatusCode.Should().Be(201);
+            createdResult.Value.Should().BeEquivalentTo(createdTeam);
+        }
+
+        [Fact]
+        public async Task ForceCreateTeam_SemesterNotFound_ReturnsNotFound()
+        {
+            // Arrange
+            var dto = new ForceCreateTeamDTO { TeamName = "X", SemesterId = 99, LeaderEmail = "a@x.com", MemberEmails = new List<string> { "a@x.com" } };
+            _mockTeamService.Setup(x => x.ForceCreateTeamAsync(1, dto))
+                .ThrowsAsync(new KeyNotFoundException("Semester 99 not found."));
+
+            // Act
+            var result = await _controller.ForceCreateTeam(dto);
+
+            // Assert
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
+
+        [Fact]
+        public async Task ForceCreateTeam_NotHOD_Returns403()
+        {
+            // Arrange
+            var dto = new ForceCreateTeamDTO { TeamName = "X", SemesterId = 1, LeaderEmail = "a@x.com", MemberEmails = new List<string> { "a@x.com" } };
+            _mockTeamService.Setup(x => x.ForceCreateTeamAsync(1, dto))
+                .ThrowsAsync(new UnauthorizedAccessException("Only Head of Department can force-create teams."));
+
+            // Act
+            var result = await _controller.ForceCreateTeam(dto);
+
+            // Assert
+            var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
+            statusResult.StatusCode.Should().Be(403);
+        }
+
+        [Fact]
+        public async Task ForceCreateTeam_StudentAlreadyInTeam_ReturnsBadRequest()
+        {
+            // Arrange
+            var dto = new ForceCreateTeamDTO { TeamName = "X", SemesterId = 1, LeaderEmail = "a@x.com", MemberEmails = new List<string> { "a@x.com" } };
+            _mockTeamService.Setup(x => x.ForceCreateTeamAsync(1, dto))
+                .ThrowsAsync(new InvalidOperationException("Student is already in team 'Team A'."));
+
+            // Act
+            var result = await _controller.ForceCreateTeam(dto);
+
+            // Assert
+            var badRequest = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            badRequest.Value!.ToString().Should().Contain("already in team");
+        }
     }
 
 }
+
