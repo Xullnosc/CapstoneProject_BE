@@ -16,13 +16,12 @@ public class ThesisReviewDAO : IThesisReviewDAO
     {
         _context = context;
     }
-
     public async Task UpsertReviewerReviewAsync(
         string thesisId,
         int reviewerId,
         string decision,
         string? note,
-        string? fileUrl
+        IEnumerable<int>? checklistIds = null
     )
     {
         var previous = await GetLatestReviewerDecisionAsync(thesisId, reviewerId);
@@ -59,16 +58,14 @@ public class ThesisReviewDAO : IThesisReviewDAO
         );
 
         ThesisReviewComment? decisionComment = null;
-        if (!string.IsNullOrWhiteSpace(note) || !string.IsNullOrWhiteSpace(fileUrl))
+        if (!string.IsNullOrWhiteSpace(note))
         {
             decisionComment = new ThesisReviewComment
             {
                 EventId = reviewEvent.Id,
                 ThesisId = thesisId,
                 AuthorUserId = reviewerId,
-                Body = string.IsNullOrWhiteSpace(note)
-                    ? "Review attachment submitted."
-                    : note.Trim(),
+                Body = note.Trim(),
                 CommentType = "DECISION_RATIONALE",
                 VisibilityScope = "PUBLIC",
                 CreatedAt = DateTime.UtcNow,
@@ -79,32 +76,28 @@ public class ThesisReviewDAO : IThesisReviewDAO
 
         await _context.SaveChangesAsync();
 
-        if (!string.IsNullOrWhiteSpace(fileUrl) && decisionComment != null)
+        if (checklistIds != null && checklistIds.Any())
         {
-            var fileName = fileUrl.Split('/').LastOrDefault();
-            _context.ThesisReviewAttachments.Add(
-                new ThesisReviewAttachment
-                {
-                    CommentId = decisionComment.Id,
-                    ThesisId = thesisId,
-                    FileUrl = fileUrl,
-                    FileName = string.IsNullOrWhiteSpace(fileName) ? "review-file" : fileName,
-                    UploadedBy = reviewerId,
-                    UploadedAt = DateTime.UtcNow,
-                    IsDeleted = false,
-                }
-            );
+            var results = checklistIds.Select(cid => new ThesisReviewChecklistResult
+            {
+                EventId = reviewEvent.Id,
+                ChecklistId = cid,
+                IsChecked = true
+            });
+            _context.ThesisReviewChecklistResults.AddRange(results);
             await _context.SaveChangesAsync();
         }
 
+        await _context.SaveChangesAsync();
+
         return;
     }
-
     public async Task UpsertHodDecisionAsync(
         string thesisId,
         int hodId,
         string decision,
-        string? note
+        string? note,
+        IEnumerable<int>? checklistIds = null
     )
     {
         var previous = await GetLatestHodDecisionAsync(thesisId);
@@ -136,6 +129,19 @@ public class ThesisReviewDAO : IThesisReviewDAO
         }
 
         await _context.SaveChangesAsync();
+
+        if (checklistIds != null && checklistIds.Any())
+        {
+            var results = checklistIds.Select(cid => new ThesisReviewChecklistResult
+            {
+                EventId = hodEvent.Id,
+                ChecklistId = cid,
+                IsChecked = true
+            });
+            _context.ThesisReviewChecklistResults.AddRange(results);
+            await _context.SaveChangesAsync();
+        }
+
         return;
     }
 
@@ -175,6 +181,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
                 u.UserId,
                 u.Email,
                 u.FullName,
+                u.Avatar,
             })
             .ToListAsync();
 
@@ -217,26 +224,15 @@ public class ThesisReviewDAO : IThesisReviewDAO
                     .ThenByDescending(c => c.Id)
                     .FirstOrDefaultAsync();
 
-                var latestAttachmentUrl =
-                    latestComment == null
-                        ? null
-                        : await _context
-                            .ThesisReviewAttachments.AsNoTracking()
-                            .Where(a => a.CommentId == latestComment.Id && !a.IsDeleted)
-                            .OrderByDescending(a => a.UploadedAt)
-                            .ThenByDescending(a => a.Id)
-                            .Select(a => a.FileUrl)
-                            .FirstOrDefaultAsync();
-
                 status.Reviewers.Add(
                     new ReviewerProgressDTO
                     {
                         UserId = reviewerId,
                         Email = user?.Email,
                         FullName = user?.FullName,
+                        Avatar = user?.Avatar,
                         Decision = latestDecision?.Decision,
                         Comment = latestComment?.Body,
-                        FileUrl = latestAttachmentUrl,
                         ReviewedAt = latestDecision?.CreatedAt,
                     }
                 );
@@ -292,6 +288,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
                 HodId = latestHodDecisionEvent.ActorUserId,
                 Email = u?.Email,
                 FullName = u?.FullName,
+                Avatar = u?.Avatar,
                 Decision = latestHodDecisionEvent.Decision ?? "Fail",
                 Comment = latestHodComment?.Body,
                 DecidedAt = latestHodDecisionEvent.CreatedAt,
@@ -371,6 +368,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
                         ActorRole = e.ActorRole,
                         ActorName = u.FullName,
                         ActorEmail = u.Email,
+                        ActorAvatar = u.Avatar,
                         Decision = e.Decision,
                         CreatedAt = e.CreatedAt,
                     }
@@ -401,6 +399,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
                         AuthorUserId = c.AuthorUserId,
                         AuthorName = u.FullName,
                         AuthorEmail = u.Email,
+                        AuthorAvatar = u.Avatar,
                         Body = c.Body,
                         CommentType = c.CommentType,
                         VisibilityScope = c.VisibilityScope,
@@ -435,6 +434,25 @@ public class ThesisReviewDAO : IThesisReviewDAO
         foreach (var evt in events)
         {
             evt.Comments = eventTopLevel[evt.EventId];
+        }
+
+        // Populate Checklist Results
+        var checklistResults = await _context.ThesisReviewChecklistResults
+            .AsNoTracking()
+            .Where(r => eventIds.Contains(r.EventId) && r.IsChecked)
+            .Join(_context.Checklists.AsNoTracking(),
+                r => r.ChecklistId,
+                c => c.ChecklistId,
+                (r, c) => new { r.EventId, c.Content })
+            .ToListAsync();
+
+        foreach (var result in checklistResults)
+        {
+            var evt = events.FirstOrDefault(e => e.EventId == result.EventId);
+            if (evt != null)
+            {
+                evt.ChecklistResults.Add(result.Content);
+            }
         }
 
         return events;
@@ -534,6 +552,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
             AuthorUserId = comment.AuthorUserId,
             AuthorName = user?.FullName,
             AuthorEmail = user?.Email,
+            AuthorAvatar = user?.Avatar,
             Body = comment.Body,
             CommentType = comment.CommentType,
             VisibilityScope = comment.VisibilityScope,

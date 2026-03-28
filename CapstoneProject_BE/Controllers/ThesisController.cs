@@ -83,7 +83,6 @@ namespace CapstoneProject_BE.Controllers
         /// <summary>
         /// GET /api/thesis/{id}
         /// Returns thesis detail including version history.
-        /// </summary>
         [HttpGet("{id}")]
         public async Task<IActionResult> GetThesisDetail(string id)
         {
@@ -137,6 +136,7 @@ namespace CapstoneProject_BE.Controllers
                     }
                 }
 
+                var emailClaim = User.FindFirst(ClaimTypes.Email) ?? User.FindFirst("email");
                 var theses = await _thesisService.GetFilteredThesesAsync(
                     status,
                     userId,
@@ -144,7 +144,8 @@ namespace CapstoneProject_BE.Controllers
                     semesterId,
                     isLocked,
                     lecturerOnly,
-                    excludeUserId
+                    excludeUserId,
+                    emailClaim?.Value
                 );
                 return Ok(theses);
             }

@@ -12,8 +12,10 @@ public class ThesisReviewTimelineEventDTO
     public string ActorRole { get; set; } = null!;
     public string? ActorName { get; set; }
     public string? ActorEmail { get; set; }
+    public string? ActorAvatar { get; set; }
     public string? Decision { get; set; }
     public DateTime CreatedAt { get; set; }
+    public List<string> ChecklistResults { get; set; } = [];
     public List<ThesisReviewTimelineCommentDTO> Comments { get; set; } = [];
 }
 
@@ -25,6 +27,7 @@ public class ThesisReviewTimelineCommentDTO
     public int AuthorUserId { get; set; }
     public string? AuthorName { get; set; }
     public string? AuthorEmail { get; set; }
+    public string? AuthorAvatar { get; set; }
     public string Body { get; set; } = null!;
     public string CommentType { get; set; } = null!;
     public string VisibilityScope { get; set; } = null!;

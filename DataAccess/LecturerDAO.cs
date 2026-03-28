@@ -103,6 +103,7 @@ namespace DataAccess
             await _context.SaveChangesAsync();
         }
 
+
         public async Task<IEnumerable<Lecturer>> SearchAsync(string term)
         {
             string normalizedTerm = term?.Trim() ?? string.Empty;
@@ -121,6 +122,16 @@ namespace DataAccess
                 .AsNoTracking()
                 .Where(l => l.IsActive && ((l.FullName ?? string.Empty).Contains(normalizedTerm) || l.Email.Contains(normalizedTerm)))
                 .OrderBy(l => l.FullName)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Lecturer>> GetByEmailsAsync(List<string> emails)
+        {
+            if (emails == null || !emails.Any()) return new List<Lecturer>();
+            var lowerEmails = emails.Select(e => e.ToLower().Trim()).ToList();
+            return await _context.Lecturers
+                .Where(l => l.Email != null && lowerEmails.Contains(l.Email.ToLower()))
+                .AsNoTracking()
                 .ToListAsync();
         }
     }

@@ -11,9 +11,15 @@ public interface IThesisReviewRepository
         int reviewerId,
         string decision,
         string? note,
-        string? fileUrl
+        IEnumerable<int>? checklistIds = null
     );
-    Task UpsertHodDecisionAsync(string thesisId, int hodId, string decision, string? comment);
+    Task UpsertHodDecisionAsync(
+        string thesisId,
+        int hodId,
+        string decision,
+        string? comment,
+        IEnumerable<int>? checklistIds = null
+    );
 
     Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId);
     Task InitializeReviewersAsync(

@@ -54,9 +54,15 @@ namespace Repositories
             await _lecturerDAO.DeleteAsync(lecturer);
         }
 
+
         public async Task<IEnumerable<Lecturer>> SearchAsync(string term)
         {
             return await _lecturerDAO.SearchAsync(term);
+        }
+
+        public async Task<IEnumerable<Lecturer>> GetByEmailsAsync(List<string> emails)
+        {
+            return await _lecturerDAO.GetByEmailsAsync(emails);
         }
     }
 }
