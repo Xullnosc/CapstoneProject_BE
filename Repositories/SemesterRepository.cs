@@ -40,5 +40,8 @@ namespace Repositories
             var semester = await _semesterDAO.GetByIdAsync(semesterId);
             return semester != null;
         }
+
+        public async Task<List<Whitelist>> GetOrphanedStudentsAsync(int semesterId)
+            => await _semesterDAO.GetOrphanedStudentsAsync(semesterId);
     }
 }

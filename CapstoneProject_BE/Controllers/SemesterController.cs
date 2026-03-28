@@ -279,5 +279,23 @@ namespace CapstoneProject_BE.Controllers
                 return NotFound(new { message = ex.Message });
             }
         }
+        [HttpGet("{id}/orphaned-students")]
+        [Authorize(Roles = CampusConstants.Roles.HOD)]
+        public async Task<IActionResult> GetOrphanedStudents(int id)
+        {
+            try
+            {
+                var orphaned = await _semesterService.GetOrphanedStudentsAsync(id);
+                return Ok(orphaned);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new { message = "An error occurred while fetching orphaned students." });
+            }
+        }
     }
 }

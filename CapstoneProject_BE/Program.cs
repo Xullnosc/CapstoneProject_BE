@@ -1,6 +1,7 @@
 using System.Text;
 using BusinessObjects.Models;
 using CapstoneProject_BE.Extensions;
+using Services.Extensions;
 using DataAccess;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,11 @@ using Services.Mappings;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Register the AI settings override file as a hot-reload config source.
+// This file is written by IAISettingsService when an admin saves config via the UI.
+var aiOverridePath = Path.Combine(builder.Environment.ContentRootPath, "ai-settings-override.json");
+builder.Configuration.AddJsonFile(aiOverridePath, optional: true, reloadOnChange: true);
 
 // EPPlus license context (set globally once during startup)
 // EPPlus 8+: set license via the static `License` property
@@ -124,6 +130,10 @@ builder.Services.AddScoped<IThesisApplicationService, ThesisApplicationService>(
 builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ISystemParameterService, SystemParameterService>();
+builder.Services.AddScoped<ISystemErrorLogService, SystemErrorLogService>();
+
+// AI Services (BYOK/BYOA — keys configured via environment variables or the admin settings UI)
+builder.Services.AddAIServices(builder.Configuration, aiOverridePath);
 
 //DAO (DataAccess Layer)
 builder.Services.AddScoped<IUserDAO, UserDAO>();
@@ -147,6 +157,7 @@ builder.Services.AddScoped<IThesisApplicationDAO, ThesisApplicationDAO>();
 builder.Services.AddScoped<ISystemSettingDAO, SystemSettingDAO>();
 builder.Services.AddScoped<IDashboardDAO, DashboardDAO>();
 builder.Services.AddScoped<ISystemParameterDAO, SystemParameterDAO>();
+builder.Services.AddScoped<ISystemErrorLogDAO, SystemErrorLogDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -170,6 +181,7 @@ builder.Services.AddScoped<IThesisApplicationRepository, ThesisApplicationReposi
 builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<ISystemParameterRepository, SystemParameterRepository>();
+builder.Services.AddScoped<ISystemErrorLogRepository, SystemErrorLogRepository>();
 
 //Middleware
 // AutoMapper
@@ -255,6 +267,8 @@ if (enableSwagger)
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseMiddleware<CapstoneProject_BE.Middlewares.GlobalExceptionMiddleware>();
 
 // Only enable HTTPS redirection when an HTTPS URL is configured (e.g. container has a certificate).
 var configuredUrls =

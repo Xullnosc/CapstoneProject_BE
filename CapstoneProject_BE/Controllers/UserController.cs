@@ -107,5 +107,33 @@ namespace CapstoneProject_BE.Controllers
                 return StatusCode(500, new { message = $"Lỗi hệ thống: {ex.Message}" });
             }
         }
+        /// <summary>
+        /// GET /api/users/{userId}/profile
+        /// Returns the profile of another user (read-only on client side).
+        /// </summary>
+        [HttpGet("{userId}/profile")]
+        public async Task<IActionResult> GetProfileByUserId([FromRoute] int userId)
+        {
+            try
+            {
+                if (userId <= 0) return BadRequest(new { message = "Invalid userId." });
+
+                var profile = await _userService.GetProfileAsync(userId);
+                if (profile == null) return NotFound(new { message = "User not found" });
+
+                return Ok(profile);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new
+                    {
+                        message = "An internal server error occurred.",
+                        details = ex.Message
+                    }
+                );
+            }
+        }
     }
 }
