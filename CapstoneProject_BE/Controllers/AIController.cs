@@ -64,6 +64,33 @@ public sealed class AIController : ControllerBase
         try
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var hasInlineProviderSettings = dto.ProviderSettings is not null;
+
+            AIProviderSettingsDto? effectiveProviderSettings = dto.ProviderSettings;
+            string? effectiveProvider = dto.Provider;
+
+            // If the client does not pass provider settings, use this user's saved BYOK settings.
+            if (!hasInlineProviderSettings && int.TryParse(userId, out var numericUserId))
+            {
+                var saved = await _userAiSettings.GetEffectiveProviderSettingsAsync(
+                    numericUserId,
+                    cancellationToken
+                );
+                if (saved is not null)
+                {
+                    effectiveProvider ??= saved.Provider;
+                    effectiveProviderSettings = new AIProviderSettingsDto
+                    {
+                        ApiKey = saved.ApiKey,
+                        Model = saved.Model,
+                        BaseUrl = saved.BaseUrl,
+                        ApiVersion = saved.ApiVersion,
+                        DeploymentName = saved.DeploymentName,
+                        TimeoutSeconds = saved.TimeoutSeconds,
+                        MaxRetries = saved.MaxRetries,
+                    };
+                }
+            }
 
             var request = new AIRequest
             {
@@ -83,18 +110,18 @@ public sealed class AIController : ControllerBase
                 MaxTokens = dto.MaxTokens ?? 1024,
                 UseCache = dto.UseCache ?? true,
                 UserId = userId,
-                Provider = dto.Provider,
-                ProviderSettings = dto.ProviderSettings is null
+                Provider = effectiveProvider,
+                ProviderSettings = effectiveProviderSettings is null
                     ? null
                     : new AIProviderRequestSettings
                     {
-                        ApiKey = dto.ProviderSettings.ApiKey,
-                        Model = dto.ProviderSettings.Model,
-                        BaseUrl = dto.ProviderSettings.BaseUrl,
-                        ApiVersion = dto.ProviderSettings.ApiVersion,
-                        DeploymentName = dto.ProviderSettings.DeploymentName,
-                        TimeoutSeconds = dto.ProviderSettings.TimeoutSeconds,
-                        MaxRetries = dto.ProviderSettings.MaxRetries,
+                        ApiKey = effectiveProviderSettings.ApiKey,
+                        Model = effectiveProviderSettings.Model,
+                        BaseUrl = effectiveProviderSettings.BaseUrl,
+                        ApiVersion = effectiveProviderSettings.ApiVersion,
+                        DeploymentName = effectiveProviderSettings.DeploymentName,
+                        TimeoutSeconds = effectiveProviderSettings.TimeoutSeconds,
+                        MaxRetries = effectiveProviderSettings.MaxRetries,
                     },
             };
 
@@ -259,7 +286,9 @@ public sealed class AIController : ControllerBase
                 502,
                 new
                 {
-                    message = "AI provider configuration error. Please contact an administrator.",
+                    message = string.IsNullOrWhiteSpace(ex.Message)
+                        ? "AI API key is invalid or missing. Update your key in AI Settings and try again."
+                        : ex.Message,
                     code = ex.Code.ToString(),
                 }
             ),
