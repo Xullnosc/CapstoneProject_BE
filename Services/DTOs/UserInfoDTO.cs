@@ -9,6 +9,7 @@ namespace Services.DTOs
         public string? Avatar { get; set; }
         public string? RoleName { get; set; }
         public string? Campus { get; set; }
+        public int CampusId { get; set; }
         public DateTime? LastLogin { get; set; }
         public bool HasTeam { get; set; }
         public int? PendingInvitationId { get; set; }

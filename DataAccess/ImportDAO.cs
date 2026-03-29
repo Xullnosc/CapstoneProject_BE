@@ -136,7 +136,12 @@ namespace DataAccess
                     whitelistMatch.StudentCode = importedItem.StudentCode;
                     whitelistMatch.FullName = importedItem.FullName;
                     whitelistMatch.RoleId = studentRoleId;
-                    whitelistMatch.Campus = importedItem.Campus;
+                    var campusRef = _context.Campuses.Local.FirstOrDefault(c => c.CampusId == importedItem.CampusId) 
+                                    ?? await _context.Campuses.FindAsync(importedItem.CampusId);
+                    string campusName = campusRef?.CampusName ?? "";
+
+                    whitelistMatch.CampusId = importedItem.CampusId.Value;
+                    whitelistMatch.Campus = campusName;
                     whitelistMatch.SemesterId = semesterId;
                     whitelistMatch.AddedDate = whitelistMatch.AddedDate ?? now;
 
@@ -158,7 +163,8 @@ namespace DataAccess
                     userMatch.Email = importedItem.Email;
                     userMatch.StudentCode = importedItem.StudentCode;
                     userMatch.FullName = importedItem.FullName;
-                    userMatch.Campus = importedItem.Campus;
+                    userMatch.CampusId = importedItem.CampusId.Value;
+                    userMatch.Campus = campusName;
                     userMatch.RoleId = studentRoleId;
                     userMatch.IsAuthorized = true;
 

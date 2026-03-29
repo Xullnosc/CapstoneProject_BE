@@ -11,6 +11,7 @@ namespace BusinessObjects.DTOs
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public string Status { get; set; } = "Upcoming";
+        public int CampusId { get; set; }
 
         // Include minimal team info or simplified list to avoid deep nesting
         // If the UI needs full team details, we can use a separate simplified DTO or stick to this if TeamDTO is already DTO-safe.
@@ -45,6 +46,7 @@ namespace BusinessObjects.DTOs
         public string? RoleName { get; set; }
         public string? Avatar { get; set; } // Added for UI
         public string? Campus { get; set; }
+        public int CampusId { get; set; }
         public string? StudentCode { get; set; }
         public bool IsReviewer { get; set; }
     }

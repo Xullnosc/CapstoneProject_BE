@@ -7,6 +7,7 @@ using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Repositories;
 using Services.Helpers;
+using BusinessObjects.Interfaces;
 
 namespace Services
 {
@@ -20,6 +21,7 @@ namespace Services
         private readonly IThesisRepository _thesisRepository;
         private readonly ISemesterService _semesterService;
         private readonly IWhitelistRepository _whitelistRepository;
+        private readonly ICampusContextService _campusContextService;
 
         public TeamService(
             ITeamRepository teamRepository, 
@@ -29,7 +31,8 @@ namespace Services
             ITeamMemberRepository teamMemberRepository,
             IThesisRepository thesisRepository,
             ISemesterService semesterService,
-            IWhitelistRepository whitelistRepository)
+            IWhitelistRepository whitelistRepository,
+            ICampusContextService campusContextService)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
@@ -39,6 +42,7 @@ namespace Services
             _thesisRepository = thesisRepository;
             _semesterService = semesterService;
             _whitelistRepository = whitelistRepository;
+            _campusContextService = campusContextService;
         }
 
         public async Task<TeamDTO> CreateTeamAsync(int leaderId, CreateTeamDTO createTeamDto)
@@ -70,9 +74,13 @@ namespace Services
             // 4. Generate Team Code
             string teamCode = await GenerateTeamCodeAsync(currentSemester.SemesterId, currentSemester.SemesterCode);
 
+            var campusId = _campusContextService.GetCurrentCampusId() 
+                ?? throw new InvalidOperationException("Yêu cầu Campus Context hợp lệ để tạo nhóm.");
+
             // 4. Create Team Entity
             var team = new Team
             {
+                CampusId = campusId,
                 TeamCode = teamCode,
                 TeamName = createTeamDto.TeamName,
                 Description = !string.IsNullOrEmpty(createTeamDto.Description) ? createTeamDto.Description : "A proactively created team for Capstone Project.",
@@ -400,9 +408,13 @@ namespace Services
                 _ => CampusConstants.TeamStatus.Insufficient
             };
 
+            var campusId = _campusContextService.GetCurrentCampusId() 
+                ?? throw new InvalidOperationException("Yêu cầu Campus Context hợp lệ. HOD hãy chọn Campus cụ thể.");
+
             // 8. Create Team
             var team = new Team
             {
+                CampusId = campusId,
                 TeamCode = teamCode,
                 TeamName = dto.TeamName,
                 Description = dto.Description ?? "Team created by HOD.",

@@ -165,6 +165,7 @@ public class AuthService : IAuthService
                         RoleId = roleId,
                         StudentCode = studentCode,
                         Campus = campus,
+                        CampusId = whitelistEntry?.CampusId,
                         IsAuthorized = isAuthorized,
                         LastLogin = DateTime.UtcNow,
                         CreatedAt = DateTime.UtcNow,
@@ -179,6 +180,11 @@ public class AuthService : IAuthService
                     user.RoleId = roleId;
                     user.StudentCode = studentCode;
                     user.Campus = campus;
+                    // Update CampusId if not already set (supports migration of existing users)
+                    if (user.CampusId == null && whitelistEntry?.CampusId != null)
+                    {
+                        user.CampusId = whitelistEntry.CampusId;
+                    }
                     user.IsAuthorized = isAuthorized;
                     user.LastLogin = DateTime.UtcNow;
 

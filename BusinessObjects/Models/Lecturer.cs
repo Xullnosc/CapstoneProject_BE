@@ -15,6 +15,10 @@ public partial class Lecturer
 
     public string? Campus { get; set; }
 
+    public int CampusId { get; set; }
+
+    public virtual Campus? CampusNavigation { get; set; }
+
     public bool IsActive { get; set; }
 
     public bool IsReviewer { get; set; }

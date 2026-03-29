@@ -2,6 +2,7 @@ using System.Text;
 using BusinessObjects.Models;
 using CapstoneProject_BE.Extensions;
 using Services.Extensions;
+using BusinessObjects.Interfaces;
 using DataAccess;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -108,8 +109,12 @@ if (!string.IsNullOrEmpty(allowedOrigins))
     });
 }
 
+// Add HttpContextAccessor for reading JWT claims in services
+builder.Services.AddHttpContextAccessor();
+
 //Services (Services Layer)
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ICampusContextService, CampusContextService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddScoped<ISemesterService, SemesterService>();
@@ -132,6 +137,7 @@ builder.Services.AddScoped<ISystemSettingService, SystemSettingService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ISystemParameterService, SystemParameterService>();
 builder.Services.AddScoped<ISystemErrorLogService, SystemErrorLogService>();
+builder.Services.AddScoped<ICampusService, CampusService>();
 
 // AI Services (BYOK/BYOA — keys configured via environment variables or the admin settings UI)
 builder.Services.AddAIServices(builder.Configuration, aiOverridePath);
@@ -159,6 +165,7 @@ builder.Services.AddScoped<ISystemSettingDAO, SystemSettingDAO>();
 builder.Services.AddScoped<IDashboardDAO, DashboardDAO>();
 builder.Services.AddScoped<ISystemParameterDAO, SystemParameterDAO>();
 builder.Services.AddScoped<ISystemErrorLogDAO, SystemErrorLogDAO>();
+builder.Services.AddScoped<CampusDAO>();
 
 //Repositories (Repositories Layer)
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -183,6 +190,7 @@ builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<ISystemParameterRepository, SystemParameterRepository>();
 builder.Services.AddScoped<ISystemErrorLogRepository, SystemErrorLogRepository>();
+builder.Services.AddScoped<ICampusRepository, CampusRepository>();
 
 //Middleware
 // AutoMapper

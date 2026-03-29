@@ -38,6 +38,10 @@ public partial class Thesis
 
     public bool IsLocked { get; set; }
 
+    public int CampusId { get; set; }
+
+    public virtual Campus Campus { get; set; } = null!;
+
     public virtual User User { get; set; } = null!;
 
     public virtual Semester? Semester { get; set; }

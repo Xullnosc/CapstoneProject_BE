@@ -113,6 +113,7 @@ namespace Services.Mappings
                 )
                 .ForMember(dest => dest.StudentCode, opt => opt.MapFrom(src => src.StudentCode))
                 .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
+                .ForMember(dest => dest.CampusId, opt => opt.MapFrom(src => src.CampusId))
                 .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.FullName));
 
             // Team -> TeamSimpleDTO (Minimal info for lists)
@@ -135,7 +136,8 @@ namespace Services.Mappings
                 .ForMember(
                     dest => dest.Whitelists,
                     opt => opt.MapFrom(src => src.Whitelists ?? new List<Whitelist>())
-                );
+                )
+                .ForMember(dest => dest.CampusId, opt => opt.MapFrom(src => src.CampusId));
 
             // Reverse map for Create/Update
             CreateMap<SemesterDTO, Semester>();

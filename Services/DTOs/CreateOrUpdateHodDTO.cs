@@ -19,6 +19,9 @@ public class CreateOrUpdateHodDTO
     [JsonPropertyName("password")]
     public string Password { get; set; } = null!;
 
+    [JsonPropertyName("campusId")]
+    public int CampusId { get; set; }
+
     [JsonPropertyName("campus")]
     public string? Campus { get; set; }
 }
