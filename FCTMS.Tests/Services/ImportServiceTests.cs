@@ -34,6 +34,7 @@ namespace FCTMS.Tests.Services
             _mockCampusContextService = new Mock<ICampusContextService>();
             _mockCampusContextService.Setup(c => c.GetCurrentCampusId()).Returns(1);
             _mockRedisService.Setup(x => x.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            _mockRedisService.Setup(x => x.RemoveByPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         }
 
         private ImportService CreateService(FctmsContext context)
@@ -119,8 +120,7 @@ namespace FCTMS.Tests.Services
             context.Whitelists.Single().SemesterId.Should().Be(1);
             context.Whitelists.Single().CampusId.Should().Be(1);
             context.Whitelists.Single().Campus.Should().Be(CampusConstants.HoaLac);
-            _mockRedisService.Verify(x => x.DeleteValueAsync("fctms:semester:all", It.IsAny<CancellationToken>()), Times.Once);
-            _mockRedisService.Verify(x => x.DeleteValueAsync("fctms:semester:id:1", It.IsAny<CancellationToken>()), Times.Once);
+            _mockRedisService.Verify(x => x.RemoveByPrefixAsync("fctms:semester:", It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -138,7 +138,7 @@ namespace FCTMS.Tests.Services
 
             await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
 
-            _mockRedisService.Verify(x => x.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+            _mockRedisService.Verify(x => x.RemoveByPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Fact]
