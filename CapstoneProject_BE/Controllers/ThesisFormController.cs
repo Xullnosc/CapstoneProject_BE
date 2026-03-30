@@ -45,6 +45,10 @@ namespace CapstoneProject_BE.Controllers
             {
                 return BadRequest(new { Message = ex.Message });
             }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
             catch (Exception ex)
             {
                 var errorMessage = ex.InnerException?.Message ?? ex.Message;

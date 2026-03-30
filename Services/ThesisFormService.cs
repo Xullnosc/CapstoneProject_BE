@@ -47,6 +47,17 @@ namespace Services
                 throw new UnauthorizedAccessException("Only the Head of Department can upload a Thesis Form.");
             }
 
+            var semester = await _semesterRepository.GetSemesterByIdAsync(req.SemesterId);
+            if (semester == null)
+            {
+                throw new ArgumentException("Semester not found.");
+            }
+
+            if (semester.Status == "Ended")
+            {
+                throw new InvalidOperationException("Cannot upload thesis form for an ended semester.");
+            }
+
             if (req.File == null)
             {
                 throw new ArgumentException("No file provided.");
