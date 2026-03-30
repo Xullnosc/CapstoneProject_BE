@@ -4,6 +4,7 @@ using BusinessObjects;
 using AutoMapper;
 using Repositories;
 using Microsoft.Extensions.Configuration;
+using BusinessObjects.Interfaces;
 
 
 namespace Services
@@ -17,6 +18,7 @@ namespace Services
         private readonly IConfiguration _configuration;
         private readonly ILecturerRepository _lecturerRepository;
         private readonly IWhitelistRepository _whitelistRepository;
+        private readonly ICampusContextService _campusContextService;
         private readonly System.Threading.SemaphoreSlim _semaphore = new System.Threading.SemaphoreSlim(1, 1);
 
         public SemesterService(
@@ -26,7 +28,8 @@ namespace Services
             IRedisService redisService,
             IConfiguration configuration,
             ILecturerRepository lecturerRepository,
-            IWhitelistRepository whitelistRepository)
+            IWhitelistRepository whitelistRepository,
+            ICampusContextService campusContextService)
         {
             _semesterRepository = semesterRepository;
             _mapper = mapper;
@@ -35,6 +38,7 @@ namespace Services
             _configuration = configuration;
             _lecturerRepository = lecturerRepository;
             _whitelistRepository = whitelistRepository;
+            _campusContextService = campusContextService;
         }
 
         /// <summary>
@@ -44,7 +48,8 @@ namespace Services
         /// <returns>List of semester DTOs with counts filtered by Student role</returns>
         public async Task<List<SemesterDTO>> GetAllSemestersAsync()
         {
-            const string cacheKey = "fctms:semester:all";
+            var campusId = _campusContextService.GetCurrentCampusId()?.ToString() ?? "global";
+            string cacheKey = $"fctms:semester:all:{campusId}";
             var cached = await _redisService.GetObjectAsync<List<SemesterDTO>>(cacheKey);
             if (cached != null) return cached;
 
@@ -99,7 +104,8 @@ namespace Services
 
         public async Task<SemesterDTO?> GetSemesterByIdAsync(int id)
         {
-            string cacheKey = $"fctms:semester:id:{id}";
+            var campusId = _campusContextService.GetCurrentCampusId()?.ToString() ?? "global";
+            string cacheKey = $"fctms:semester:id:{id}:{campusId}";
             var cached = await _redisService.GetObjectAsync<SemesterDTO>(cacheKey);
             if (cached != null) return cached;
 
@@ -189,7 +195,11 @@ namespace Services
                 throw new System.InvalidOperationException($"Semester code '{semesterCreateDTO.SemesterCode}' already exists.");
             }
 
+            var campusId = _campusContextService.GetCurrentCampusId() 
+                ?? throw new System.InvalidOperationException("Hành động này yêu cầu Campus Context hợp lệ. Super Admin phải chọn Campus cụ thể.");
+
             var semester = _mapper.Map<Semester>(semesterCreateDTO);
+            semester.CampusId = campusId;
             // Force Status to Upcoming. Must be started manually.
             semester.Status = "Upcoming";
             var createdSemester = await _semesterRepository.CreateSemesterAsync(semester);
@@ -445,18 +455,9 @@ namespace Services
 
         public async Task InvalidateSemesterCacheAsync(int? id = null)
         {
-            await _redisService.DeleteValueAsync("fctms:semester:all");
-            if (id.HasValue)
-            {
-                await _redisService.DeleteValueAsync($"fctms:semester:id:{id.Value}");
-            }
-            else
-            {
-                // If no specific ID, we might need to invalidate all semester detail caches
-                // but usually after Create, only "all" needs invalidation.
-                // However, following the requirement for prefix based invalidation:
-                await _redisService.RemoveByPrefixAsync("fctms:semester:");
-            }
+            // Clear all semester-related caches (all campuses)
+            // This is safer and ensures no stale data remains after a structural change.
+            await _redisService.RemoveByPrefixAsync("fctms:semester:");
         }
 
         private async Task PopulateWhitelistsAvatarsAndReviewersAsync(List<WhitelistDTO> whitelists)
@@ -521,7 +522,14 @@ namespace Services
                 }
 
                 // Map Campus Code to Name
-                wl.Campus = CampusConstants.MapCodeToFullName(wl.Campus);
+                if (string.IsNullOrWhiteSpace(wl.Campus) && wl.CampusId > 0)
+                {
+                    wl.Campus = CampusConstants.MapIdToFullName(wl.CampusId);
+                }
+                else
+                {
+                    wl.Campus = CampusConstants.MapCodeToFullName(wl.Campus);
+                }
             }
         }
     }

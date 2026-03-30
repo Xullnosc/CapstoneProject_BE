@@ -9,6 +9,7 @@ using Moq;
 using Repositories;
 using Services;
 using Services.Helpers;
+using BusinessObjects.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,19 +24,23 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ISemesterRepository> _mockSemesterRepository;
         private readonly Mock<ILogger<ImportService>> _mockLogger;
         private readonly Mock<IRedisService> _mockRedisService;
+        private readonly Mock<ICampusContextService> _mockCampusContextService;
 
         public ImportServiceTests()
         {
             _mockSemesterRepository = new Mock<ISemesterRepository>();
             _mockLogger = new Mock<ILogger<ImportService>>();
             _mockRedisService = new Mock<IRedisService>();
+            _mockCampusContextService = new Mock<ICampusContextService>();
+            _mockCampusContextService.Setup(c => c.GetCurrentCampusId()).Returns(1);
             _mockRedisService.Setup(x => x.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            _mockRedisService.Setup(x => x.RemoveByPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
         }
 
         private ImportService CreateService(FctmsContext context)
         {
             IImportRepository importRepository = new ImportRepository(new ImportDAO(context));
-            return new ImportService(importRepository, _mockSemesterRepository.Object, _mockLogger.Object, _mockRedisService.Object);
+            return new ImportService(importRepository, _mockSemesterRepository.Object, _mockLogger.Object, _mockRedisService.Object, _mockCampusContextService.Object);
         }
 
         private static FctmsContext CreateContext()
@@ -49,12 +54,24 @@ namespace FCTMS.Tests.Services
             return context;
         }
 
+        private static void SeedCampuses(FctmsContext context)
+        {
+            if (!context.Campuses.Any())
+            {
+                context.Campuses.Add(new Campus { CampusId = 1, CampusCode = "HL", CampusName = CampusConstants.HoaLac });
+                context.Campuses.Add(new Campus { CampusId = 2, CampusCode = "DN", CampusName = CampusConstants.DaNang });
+                context.SaveChanges();
+            }
+        }
+
         private static void SeedUploader(FctmsContext context, string email = "hod@example.com", string campus = CampusConstants.HoaLac)
         {
+            SeedCampuses(context);
             context.Users.Add(new User
             {
                 Email = email,
                 Campus = campus,
+                CampusId = 1,
                 RoleId = 1,
                 IsAuthorized = true,
                 CreatedAt = DateTime.UtcNow,
@@ -99,11 +116,11 @@ namespace FCTMS.Tests.Services
             await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
 
             context.Whitelists.Should().ContainSingle();
-            context.Users.Should().ContainSingle(user => user.Email == "student@example.com" && user.RoleId == 3 && user.Campus == CampusConstants.HoaLac);
+            context.Users.Should().ContainSingle(user => user.Email == "student@example.com" && user.RoleId == 3 && user.CampusId == 1 && user.Campus == CampusConstants.HoaLac);
             context.Whitelists.Single().SemesterId.Should().Be(1);
+            context.Whitelists.Single().CampusId.Should().Be(1);
             context.Whitelists.Single().Campus.Should().Be(CampusConstants.HoaLac);
-            _mockRedisService.Verify(x => x.DeleteValueAsync("fctms:semester:all", It.IsAny<CancellationToken>()), Times.Once);
-            _mockRedisService.Verify(x => x.DeleteValueAsync("fctms:semester:id:1", It.IsAny<CancellationToken>()), Times.Once);
+            _mockRedisService.Verify(x => x.RemoveByPrefixAsync("fctms:semester:", It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -121,7 +138,7 @@ namespace FCTMS.Tests.Services
 
             await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
 
-            _mockRedisService.Verify(x => x.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+            _mockRedisService.Verify(x => x.RemoveByPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Fact]
@@ -180,7 +197,7 @@ namespace FCTMS.Tests.Services
                 FullName = "Old Name",
                 StudentCode = "OLD001",
                 RoleId = 3,
-                Campus = CampusConstants.DaNang,
+                CampusId = 2,
                 IsAuthorized = true,
                 CreatedAt = DateTime.UtcNow,
             });
@@ -190,7 +207,7 @@ namespace FCTMS.Tests.Services
                 FullName = "Old Name",
                 StudentCode = "OLD001",
                 RoleId = 3,
-                Campus = CampusConstants.DaNang,
+                CampusId = 2,
                 SemesterId = 1,
                 AddedDate = DateTime.UtcNow,
             });

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
+using BusinessObjects;
 using BusinessObjects.Models;
 using Microsoft.IdentityModel.Tokens;
 
@@ -24,6 +25,12 @@ namespace Services.Helpers
             if (user.Role != null && !string.IsNullOrEmpty(user.Role.RoleName))
             {
                 claims.Add(new Claim("role", user.Role.RoleName));
+
+                // Add campus_id if user is NOT an Admin or Super Admin
+                if (user.Role.RoleName != CampusConstants.Roles.Admin && user.CampusId > 0)
+                {
+                    claims.Add(new Claim("campus_id", user.CampusId.ToString()));
+                }
             }
             
             if (isReviewer)

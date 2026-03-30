@@ -4,6 +4,7 @@ using Moq;
 using Repositories;
 using Services;
 using Services.Helpers;
+using BusinessObjects.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -23,6 +24,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<IThesisRepository> _mockThesisRepository;
         private readonly Mock<ISemesterService> _mockSemesterService;
         private readonly Mock<IWhitelistRepository> _mockWhitelistRepository;
+        private readonly Mock<ICampusContextService> _mockCampusContextService;
         private readonly TeamService _teamService;
 
         public TeamServiceTests()
@@ -35,6 +37,8 @@ namespace FCTMS.Tests.Services
             _mockThesisRepository = new Mock<IThesisRepository>();
             _mockSemesterService = new Mock<ISemesterService>();
             _mockWhitelistRepository = new Mock<IWhitelistRepository>();
+            _mockCampusContextService = new Mock<ICampusContextService>();
+            _mockCampusContextService.Setup(c => c.GetCurrentCampusId()).Returns(1);
             _teamService = new TeamService(
                 _mockTeamRepository.Object,
                 _mockSemesterRepository.Object,
@@ -43,7 +47,8 @@ namespace FCTMS.Tests.Services
                 _mockTeamMemberRepository.Object,
                 _mockThesisRepository.Object,
                 _mockSemesterService.Object,
-                _mockWhitelistRepository.Object
+                _mockWhitelistRepository.Object,
+                _mockCampusContextService.Object
             );
         }
 

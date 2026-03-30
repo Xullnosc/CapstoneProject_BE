@@ -87,6 +87,11 @@ namespace DataAccess
                 .FirstOrDefaultAsync(s => s.StartDate <= now && s.EndDate >= now);
         }
 
+        /// <summary>
+        /// Gets a semester by code within the current campus context.
+        /// NOTE: This is automatically scoped by the EF Core Global Query Filter on Semesters (CampusId).
+        /// Two campuses can therefore have the same SemesterCode without collision.
+        /// </summary>
         public async Task<Semester?> GetByCodeAsync(string code)
         {
             return await _context

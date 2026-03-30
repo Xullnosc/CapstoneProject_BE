@@ -19,6 +19,10 @@ public partial class Whitelist
 
     public string? Campus { get; set; }
 
+    public int CampusId { get; set; }
+
+    public virtual Campus CampusNavigation { get; set; } = null!;
+
     public DateTime? AddedDate { get; set; }
 
     public int? SemesterId { get; set; }

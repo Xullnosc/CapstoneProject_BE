@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BusinessObjects.Interfaces;
 
 namespace Services
 {
@@ -16,19 +17,22 @@ namespace Services
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly ISemesterRepository _semesterRepository;
         private readonly IRedisService _redisService;
+        private readonly ICampusContextService _campusContextService;
 
         public LecturerService(
             ILecturerRepository lecturerRepository,
             IUserRepository userRepository,
             IWhitelistRepository whitelistRepository,
             ISemesterRepository semesterRepository,
-            IRedisService redisService)
+            IRedisService redisService,
+            ICampusContextService campusContextService)
         {
             _lecturerRepository = lecturerRepository;
             _userRepository = userRepository;
             _whitelistRepository = whitelistRepository;
             _semesterRepository = semesterRepository;
             _redisService = redisService;
+            _campusContextService = campusContextService;
         }
 
         public async Task<IEnumerable<Lecturer>> GetAllLecturersAsync()
@@ -149,7 +153,23 @@ namespace Services
         {
             // Normalize data
             if (lecturer.Email != null) lecturer.Email = lecturer.Email.Trim();
-            lecturer.Campus = CampusConstants.MapCodeToFullName(lecturer.Campus);
+
+            // Security check & support manual CampusId
+            var contextCampusId = _campusContextService.GetCurrentCampusId();
+            if (contextCampusId != null)
+            {
+                // If requester has a campus context (HOD), force it
+                lecturer.CampusId = contextCampusId.Value;
+            }
+            else if (lecturer.CampusId <= 0)
+            {
+                // If requester is Super Admin and didn't provide CampusId, throw
+                throw new InvalidOperationException("Super Admin phải cung cấp CampusId hợp lệ.");
+            }
+
+            // Synchronize legacy Campus string
+            lecturer.Campus = CampusConstants.MapIdToFullName(lecturer.CampusId);
+
             lecturer.CreatedAt = DateTime.UtcNow;
             lecturer.UpdatedAt = DateTime.UtcNow;
             
@@ -167,18 +187,26 @@ namespace Services
 
             // Normalize data
             if (lecturer.Email != null) lecturer.Email = lecturer.Email.Trim();
-            string? mappedCampus = CampusConstants.MapCodeToFullName(lecturer.Campus);
+            
+            // If campusId changed, sync the name
+            if (lecturer.CampusId > 0 && existing.CampusId != lecturer.CampusId)
+            {
+                existing.CampusId = lecturer.CampusId;
+                existing.Campus = CampusConstants.MapIdToFullName(lecturer.CampusId);
+            }
+            else if (!string.IsNullOrEmpty(lecturer.Campus))
+            {
+                existing.Campus = CampusConstants.MapCodeToFullName(lecturer.Campus);
+            }
 
             bool statusChanged = existing.IsActive != lecturer.IsActive;
             bool infoChanged = (existing.Email != null && !existing.Email.Equals(lecturer.Email, StringComparison.OrdinalIgnoreCase)) || 
-                               (existing.FullName != null && !existing.FullName.Equals(lecturer.FullName, StringComparison.OrdinalIgnoreCase)) || 
-                               existing.Campus != mappedCampus;
+                               (existing.FullName != null && !existing.FullName.Equals(lecturer.FullName, StringComparison.OrdinalIgnoreCase));
 
             // Update existing tracked entity
             existing.Email = lecturer.Email;
             existing.FullName = lecturer.FullName;
             existing.Avatar = lecturer.Avatar;
-            existing.Campus = mappedCampus;
             existing.IsActive = lecturer.IsActive;
             existing.UpdatedAt = DateTime.UtcNow;
 
@@ -241,7 +269,8 @@ namespace Services
                         Email = lecturer.Email,
                         FullName = lecturer.FullName,
                         Avatar = lecturer.Avatar,
-                        Campus = mappedCampus,
+                        Campus = CampusConstants.MapIdToFullName(lecturer.CampusId),
+                        CampusId = lecturer.CampusId,
                         RoleId = lecturerRole.RoleId,
                         SemesterId = null, // Global lecturer whitelist
                         AddedDate = DateTime.UtcNow
@@ -250,13 +279,16 @@ namespace Services
                 }
                 else
                 {
+                    var mappedFullName = CampusConstants.MapIdToFullName(lecturer.CampusId);
                     if (existingEntry.FullName != lecturer.FullName || 
                         existingEntry.Avatar != lecturer.Avatar || 
-                        existingEntry.Campus != mappedCampus)
+                        existingEntry.CampusId != lecturer.CampusId ||
+                        existingEntry.Campus != mappedFullName)
                     {
                         existingEntry.FullName = lecturer.FullName;
                         existingEntry.Avatar = lecturer.Avatar;
-                        existingEntry.Campus = mappedCampus;
+                        existingEntry.CampusId = lecturer.CampusId;
+                        existingEntry.Campus = mappedFullName;
                         await _whitelistRepository.UpdateAsync(existingEntry);
                         changed = true;
                     }

@@ -1,13 +1,21 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
+using BusinessObjects.Interfaces;
 
 namespace BusinessObjects.Models;
 
 public partial class FctmsContext : DbContext
 {
-    public FctmsContext(DbContextOptions<FctmsContext> options)
-        : base(options) { }
+    private readonly ICampusContextService? _campusContextService;
+
+    public FctmsContext(DbContextOptions<FctmsContext> options, ICampusContextService? campusContextService = null)
+        : base(options)
+    {
+        _campusContextService = campusContextService;
+    }
+
+    public int? CurrentCampusId => _campusContextService?.GetCurrentCampusId();
 
     public virtual DbSet<FlywaySchemaHistory> FlywaySchemaHistories { get; set; }
 
@@ -22,6 +30,8 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<Teammember> Teammembers { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<Campus> Campuses { get; set; }
 
     public virtual DbSet<Whitelist> Whitelists { get; set; }
 
@@ -59,6 +69,18 @@ public partial class FctmsContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("utf8mb4_0900_ai_ci").HasCharSet("utf8mb4");
+
+        modelBuilder.Entity<Campus>(entity =>
+        {
+            entity.HasKey(e => e.CampusId).HasName("PRIMARY");
+            entity.ToTable("campuses");
+            entity.HasIndex(e => e.CampusCode, "UQ_Campuses_CampusCode").IsUnique();
+            entity.Property(e => e.CampusCode).HasMaxLength(20);
+            entity.Property(e => e.CampusName).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+        });
 
         modelBuilder.Entity<ThesisForm>(entity =>
         {
@@ -178,13 +200,22 @@ public partial class FctmsContext : DbContext
 
             entity.ToTable("semesters");
 
-            entity.HasIndex(e => e.SemesterCode, "UQ_Semesters_SemesterCode").IsUnique();
+            entity.HasIndex(e => new { e.SemesterCode, e.CampusId }, "UQ_Semesters_SemesterCode_Campus").IsUnique();
 
             entity.Property(e => e.SemesterId).HasColumnName("SemesterID");
             entity.Property(e => e.EndDate).HasColumnType("datetime");
             entity.Property(e => e.SemesterCode).HasMaxLength(50);
             entity.Property(e => e.SemesterName).HasMaxLength(50);
             entity.Property(e => e.StartDate).HasColumnType("datetime");
+
+            entity
+                .HasOne(d => d.Campus)
+                .WithMany(p => p.Semesters)
+                .HasForeignKey(d => d.CampusId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_Semesters_Campus");
+
+            entity.HasQueryFilter(e => CurrentCampusId == null || e.CampusId == CurrentCampusId);
         });
 
         modelBuilder.Entity<Team>(entity =>
@@ -193,7 +224,7 @@ public partial class FctmsContext : DbContext
 
             entity.ToTable("teams");
 
-            entity.HasIndex(e => e.TeamCode, "TeamCode").IsUnique();
+            entity.HasIndex(e => new { e.TeamCode, e.CampusId }, "UQ_Teams_TeamCode_Campus").IsUnique();
 
             entity.HasIndex(e => e.LeaderId, "idx_leader");
 
@@ -247,6 +278,15 @@ public partial class FctmsContext : DbContext
                 .WithMany()
                 .HasForeignKey(d => d.MentorId2)
                 .HasConstraintName("FK_Teams_Users_MentorId2");
+
+            entity
+                .HasOne(d => d.Campus)
+                .WithMany(p => p.Teams)
+                .HasForeignKey(d => d.CampusId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_Teams_Campus");
+
+            entity.HasQueryFilter(e => CurrentCampusId == null || e.CampusId == CurrentCampusId);
         });
 
         modelBuilder.Entity<ThesisReviewEvent>(entity =>
@@ -546,6 +586,15 @@ public partial class FctmsContext : DbContext
                 .WithOne(p => p.User)
                 .HasForeignKey<AccountDetail>(d => d.UserId)
                 .HasConstraintName("FK_AccountDetail_Users");
+
+            entity
+                .HasOne(d => d.CampusNavigation)
+                .WithMany(p => p.Users)
+                .HasForeignKey(d => d.CampusId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_Users_Campus");
+
+            entity.HasQueryFilter(e => CurrentCampusId == null || e.CampusId == CurrentCampusId);
         });
 
         modelBuilder.Entity<AccountDetail>(entity =>
@@ -604,6 +653,15 @@ public partial class FctmsContext : DbContext
                 .WithMany(p => p.Whitelists)
                 .HasForeignKey(d => d.SemesterId)
                 .HasConstraintName("FK_Whitelist_Semester");
+
+            entity
+                .HasOne(d => d.CampusNavigation)
+                .WithMany(p => p.Whitelists)
+                .HasForeignKey(d => d.CampusId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_Whitelist_Campus");
+
+            entity.HasQueryFilter(e => CurrentCampusId == null || e.CampusId == CurrentCampusId);
         });
 
         modelBuilder.Entity<Thesis>(entity =>
@@ -669,6 +727,15 @@ public partial class FctmsContext : DbContext
                 .WithMany()
                 .HasForeignKey(d => d.MentorId2)
                 .HasConstraintName("FK_Thesis_Lecturers_MentorId2");
+
+            entity
+                .HasOne(d => d.Campus)
+                .WithMany(p => p.Theses)
+                .HasForeignKey(d => d.CampusId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_Thesis_Campus");
+
+            entity.HasQueryFilter(e => CurrentCampusId == null || e.CampusId == CurrentCampusId);
         });
 
         modelBuilder.Entity<ThesisHistory>(entity =>
@@ -745,6 +812,15 @@ public partial class FctmsContext : DbContext
                 .ValueGeneratedOnAddOrUpdate()
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
+
+            entity
+                .HasOne(d => d.CampusNavigation)
+                .WithMany(p => p.Lecturers)
+                .HasForeignKey(d => d.CampusId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_Lecturers_Campus");
+
+            entity.HasQueryFilter(e => CurrentCampusId == null || e.CampusId == CurrentCampusId);
         });
 
         modelBuilder.Entity<SystemUserCredential>(entity =>

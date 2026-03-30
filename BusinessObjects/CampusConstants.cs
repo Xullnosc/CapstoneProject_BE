@@ -38,6 +38,19 @@ namespace BusinessObjects
             };
         }
 
+        public static string MapIdToFullName(int campusId)
+        {
+            return campusId switch
+            {
+                1 => HoaLac,
+                2 => DaNang,
+                3 => HoChiMinh,
+                4 => CanTho,
+                5 => QuyNhon,
+                _ => "Unknown"
+            };
+        }
+
         public static class Roles
         {
             public const string HOD = "HOD";

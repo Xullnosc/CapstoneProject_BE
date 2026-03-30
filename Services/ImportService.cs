@@ -7,6 +7,7 @@ using BusinessObjects.Models;
 using Microsoft.Extensions.Logging;
 using Repositories;
 using Services.Helpers;
+using BusinessObjects.Interfaces;
 
 namespace Services
 {
@@ -16,17 +17,20 @@ namespace Services
         private readonly ISemesterRepository _semesterRepository;
         private readonly ILogger<ImportService> _logger;
         private readonly IRedisService _redisService;
+        private readonly ICampusContextService _campusContextService;
 
         public ImportService(
             IImportRepository importRepository,
             ISemesterRepository semesterRepository,
             ILogger<ImportService> logger,
-            IRedisService redisService)
+            IRedisService redisService,
+            ICampusContextService campusContextService)
         {
             _importRepository = importRepository;
             _semesterRepository = semesterRepository;
             _logger = logger;
             _redisService = redisService;
+            _campusContextService = campusContextService;
         }
 
         public async Task<ImportResult<WhitelistImportDTO>> ImportWhitelistFromExcel(
@@ -138,7 +142,9 @@ namespace Services
         {
             if (importResult == null) throw new ArgumentNullException(nameof(importResult));
 
-            var uploaderCampus = await ResolveUploaderCampusAsync(uploaderEmail);
+            var campusId = _campusContextService.GetCurrentCampusId() 
+                ?? throw new InvalidOperationException("Yêu cầu Campus Context hợp lệ để import danh sách sinh viên. Nếu là Super Admin, hãy sử dụng tính năng chỉ định Campus.");
+
             int studentRoleId = await _semesterRepository.GetStudentRoleIdAsync();
 
             var items = importResult.Items ?? new List<WhitelistImportDTO>();
@@ -172,7 +178,8 @@ namespace Services
                 item.StudentCode = item.StudentCode?.Trim();
                 item.FullName = item.FullName?.Trim();
                 item.SemesterCode = item.SemesterCode?.Trim();
-                item.Campus = uploaderCampus;
+                item.CampusId = campusId;
+                item.Campus = CampusConstants.MapIdToFullName(campusId);
                 item.RoleId = studentRoleId;
                 item.Role = CampusConstants.Roles.Student;
                 item.IsMarked = false;
@@ -229,23 +236,6 @@ namespace Services
             importResult.Items = validItems;
             await MarkBlockingConflictsAsync(importResult.Items, studentRoleId);
             return importResult;
-        }
-
-        private async Task<string> ResolveUploaderCampusAsync(string uploaderEmail)
-        {
-            var normalizedUploaderEmail = NormalizeEmail(uploaderEmail);
-            if (string.IsNullOrWhiteSpace(normalizedUploaderEmail))
-            {
-                throw new UnauthorizedAccessException("Unable to resolve uploader identity.");
-            }
-
-            var uploaderCampus = await _importRepository.GetUserCampusByEmailAsync(normalizedUploaderEmail);
-            if (string.IsNullOrWhiteSpace(uploaderCampus))
-            {
-                throw new UnauthorizedAccessException("Uploader does not exist in the system or has no campus configured.");
-            }
-
-            return uploaderCampus.Trim();
         }
 
         private async Task MarkBlockingConflictsAsync(List<WhitelistImportDTO> items, int studentRoleId)
@@ -315,16 +305,9 @@ namespace Services
 
         private async Task InvalidateSemesterCacheAsync(List<int> semesterIds)
         {
-            // Invalidate the "all semesters" cache since whitelist counts changed
-            await _redisService.DeleteValueAsync("fctms:semester:all");
-
-            // Also invalidate cache for specific semesters if they exist
-            foreach (var semesterId in semesterIds)
-            {
-                await _redisService.DeleteValueAsync($"fctms:semester:id:{semesterId}");
-            }
-
-            _logger.LogInformation("Invalidated semester cache for {count} semesters", semesterIds.Count);
+            // Clear all semester-related caches (all campuses)
+            await _redisService.RemoveByPrefixAsync("fctms:semester:");
+            _logger.LogInformation("Invalidated all semester caches after whitelist import");
         }
     }
 }
