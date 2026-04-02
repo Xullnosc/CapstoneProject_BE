@@ -17,5 +17,13 @@ namespace Repositories
         {
             return await _dashboardDAO.GetDashboardStatsAsync();
         }
+
+        public async Task<LecturerDashboardStatsDTO> GetLecturerDashboardStatsAsync(
+            int userId,
+            bool includeReviewerSection
+        )
+        {
+            return await _dashboardDAO.GetLecturerDashboardStatsAsync(userId, includeReviewerSection);
+        }
     }
 }
