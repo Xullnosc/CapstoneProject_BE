@@ -134,6 +134,27 @@ namespace DataAccess
             return await query.OrderByDescending(t => t.UpdateDate).ToListAsync();
         }
 
+        public async Task<IEnumerable<Thesis>> GetThesesForEvaluationExportAsync(
+            int? semesterId = null
+        )
+        {
+            var query = _context
+                .Theses.AsNoTracking()
+                .Include(t => t.Team)
+                    .ThenInclude(team => team.Teammembers)
+                        .ThenInclude(teamMember => teamMember.Student)
+                .Include(t => t.Mentor1)
+                .Include(t => t.Mentor2)
+                .Where(t => t.TeamId.HasValue && t.Team != null);
+
+            if (semesterId.HasValue)
+            {
+                query = query.Where(t => t.SemesterId == semesterId.Value);
+            }
+
+            return await query.OrderBy(t => t.Team!.TeamCode).ThenBy(t => t.ThesisId).ToListAsync();
+        }
+
         public async Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id)
         {
             if (string.IsNullOrEmpty(id))

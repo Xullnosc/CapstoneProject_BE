@@ -1,7 +1,7 @@
-using BusinessObjects.Models;
-using BusinessObjects.DTOs;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using BusinessObjects.DTOs;
+using BusinessObjects.Models;
 
 namespace Repositories
 {
@@ -29,7 +29,11 @@ namespace Repositories
             return await _lecturerDAO.GetByEmailAsync(email);
         }
 
-        public async Task<PagedResult<Lecturer>> GetByCampusAsync(string campus, int pageIndex, int pageSize)
+        public async Task<PagedResult<Lecturer>> GetByCampusAsync(
+            string campus,
+            int pageIndex,
+            int pageSize
+        )
         {
             return await _lecturerDAO.GetByCampusAsync(campus, pageIndex, pageSize);
         }
@@ -37,6 +41,11 @@ namespace Repositories
         public async Task<IEnumerable<Lecturer>> GetActiveLecturersAsync()
         {
             return await _lecturerDAO.GetActiveLecturersAsync();
+        }
+
+        public async Task<IEnumerable<Lecturer>> GetReviewersAsync()
+        {
+            return await _lecturerDAO.GetReviewersAsync();
         }
 
         public async Task AddAsync(Lecturer lecturer)
@@ -53,7 +62,6 @@ namespace Repositories
         {
             await _lecturerDAO.DeleteAsync(lecturer);
         }
-
 
         public async Task<IEnumerable<Lecturer>> SearchAsync(string term)
         {

@@ -1,7 +1,7 @@
-using BusinessObjects.Models;
-using DataAccess;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using BusinessObjects.Models;
+using DataAccess;
 
 namespace Repositories
 {
@@ -14,34 +14,59 @@ namespace Repositories
             _thesisDAO = thesisDAO;
         }
 
-        public Task<Thesis> CreateThesisAsync(Thesis thesis) => _thesisDAO.CreateThesisAsync(thesis);
+        public Task<Thesis> CreateThesisAsync(Thesis thesis) =>
+            _thesisDAO.CreateThesisAsync(thesis);
 
         public Task<IEnumerable<Thesis>> GetAllThesesAsync() => _thesisDAO.GetAllThesesAsync();
 
         public Task<Thesis?> GetThesisByIdAsync(string id) => _thesisDAO.GetThesisByIdAsync(id);
 
-        public Task<IEnumerable<Thesis>> GetThesesByUserIdAsync(int userId) => _thesisDAO.GetThesesByUserIdAsync(userId);
+        public Task<IEnumerable<Thesis>> GetThesesByUserIdAsync(int userId) =>
+            _thesisDAO.GetThesesByUserIdAsync(userId);
 
         public Task UpdateThesisAsync(Thesis thesis) => _thesisDAO.UpdateThesisAsync(thesis);
 
         // ─── Phase 02: New Methods ───────────────────────────────────────────────
 
-        public Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(string? status, int? userId, int? semesterId = null, bool? isLocked = null, bool lecturerOnly = false, int? excludeUserId = null)
-            => _thesisDAO.GetAllThesesFilteredAsync(status, userId, semesterId, isLocked, lecturerOnly, excludeUserId);
+        public Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(
+            string? status,
+            int? userId,
+            int? semesterId = null,
+            bool? isLocked = null,
+            bool lecturerOnly = false,
+            int? excludeUserId = null
+        ) =>
+            _thesisDAO.GetAllThesesFilteredAsync(
+                status,
+                userId,
+                semesterId,
+                isLocked,
+                lecturerOnly,
+                excludeUserId
+            );
 
-        public Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id)
-            => _thesisDAO.GetThesisByIdWithHistoriesAsync(id);
+        public Task<IEnumerable<Thesis>> GetThesesForEvaluationExportAsync(
+            int? semesterId = null
+        ) => _thesisDAO.GetThesesForEvaluationExportAsync(semesterId);
 
-        public Task AddThesisHistoryAsync(ThesisHistory history)
-            => _thesisDAO.AddThesisHistoryAsync(history);
+        public Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id) =>
+            _thesisDAO.GetThesisByIdWithHistoriesAsync(id);
 
-        public Task<IEnumerable<Thesis>> GetThesesByOwnerOrTeamAsync(IEnumerable<int> ownerIds, IEnumerable<int> teamIds, int? semesterId = null)
-            => _thesisDAO.GetThesesByOwnerOrTeamAsync(ownerIds, teamIds, semesterId);
+        public Task AddThesisHistoryAsync(ThesisHistory history) =>
+            _thesisDAO.AddThesisHistoryAsync(history);
 
-        public Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId, int? semesterId = null)
-            => _thesisDAO.GetApprovedThesisByLeaderIdAsync(leaderId, semesterId);
+        public Task<IEnumerable<Thesis>> GetThesesByOwnerOrTeamAsync(
+            IEnumerable<int> ownerIds,
+            IEnumerable<int> teamIds,
+            int? semesterId = null
+        ) => _thesisDAO.GetThesesByOwnerOrTeamAsync(ownerIds, teamIds, semesterId);
 
-        public Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int? semesterId = null)
-            => _thesisDAO.GetThesisForInvitationAsync(leaderId, semesterId);
+        public Task<Thesis?> GetApprovedThesisByLeaderIdAsync(
+            int leaderId,
+            int? semesterId = null
+        ) => _thesisDAO.GetApprovedThesisByLeaderIdAsync(leaderId, semesterId);
+
+        public Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int? semesterId = null) =>
+            _thesisDAO.GetThesisForInvitationAsync(leaderId, semesterId);
     }
 }
