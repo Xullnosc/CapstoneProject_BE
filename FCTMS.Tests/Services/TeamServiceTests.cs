@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Xunit;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using BusinessObjects;
 
 namespace FCTMS.Tests.Services
 {
@@ -366,6 +367,11 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(1)).ReturnsAsync(semester);
             _mockUserRepository.Setup(r => r.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
                 .ReturnsAsync(new List<User> { student1, student2 });
+            _mockWhitelistRepository.Setup(r => r.GetBySemesterIdAsync(1))
+                .ReturnsAsync(new List<Whitelist> {
+                    new Whitelist { Email = "s1@fpt.edu.vn", Role = new Role { RoleName = "Student" } },
+                    new Whitelist { Email = "s2@fpt.edu.vn", Role = new Role { RoleName = "Student" } }
+                });
             _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(It.IsAny<int>(), 1)).ReturnsAsync((Team?)null);
             _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1)).ReturnsAsync(new List<string>());
             _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => { t.TeamId = 1; return t; });
@@ -376,7 +382,7 @@ namespace FCTMS.Tests.Services
             // Assert
             result.Should().NotBeNull();
             result.TeamName.Should().Be("Force Team");
-            result.Status.Should().Be("Insufficient"); // 2 members < 3
+            result.Status.Should().Be(CampusConstants.TeamStatus.Active); // 2 members < 4 = Special = Qualified
             result.MemberCount.Should().Be(2);
             _mockTeamRepository.Verify(r => r.CreateAsync(It.Is<Team>(t => t.LeaderId == 100)), Times.Once);
         }
@@ -442,6 +448,10 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(1)).ReturnsAsync(semester);
             _mockUserRepository.Setup(r => r.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
                 .ReturnsAsync(new List<User> { student });
+            _mockWhitelistRepository.Setup(r => r.GetBySemesterIdAsync(1))
+                .ReturnsAsync(new List<Whitelist> {
+                    new Whitelist { Email = "s1@fpt.edu.vn", Role = new Role { RoleName = "Student" } }
+                });
             _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(100, 1)).ReturnsAsync(existingTeam);
 
             // Act & Assert

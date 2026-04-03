@@ -234,15 +234,17 @@ namespace FCTMS.Tests.Controllers
                 new WhitelistDTO { WhitelistId = 1, Email = "orphan@fpt.edu.vn", FullName = "Orphan Student" }
             };
 
-            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id))
-                .ReturnsAsync(orphaned);
+            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>()))
+                .ReturnsAsync(new PagedResult<WhitelistDTO>(orphaned, orphaned.Count, 1, 10));
 
             // Act
             var result = await _controller.GetOrphanedStudents(id);
 
             // Assert
             var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-            okResult.Value.Should().BeEquivalentTo(orphaned);
+            var actual = okResult.Value as PagedResult<WhitelistDTO>;
+            actual.Should().NotBeNull();
+            actual!.Items.Should().BeEquivalentTo(orphaned);
         }
 
         [Fact]
@@ -250,7 +252,7 @@ namespace FCTMS.Tests.Controllers
         {
             // Arrange
             int id = 99;
-            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id))
+            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>()))
                 .ThrowsAsync(new KeyNotFoundException("Semester 99 not found"));
 
             // Act
@@ -266,7 +268,7 @@ namespace FCTMS.Tests.Controllers
         {
             // Arrange
             int id = 1;
-            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id))
+            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>()))
                 .ThrowsAsync(new Exception("DB error"));
 
             // Act
