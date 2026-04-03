@@ -1,4 +1,5 @@
 using BusinessObjects.Models;
+using BusinessObjects.DTOs;
 using DataAccess;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -15,6 +16,9 @@ namespace Repositories
         }
 
         public async Task<List<Semester>> GetAllSemestersAsync() => await _semesterDAO.GetAllAsync();
+
+        public async Task<PagedResult<Semester>> GetAllSemestersAsync(int pageIndex, int pageSize) 
+            => await _semesterDAO.GetAllAsync(pageIndex, pageSize);
 
         public async Task<Semester?> GetSemesterByIdAsync(int id) => await _semesterDAO.GetByIdAsync(id);
 

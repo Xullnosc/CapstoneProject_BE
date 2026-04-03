@@ -14,6 +14,7 @@ namespace FCTMS.Tests.Services
     public class WhitelistServiceTests
     {
         private readonly Mock<IWhitelistRepository> _mockWhitelistRepository;
+        private readonly Mock<ISemesterRepository> _mockSemesterRepository;
         private readonly Mock<IRedisService> _mockRedisService;
         private readonly WhitelistService _whitelistService;
         private readonly Mock<ILecturerRepository> _mockLecturerRepository;
@@ -24,6 +25,7 @@ namespace FCTMS.Tests.Services
         {
             _mockLecturerRepository = new Mock<ILecturerRepository>();
             _mockWhitelistRepository = new Mock<IWhitelistRepository>();
+            _mockSemesterRepository = new Mock<ISemesterRepository>();
             _mockUserRepository = new Mock<IUserRepository>();
             _mockCredentialRepository = new Mock<ISystemUserCredentialRepository>();
             _mockRedisService = new Mock<IRedisService>();
@@ -31,6 +33,7 @@ namespace FCTMS.Tests.Services
             _mockRedisService.Setup(x => x.RemoveByPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
             _whitelistService = new WhitelistService(
                 _mockWhitelistRepository.Object, 
+                _mockSemesterRepository.Object,
                 _mockRedisService.Object, 
                 _mockLecturerRepository.Object,
                 _mockUserRepository.Object,

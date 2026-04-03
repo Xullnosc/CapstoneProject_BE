@@ -1,4 +1,5 @@
 using BusinessObjects.Models;
+using CapstoneProject_BE.DTOs.Requests;
 using Microsoft.AspNetCore.Mvc;
 using Services;
 using System.Collections.Generic;
@@ -39,16 +40,40 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Whitelist>> Add([FromBody] Whitelist whitelist)
+        public async Task<ActionResult<Whitelist>> Add([FromBody] WhitelistUpsertRequest request)
         {
+            var whitelist = new Whitelist
+            {
+                Email = request.Email,
+                StudentCode = request.StudentCode,
+                FullName = request.FullName,
+                RoleId = request.RoleId,
+                Avatar = request.Avatar,
+                Campus = request.Campus,
+                CampusId = request.CampusId ?? 0,
+                SemesterId = request.SemesterId
+            };
+
             var result = await _whitelistService.AddStudentToWhitelistAsync(whitelist);
             return Ok(result);
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] Whitelist whitelist)
+        public async Task<IActionResult> Update(int id, [FromBody] WhitelistUpsertRequest request)
         {
-            if (id != whitelist.WhitelistId) return BadRequest();
+            var whitelist = new Whitelist
+            {
+                WhitelistId = id,
+                Email = request.Email,
+                StudentCode = request.StudentCode,
+                FullName = request.FullName,
+                RoleId = request.RoleId,
+                Avatar = request.Avatar,
+                Campus = request.Campus,
+                CampusId = request.CampusId ?? 0,
+                SemesterId = request.SemesterId
+            };
+
             await _whitelistService.UpdateWhitelistAsync(whitelist);
             return NoContent();
         }

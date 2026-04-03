@@ -102,6 +102,68 @@ namespace Services
             }
         }
 
+        /// <summary>
+        /// Retrieves a page of semesters with aggregated team and student counts.
+        /// Results are cached per-page and per-campus.
+        /// </summary>
+        public async Task<PagedResult<SemesterDTO>> GetAllSemestersPaginatedAsync(int page, int pageSize)
+        {
+            var campusId = _campusContextService.GetCurrentCampusId()?.ToString() ?? "global";
+            string cacheKey = $"fctms:semester:paged:{campusId}:{page}:{pageSize}";
+            var cached = await _redisService.GetObjectAsync<PagedResult<SemesterDTO>>(cacheKey);
+            if (cached != null) return cached;
+
+            await _semaphore.WaitAsync();
+            try
+            {
+                // Double-check cache after acquiring semaphore
+                cached = await _redisService.GetObjectAsync<PagedResult<SemesterDTO>>(cacheKey);
+                if (cached != null) return cached;
+
+                // Get paged results from DAO
+                var pagedSemesters = await _semesterRepository.GetAllSemestersAsync(page, pageSize);
+                
+                if (pagedSemesters.Items == null || !pagedSemesters.Items.Any())
+                    return new PagedResult<SemesterDTO>(new List<SemesterDTO>(), pagedSemesters.TotalCount, page, pageSize);
+
+                var semesterDTOs = _mapper.Map<List<SemesterDTO>>(pagedSemesters.Items);
+
+                // Gets Student Role ID for filtering
+                int studentRoleId = await _semesterRepository.GetStudentRoleIdAsync();
+
+                foreach (var dto in semesterDTOs)
+                {
+                    // Add Count for Teams from Live data (including all statuses)
+                    dto.TeamCount = dto.Teams?.Count ?? 0;
+                    dto.ActiveTeamCount = dto.Teams?
+                        .Count(t => string.Equals(t.Status, CampusConstants.TeamStatus.Active, StringComparison.OrdinalIgnoreCase)) ?? 0;
+
+                    // Student Count Logic:
+                    // Count Whitelist (Role = Student) directly from navigation property
+                    dto.WhitelistCount = dto.Whitelists?
+                        .Count(w => w.RoleId == studentRoleId) ?? 0;
+                    
+                    // CRITICAL OPTIMIZATION: Clear the Teams and Whitelists lists for the Dashboard view.
+                    dto.Teams = new List<TeamSimpleDTO>(); 
+                    dto.Whitelists = new List<WhitelistDTO>();
+                }
+
+                var result = new PagedResult<SemesterDTO>(semesterDTOs, pagedSemesters.TotalCount, page, pageSize);
+
+                var ttlStr = _configuration["RedisSettings:SemesterTTLMinutes"];
+                int ttlMinutes;
+                if (!int.TryParse(ttlStr, out ttlMinutes)) ttlMinutes = 30;
+                ttlMinutes = System.Math.Max(1, ttlMinutes);
+                await _redisService.SetObjectAsync(cacheKey, result, System.TimeSpan.FromMinutes(ttlMinutes), System.Threading.CancellationToken.None);
+
+                return result;
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
         public async Task<SemesterDTO?> GetSemesterByIdAsync(int id)
         {
             var campusId = _campusContextService.GetCurrentCampusId()?.ToString() ?? "global";
@@ -210,6 +272,17 @@ namespace Services
 
         public async Task UpdateSemesterAsync(SemesterCreateDTO semesterCreateDTO)
         {
+            var currentSemester = await _semesterRepository.GetSemesterByIdAsync(semesterCreateDTO.SemesterId);
+            if (currentSemester == null)
+            {
+                throw new KeyNotFoundException($"Semester with ID {semesterCreateDTO.SemesterId} not found.");
+            }
+
+            if (string.Equals(currentSemester.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("On-going semesters cannot be edited.");
+            }
+
             await ValidateSemesterLogicAsync(semesterCreateDTO);
 
             var existing = await _semesterRepository.GetSemesterByCodeAsync(semesterCreateDTO.SemesterCode);
@@ -219,6 +292,9 @@ namespace Services
             }
 
             var semester = _mapper.Map<Semester>(semesterCreateDTO);
+            // Preserve fields not carried by SemesterCreateDTO.
+            semester.CampusId = currentSemester.CampusId;
+            semester.Status = currentSemester.Status;
 
             await _semesterRepository.UpdateSemesterAsync(semester);
             await InvalidateSemesterCacheAsync(semester.SemesterId);

@@ -7,6 +7,7 @@ namespace Services
     public interface ISemesterService
     {
         Task<List<SemesterDTO>> GetAllSemestersAsync();
+        Task<PagedResult<SemesterDTO>> GetAllSemestersPaginatedAsync(int page, int pageSize);
         Task<SemesterDTO?> GetSemesterByIdAsync(int id);
         Task<SemesterDTO> CreateSemesterAsync(SemesterCreateDTO semesterCreateDTO);
         Task UpdateSemesterAsync(SemesterCreateDTO semesterCreateDTO);

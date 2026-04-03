@@ -33,6 +33,22 @@ namespace CapstoneProject_BE.Controllers
             return await _semesterService.GetAllSemestersAsync();
         }
 
+        [HttpGet("paginated")]
+        public async Task<ActionResult<PagedResult<SemesterDTO>>> GetSemestersPaginated(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 6)
+        {
+            try
+            {
+                var result = await _semesterService.GetAllSemestersPaginatedAsync(page, pageSize);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while fetching semesters.", detail = ex.Message });
+            }
+        }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<SemesterDTO>> GetSemester(int id)
         {
