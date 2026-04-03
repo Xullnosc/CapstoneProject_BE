@@ -22,7 +22,10 @@ namespace DataAccess
             return await _context.Semesters
                 .Include(s => s.Teams)
                 .Include(s => s.Whitelists)
-                .AsNoTracking().ToListAsync();
+                .AsNoTracking()
+                .OrderBy(s => s.Status == "Active" ? 0 : s.Status == "Upcoming" ? 1 : 2)
+                .ThenByDescending(s => s.StartDate)
+                .ToListAsync();
         }
 
         public async Task<PagedResult<Semester>> GetAllAsync(int pageIndex, int pageSize)
@@ -35,7 +38,8 @@ namespace DataAccess
             var totalCount = await query.CountAsync();
 
             var items = await query
-                .OrderBy(s => s.SemesterId)
+                .OrderBy(s => s.Status == "Active" ? 0 : s.Status == "Upcoming" ? 1 : 2)
+                .ThenByDescending(s => s.StartDate)
                 .Skip((pageIndex - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -48,6 +52,7 @@ namespace DataAccess
             return await _context
                 .Semesters.Include(s => s.Teams)
                     .ThenInclude(t => t.Teammembers)
+                .Include(s => s.Campus)
                 .Include(s => s.Whitelists)
                     .ThenInclude(w => w.Role)
                 .AsNoTracking()

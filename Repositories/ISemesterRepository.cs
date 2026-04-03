@@ -1,4 +1,5 @@
 using BusinessObjects.Models;
+using BusinessObjects.DTOs;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -7,6 +8,7 @@ namespace Repositories
     public interface ISemesterRepository
     {
         Task<List<Semester>> GetAllSemestersAsync();
+        Task<PagedResult<Semester>> GetAllSemestersAsync(int pageIndex, int pageSize);
         Task<Semester?> GetSemesterByIdAsync(int id);
         Task<Semester> CreateSemesterAsync(Semester semester);
         Task UpdateSemesterAsync(Semester semester);
