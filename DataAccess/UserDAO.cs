@@ -22,6 +22,7 @@ namespace DataAccess
         public async Task<User?> GetByEmailAsync(string email)
         {
             return await _context.Users
+                .IgnoreQueryFilters()
                 .Include(u => u.Role)
                 .Include(u => u.AccountDetail)
                 .FirstOrDefaultAsync(u => u.Email == email);
@@ -95,6 +96,8 @@ namespace DataAccess
             var lowerEmails = emails.Select(e => e.ToLower().Trim()).ToList();
 
             return await _context.Users
+                .IgnoreQueryFilters()
+                .Include(u => u.Role)
                 .Where(u => u.Email != null && lowerEmails.Contains(u.Email.ToLower()))
                 .AsNoTracking()
                 .ToListAsync();
@@ -108,6 +111,8 @@ namespace DataAccess
             var lowerEmails = emails.Select(e => e.ToLower().Trim()).ToList();
 
             var query = _context.Users
+                .IgnoreQueryFilters()
+                .Include(u => u.Role)
                 .Where(u => lowerEmails.Contains(u.Email.ToLower()))
                 .AsNoTracking();
 
