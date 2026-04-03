@@ -64,20 +64,6 @@ namespace CapstoneProject_BE.Controllers
         [HttpPost]
         public async Task<ActionResult<Lecturer>> Create([FromBody] Lecturer lecturer)
         {
-            var roleClaim = User.FindFirst(ClaimTypes.Role) ?? User.FindFirst("role");
-            if (roleClaim?.Value == CampusConstants.Roles.HOD)
-            {
-                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
-                if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
-                {
-                    var profile = await _userService.GetProfileAsync(userId);
-                    if (profile != null)
-                    {
-                        lecturer.Campus = profile.Campus;
-                    }
-                }
-            }
-
             await _lecturerService.AddLecturerAsync(lecturer);
             return CreatedAtAction(nameof(GetById), new { id = lecturer.LecturerId }, lecturer);
         }

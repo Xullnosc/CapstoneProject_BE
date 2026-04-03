@@ -84,6 +84,12 @@ public class AdminService : IAdminService
         if (hodRole == null)
             throw new InvalidOperationException("HOD role not found in database.");
 
+        var campusRef = await _context.Campuses.FirstOrDefaultAsync(c => c.CampusId == dto.CampusId);
+        if (campusRef == null)
+            throw new InvalidOperationException($"Campus with ID {dto.CampusId} does not exist.");
+
+        string campusNameString = dto.Campus ?? campusRef.CampusName;
+
         User? user = null;
         if (dto.UserId.HasValue)
         {
@@ -104,7 +110,8 @@ public class AdminService : IAdminService
 
             user.Email = dto.Email.Trim();
             user.FullName = dto.FullName?.Trim() ?? user.FullName;
-            user.Campus = dto.Campus;
+            user.CampusId = dto.CampusId;
+            user.Campus = campusNameString;
             await _userRepository.UpdateAsync(user);
         }
         else
@@ -117,7 +124,8 @@ public class AdminService : IAdminService
                 
                 user = existingWithEmail;
                 user.FullName = dto.FullName?.Trim() ?? user.FullName;
-                user.Campus = dto.Campus;
+                user.CampusId = dto.CampusId;
+                user.Campus = campusNameString;
                 await _userRepository.UpdateAsync(user);
             }
             else
@@ -129,7 +137,8 @@ public class AdminService : IAdminService
                     RoleId = hodRole.RoleId,
                     IsAuthorized = true,
                     CreatedAt = DateTime.UtcNow,
-                    Campus = dto.Campus
+                    CampusId = dto.CampusId,
+                    Campus = campusNameString
                 };
                 user = await _userRepository.AddAsync(user);
             }

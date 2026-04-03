@@ -21,6 +21,10 @@ public partial class User
 
     public string? Campus { get; set; }
 
+    public int? CampusId { get; set; }
+
+    public virtual Campus CampusNavigation { get; set; } = null!;
+
     public DateTime? LastLogin { get; set; }
 
     public DateTime? CreatedAt { get; set; }

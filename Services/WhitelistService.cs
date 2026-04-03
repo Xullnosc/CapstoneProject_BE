@@ -56,6 +56,7 @@ namespace Services
                     Email = whitelist.Email,
                     FullName = whitelist.FullName ?? "New Lecturer",
                     Campus = whitelist.Campus ?? "N/A",
+                    CampusId = whitelist.CampusId,
                     IsReviewer = true,
                     IsActive = true
                 };

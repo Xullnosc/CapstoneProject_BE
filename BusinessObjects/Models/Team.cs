@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace BusinessObjects.Models;
@@ -30,6 +30,10 @@ public partial class Team
     public DateTime? UpdatedAt { get; set; }
 
     public bool IsSpecial { get; set; }
+
+    public int CampusId { get; set; }
+
+    public virtual Campus Campus { get; set; } = null!;
 
     public virtual User Leader { get; set; } = null!;
 

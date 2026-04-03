@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace BusinessObjects.Models;
@@ -16,6 +16,10 @@ public partial class Semester
     public DateTime EndDate { get; set; }
 
     public string Status { get; set; } = "Upcoming";
+
+    public int CampusId { get; set; }
+
+    public virtual Campus Campus { get; set; } = null!;
 
     public virtual ICollection<Team> Teams { get; set; } = new List<Team>();
 

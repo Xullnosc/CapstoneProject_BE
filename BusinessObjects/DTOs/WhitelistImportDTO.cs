@@ -18,6 +18,8 @@ namespace BusinessObjects.DTOs
 
         public string? Campus { get; set; }
 
+        public int? CampusId { get; set; }
+
         public string? SemesterCode { get; set; }
 
         public int? SemesterId { get; set; }

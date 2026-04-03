@@ -142,6 +142,7 @@ namespace Services
 
             var thesis = new Thesis
             {
+                CampusId = targetUser.CampusId ?? 1,
                 ThesisId = Guid.NewGuid().ToString(),
                 Title = string.IsNullOrWhiteSpace(req.Title)
                     ? (

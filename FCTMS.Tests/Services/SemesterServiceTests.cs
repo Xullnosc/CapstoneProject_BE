@@ -5,6 +5,7 @@ using FluentAssertions;
 using Moq;
 using Repositories;
 using Services;
+using BusinessObjects.Interfaces;
 using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -22,6 +23,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<Microsoft.Extensions.Configuration.IConfiguration> _mockConfiguration;
         private readonly Mock<ILecturerRepository> _mockLecturerRepository;
         private readonly Mock<IWhitelistRepository> _mockWhitelistRepository;
+        private readonly Mock<ICampusContextService> _mockCampusContextService;
         private readonly SemesterService _semesterService;
 
         public SemesterServiceTests()
@@ -33,6 +35,8 @@ namespace FCTMS.Tests.Services
             _mockConfiguration = new Mock<Microsoft.Extensions.Configuration.IConfiguration>();
             _mockLecturerRepository = new Mock<ILecturerRepository>();
             _mockWhitelistRepository = new Mock<IWhitelistRepository>();
+            _mockCampusContextService = new Mock<ICampusContextService>();
+            _mockCampusContextService.Setup(c => c.GetCurrentCampusId()).Returns(1);
 
             // Default redis mock behaviors
             _mockRedisService.Setup(r => r.GetObjectAsync<List<SemesterDTO>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -61,7 +65,8 @@ namespace FCTMS.Tests.Services
                 _mockRedisService.Object,
                 _mockConfiguration.Object,
                 _mockLecturerRepository.Object,
-                _mockWhitelistRepository.Object
+                _mockWhitelistRepository.Object,
+                _mockCampusContextService.Object
             );
         }
 
