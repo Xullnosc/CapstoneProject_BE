@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Services;
 using System;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace CapstoneProject_BE.Controllers
@@ -19,7 +20,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet("stats")]
-        [Authorize(Roles = "HOD,Admin,Head of Department")]
+        [Authorize(Roles = "HOD,Admin,Head of Department,Lecturer")]
         public async Task<ActionResult<DashboardStatsDTO>> GetDashboardStats()
         {
             try
@@ -30,6 +31,36 @@ namespace CapstoneProject_BE.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Error retrieving dashboard statistics.", details = ex.Message });
+            }
+        }
+
+        [HttpGet("lecturer-stats")]
+        [Authorize(Roles = "Lecturer")]
+        public async Task<ActionResult<LecturerDashboardStatsDTO>> GetLecturerDashboardStats()
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (!int.TryParse(userIdClaim, out int userId))
+                {
+                    return Unauthorized(new { message = "Invalid user identifier." });
+                }
+
+                var isReviewer = string.Equals(
+                    User.FindFirst("IsReviewer")?.Value,
+                    "true",
+                    StringComparison.OrdinalIgnoreCase
+                );
+
+                var stats = await _dashboardService.GetLecturerDashboardStatsAsync(userId, isReviewer);
+                return Ok(stats);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new { message = "Error retrieving lecturer dashboard statistics.", details = ex.Message }
+                );
             }
         }
     }
