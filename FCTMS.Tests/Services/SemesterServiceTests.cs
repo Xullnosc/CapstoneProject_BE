@@ -414,7 +414,7 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync((Semester?)null);
 
             // Act
-            Func<Task> act = async () => await _semesterService.GetOrphanedStudentsAsync(id);
+            Func<Task> act = async () => await _semesterService.GetOrphanedStudentsAsync(id, 1, 10);
 
             // Assert
             await act.Should().ThrowAsync<KeyNotFoundException>()
@@ -426,30 +426,34 @@ namespace FCTMS.Tests.Services
         {
             // Arrange
             int id = 1;
+            int page = 1;
+            int pageSize = 10;
             var semester = new Semester { SemesterId = id };
             var orphanedWhitelists = new List<Whitelist>
             {
                 new Whitelist { WhitelistId = 1, Email = "orphan@fpt.edu.vn", FullName = "Orphan" }
             };
+            var pagedOrphaned = new PagedResult<Whitelist>(orphanedWhitelists, 1, page, pageSize);
             var orphanedDTOs = new List<WhitelistDTO>
             {
                 new WhitelistDTO { WhitelistId = 1, Email = "orphan@fpt.edu.vn", FullName = "Orphan" }
             };
 
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
-            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(id)).ReturnsAsync(orphanedWhitelists);
+            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(id, page, pageSize)).ReturnsAsync(pagedOrphaned);
             _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(orphanedWhitelists)).Returns(orphanedDTOs);
             _mockUserRepository.Setup(u => u.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
                 .ReturnsAsync(new List<User> { new User { Email = "orphan@fpt.edu.vn", Avatar = "avatar.png" } });
 
             // Act
-            var result = await _semesterService.GetOrphanedStudentsAsync(id);
+            var result = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize);
 
             // Assert
             result.Should().NotBeNull();
-            result.Should().HaveCount(1);
-            result[0].Email.Should().Be("orphan@fpt.edu.vn");
-            result[0].Avatar.Should().Be("avatar.png");
+            result.Items.Should().HaveCount(1);
+            result.Items[0].Email.Should().Be("orphan@fpt.edu.vn");
+            result.Items[0].Avatar.Should().Be("avatar.png");
+            result.TotalCount.Should().Be(1);
         }
 
         [Fact]
@@ -457,18 +461,22 @@ namespace FCTMS.Tests.Services
         {
             // Arrange
             int id = 1;
+            int page = 1;
+            int pageSize = 10;
             var semester = new Semester { SemesterId = id };
+            var pagedOrphaned = new PagedResult<Whitelist>(new List<Whitelist>(), 0, page, pageSize);
 
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
-            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(id)).ReturnsAsync(new List<Whitelist>());
+            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(id, page, pageSize)).ReturnsAsync(pagedOrphaned);
             _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(It.IsAny<List<Whitelist>>())).Returns(new List<WhitelistDTO>());
 
             // Act
-            var result = await _semesterService.GetOrphanedStudentsAsync(id);
+            var result = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize);
 
             // Assert
             result.Should().NotBeNull();
-            result.Should().BeEmpty();
+            result.Items.Should().BeEmpty();
+            result.TotalCount.Should().Be(0);
         }
 
         #endregion

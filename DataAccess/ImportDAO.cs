@@ -237,8 +237,21 @@ namespace DataAccess
 
                     if (replacementLeader == null)
                     {
-                        _context.Teams.Remove(team);
-                        teamRemoved = true;
+                        // Requirement: If team has thesis and mentor, transfer authorid to mentor and set disbanded
+                        var teamThesis = await _context.Theses.FirstOrDefaultAsync(t => t.TeamId == team.TeamId && t.SemesterId == team.SemesterId);
+                        if (teamThesis != null && team.MentorId != null)
+                        {
+                            team.Status = CampusConstants.TeamStatus.Disbanded;
+                            team.LeaderId = team.MentorId.Value; // Move leadership to mentor for the record
+                            team.UpdatedAt = DateTime.UtcNow;
+                            reassignedLeaderId = team.MentorId.Value;
+                            teamRemoved = false;
+                        }
+                        else
+                        {
+                            _context.Teams.Remove(team);
+                            teamRemoved = true;
+                        }
                     }
                     else
                     {
@@ -276,10 +289,13 @@ namespace DataAccess
 
                 int remainingMemberCount = team.Teammembers.Count(m => m.StudentId != user.UserId);
                 
-                // If this was the last member, remove the team
+                // If this was the last member, handle removals or status update
                 if (remainingMemberCount == 0)
                 {
-                    _context.Teams.Remove(team);
+                    if (team.Status != CampusConstants.TeamStatus.Disbanded)
+                    {
+                        _context.Teams.Remove(team);
+                    }
                     continue;
                 }
 

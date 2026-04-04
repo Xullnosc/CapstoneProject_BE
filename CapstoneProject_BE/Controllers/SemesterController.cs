@@ -296,12 +296,15 @@ namespace CapstoneProject_BE.Controllers
             }
         }
         [HttpGet("{id}/orphaned-students")]
-        [Authorize(Roles = CampusConstants.Roles.HOD)]
-        public async Task<IActionResult> GetOrphanedStudents(int id)
+        [Authorize(Roles = CampusConstants.Roles.HOD + "," + CampusConstants.Roles.Admin)]
+        public async Task<IActionResult> GetOrphanedStudents(
+            int id,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
             try
             {
-                var orphaned = await _semesterService.GetOrphanedStudentsAsync(id);
+                var orphaned = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize);
                 return Ok(orphaned);
             }
             catch (KeyNotFoundException ex)
