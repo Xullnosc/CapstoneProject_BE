@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using BusinessObjects.DTOs;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using Services;
 
@@ -25,6 +26,7 @@ namespace CapstoneProject_BE.Controllers
         // ─── Existing Endpoint (untouched) ───────────────────────────────────────
 
         [HttpPost("propose")]
+        [EnableRateLimiting("Strict")]
         public async Task<IActionResult> ProposeThesis([FromForm] ProposeThesisDTO req)
         {
             try

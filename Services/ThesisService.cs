@@ -33,6 +33,7 @@ namespace Services
         private readonly ILecturerRepository _lecturerRepository;
         private readonly ITeamInvitationRepository _teamInvitationRepository;
         private readonly IMapper _mapper;
+        private readonly ISystemParameterService _systemParameterService;
         private readonly IChecklistRepository? _checklistRepository;
         private readonly IAIService? _aiService;
         private readonly IUserAISettingsService? _userAiSettingsService;
@@ -51,6 +52,7 @@ namespace Services
             ILecturerRepository lecturerRepository,
             ITeamInvitationRepository teamInvitationRepository,
             IMapper mapper,
+            ISystemParameterService systemParameterService,
             IChecklistRepository? checklistRepository = null,
             IAIService? aiService = null,
             IUserAISettingsService? userAiSettingsService = null,
@@ -67,6 +69,7 @@ namespace Services
             _lecturerRepository = lecturerRepository;
             _teamInvitationRepository = teamInvitationRepository;
             _mapper = mapper;
+            _systemParameterService = systemParameterService;
             _checklistRepository = checklistRepository;
             _aiService = aiService;
             _userAiSettingsService = userAiSettingsService;
@@ -115,6 +118,11 @@ namespace Services
             // Students must be the team leader and the team must have at least 4 members.
             if (!isTargetLecturer)
             {
+                // Check if thesis registration is open
+                var isRegistrationOpen = await _systemParameterService.GetBoolAsync("THESIS_REGISTRATION_OPEN", true);
+                if (!isRegistrationOpen)
+                    throw new InvalidOperationException("Thesis registration is currently closed by administrator.");
+
                 team = await _teamRepository.GetActiveTeamByStudentIdAsync(targetUser.UserId);
                 if (team == null)
                     throw new InvalidOperationException(
@@ -134,7 +142,12 @@ namespace Services
 
             string? fileUrl = null;
             if (req.File != null)
+            {
+                var limitMb = await _systemParameterService.GetIntAsync("FILE_SIZE_LIMIT_MB", 10);
+                if (req.File.Length > limitMb * 1024L * 1024L)
+                    throw new InvalidOperationException($"File size exceeds the {limitMb}MB limit set by administrator.");
                 fileUrl = await _cloudinaryHelper.UploadFileAsync(req.File);
+            }
 
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
             var hasAssignedMentor =
@@ -242,6 +255,9 @@ namespace Services
             // Upload new file to Cloudinary (if provided)
             if (req.File != null)
             {
+                var limitMb = await _systemParameterService.GetIntAsync("FILE_SIZE_LIMIT_MB", 10);
+                if (req.File.Length > limitMb * 1024L * 1024L)
+                    throw new InvalidOperationException($"File size exceeds the {limitMb}MB limit set by administrator.");
                 string newFileUrl = await _cloudinaryHelper.UploadFileAsync(req.File);
 
                 // Calculate next version number

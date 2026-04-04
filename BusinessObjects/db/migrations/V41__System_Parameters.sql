@@ -1,4 +1,4 @@
-CREATE TABLE SystemParameters (
+CREATE TABLE IF NOT EXISTS SystemParameters (
     `Key` VARCHAR(255) PRIMARY KEY,
     `Value` LONGTEXT NOT NULL,
     `Description` VARCHAR(1000) NULL,

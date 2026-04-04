@@ -55,5 +55,21 @@ namespace Services
                 await _repository.UpdateParameterAsync(existingParam);
             }
         }
+
+        public async Task<int> GetIntAsync(string key, int fallback = 0)
+        {
+            var param = await _repository.GetParameterByKeyAsync(key);
+            if (param != null && int.TryParse(param.Value, out int parsed))
+                return parsed;
+            return fallback;
+        }
+
+        public async Task<bool> GetBoolAsync(string key, bool fallback = true)
+        {
+            var param = await _repository.GetParameterByKeyAsync(key);
+            if (param != null && bool.TryParse(param.Value, out bool parsed))
+                return parsed;
+            return fallback;
+        }
     }
 }
