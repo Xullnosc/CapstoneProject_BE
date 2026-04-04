@@ -59,6 +59,17 @@ namespace CapstoneProject_BE.Controllers
             }
             return semester;
         }
+    
+        [HttpGet("current")]
+        public async Task<ActionResult<SemesterDTO>> GetCurrentSemester()
+        {
+            var semester = await _semesterService.GetCurrentSemesterAsync();
+            if (semester == null)
+            {
+                return NotFound(new { message = "No active semester found." });
+            }
+            return semester;
+        }
 
         [HttpPost]
         [Authorize(Roles = CampusConstants.Roles.HOD + "," + CampusConstants.Roles.Admin)]
@@ -144,32 +155,79 @@ namespace CapstoneProject_BE.Controllers
             }
         }
 
-        [HttpPost("{id}/end")]
+        [HttpPost("{id}/lock-submission")]
         [Authorize(Roles = CampusConstants.Roles.HOD)]
-        public async Task<IActionResult> EndSemester(int id)
+        public async Task<IActionResult> LockSubmission(int id)
         {
             try
             {
-                await _semesterService.EndSemesterAsync(id);
-                return Ok(new { message = $"Semester {id} ended successfully. Data archived." });
+                await _semesterService.LockSubmissionAsync(id);
+                return Ok(new { message = $"Semester {id} submission locked. Now in Review Thesis stage." });
             }
             catch (KeyNotFoundException ex)
             {
                 return NotFound(new { message = ex.Message });
             }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
             catch (Exception ex)
             {
-                // In production, log this error
-                return StatusCode(
-                    500,
-                    new
-                    {
-                        message = "An error occurred while ending the semester.",
-                        detail = ex.Message,
-                    }
-                );
+                return StatusCode(500, new { message = "An error occurred while locking submission.", detail = ex.Message });
             }
         }
+
+        [HttpPost("{id}/lock-updates")]
+        [Authorize(Roles = CampusConstants.Roles.HOD)]
+        public async Task<IActionResult> LockUpdates(int id)
+        {
+            try
+            {
+                await _semesterService.LockAllUpdatesAsync(id);
+                return Ok(new { message = $"Semester {id} updates locked. Now in Review Middle Semester stage." });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while locking updates.", detail = ex.Message });
+            }
+        }
+
+        [HttpPost("{id}/close")]
+        [Authorize(Roles = CampusConstants.Roles.HOD)]
+        public async Task<IActionResult> CloseSemester(int id)
+        {
+            try
+            {
+                await _semesterService.CloseSemesterAsync(id);
+                return Ok(new { message = $"Semester {id} closed successfully." });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while closing the semester.", detail = ex.Message });
+            }
+        }
+
+        // Keep /end as an alias for CloseSemester for backward compatibility
+        [HttpPost("{id}/end")]
+        [Authorize(Roles = CampusConstants.Roles.HOD)]
+        public async Task<IActionResult> EndSemester(int id) => await CloseSemester(id);
 
         [HttpPost("{id}/whitelist/import")]
         [Authorize(Roles = CampusConstants.Roles.HOD)]

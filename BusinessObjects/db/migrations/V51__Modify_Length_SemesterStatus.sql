@@ -1,0 +1,1 @@
+ALTER TABLE semesters MODIFY COLUMN Status VARCHAR(50) DEFAULT 'Upcoming';

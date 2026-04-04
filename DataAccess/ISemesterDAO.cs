@@ -10,6 +10,7 @@ namespace DataAccess
         Task<List<Semester>> GetAllAsync();
         Task<PagedResult<Semester>> GetAllAsync(int pageIndex, int pageSize);
         Task<Semester?> GetByIdAsync(int id);
+        Task<Semester?> GetByIdSimpleAsync(int id);
         Task<Semester> AddAsync(Semester semester);
         Task UpdateAsync(Semester semester);
         Task<Semester?> GetCurrentSemesterAsync();

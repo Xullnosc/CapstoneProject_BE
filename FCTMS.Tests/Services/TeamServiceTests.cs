@@ -212,7 +212,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             int userId = 1;
             var createDto = new CreateTeamDTO { TeamName = "New Team" };
-            var semester = new Semester { SemesterId = 1, SemesterCode = "FA24" };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "FA24", Status = CampusConstants.SemesterStatus.Active };
             
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { UserId = userId, Email = "test@edu.vn" });
@@ -234,7 +234,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             int userId = 2;
             var createDto = new CreateTeamDTO { TeamName = "Team 2" };
-            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25" };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25", Status = CampusConstants.SemesterStatus.Active };
             
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { UserId = userId, Email = "test@edu.vn" });
