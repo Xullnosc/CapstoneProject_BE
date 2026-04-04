@@ -10,6 +10,7 @@ namespace Repositories
         Task<List<Semester>> GetAllSemestersAsync();
         Task<PagedResult<Semester>> GetAllSemestersAsync(int pageIndex, int pageSize);
         Task<Semester?> GetSemesterByIdAsync(int id);
+        Task<Semester?> GetSemesterByIdSimpleAsync(int id);
         Task<Semester> CreateSemesterAsync(Semester semester);
         Task UpdateSemesterAsync(Semester semester);
         Task<Semester?> GetCurrentSemesterAsync();

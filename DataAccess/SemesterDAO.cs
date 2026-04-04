@@ -23,7 +23,10 @@ namespace DataAccess
                 .Include(s => s.Teams)
                 .Include(s => s.Whitelists)
                 .AsNoTracking()
-                .OrderBy(s => s.Status == "Active" ? 0 : s.Status == "Upcoming" ? 1 : 2)
+                .OrderBy(s => s.Status == "Active" ? 0 
+                           : s.Status == "Review Thesis" ? 1 
+                           : s.Status == "Review Middle Semester" ? 2 
+                           : s.Status == "Upcoming" ? 3 : 4)
                 .ThenByDescending(s => s.StartDate)
                 .ToListAsync();
         }
@@ -38,7 +41,10 @@ namespace DataAccess
             var totalCount = await query.CountAsync();
 
             var items = await query
-                .OrderBy(s => s.Status == "Active" ? 0 : s.Status == "Upcoming" ? 1 : 2)
+                .OrderBy(s => s.Status == "Active" ? 0 
+                           : s.Status == "Review Thesis" ? 1 
+                           : s.Status == "Review Middle Semester" ? 2 
+                           : s.Status == "Upcoming" ? 3 : 4)
                 .ThenByDescending(s => s.StartDate)
                 .Skip((pageIndex - 1) * pageSize)
                 .Take(pageSize)
@@ -59,6 +65,12 @@ namespace DataAccess
                 .FirstOrDefaultAsync(s => s.SemesterId == id);
         }
 
+        public async Task<Semester?> GetByIdSimpleAsync(int id)
+        {
+            return await _context.Semesters
+                .FirstOrDefaultAsync(s => s.SemesterId == id);
+        }
+
         public async Task<Semester> AddAsync(Semester semester)
         {
             await _context.Semesters.AddAsync(semester);
@@ -74,10 +86,11 @@ namespace DataAccess
 
         public async Task<Semester?> GetCurrentSemesterAsync()
         {
-            // Priority 1: Check for explicitly ACTIVE semester (The "Golden Rule")
+            // Priority 1: Check for any "Live" semester (Active, Review Thesis, or Review Middle)
+            var liveStatuses = new[] { "Active", "Review Thesis", "Review Middle Semester" };
             var activeSemester = await _context.Semesters
                 .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Status == "Active");
+                .FirstOrDefaultAsync(s => liveStatuses.Contains(s.Status));
 
             if (activeSemester != null)
             {
@@ -85,7 +98,6 @@ namespace DataAccess
             }
 
             // Priority 2: Fallback to Date Range (Backward Compatibility)
-            // If no semester is explicitly Active, we fall back to checking which semester includes 'now' in its date range.
             var now = DateTime.UtcNow;
             return await _context
                 .Semesters.AsNoTracking()

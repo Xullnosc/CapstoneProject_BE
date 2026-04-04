@@ -51,7 +51,13 @@ namespace Services
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
             if (currentSemester == null)
             {
-                 throw new InvalidOperationException("No active semester found at the moment.");
+                 throw new InvalidOperationException("Không tìm thấy kỳ học hiện tại.");
+            }
+
+            // [LIFECYCLE GUARD] Chỉ cho phép tạo nhóm trong giai đoạn Active
+            if (currentSemester.Status != CampusConstants.SemesterStatus.Active)
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Không thể tạo nhóm mới.");
             }
 
             // 2. Validate User is whitelisted for current semester
@@ -174,6 +180,13 @@ namespace Services
             var team = await _teamRepository.GetByIdAsync(teamId);
             if (team == null) return false;
 
+            // [LIFECYCLE GUARD]
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester?.Status == CampusConstants.SemesterStatus.ReviewMiddle || currentSemester?.Status == CampusConstants.SemesterStatus.Closed)
+            {
+                throw new InvalidOperationException("Kỳ học đã chốt hoặc kết thúc. Không thể giải tán nhóm.");
+            }
+
             if (team.LeaderId != leaderId)
             {
                 throw new Exception("Only the team leader can disband the team.");
@@ -257,6 +270,13 @@ namespace Services
             var team = await _teamRepository.GetByIdAsync(teamId);
             if (team == null) throw new KeyNotFoundException("Team not found");
 
+            // [LIFECYCLE GUARD]
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester?.Status == CampusConstants.SemesterStatus.ReviewMiddle || currentSemester?.Status == CampusConstants.SemesterStatus.Closed)
+            {
+                throw new InvalidOperationException("Kỳ học đã chốt hoặc kết thúc. Không thể cập nhật thông tin nhóm.");
+            }
+
             if (team.LeaderId != leaderId)
             {
                 throw new UnauthorizedAccessException("Only the team leader can update team information.");
@@ -280,6 +300,13 @@ namespace Services
         {
             var team = await _teamRepository.GetByIdAsync(teamId);
             if (team == null) return false;
+
+            // [LIFECYCLE GUARD]
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester?.Status == CampusConstants.SemesterStatus.ReviewMiddle || currentSemester?.Status == CampusConstants.SemesterStatus.Closed)
+            {
+                throw new InvalidOperationException("Kỳ học đã chốt hoặc kết thúc. Không thể thay đổi nhóm trưởng.");
+            }
 
             if (team.LeaderId != currentLeaderId)
             {
@@ -319,6 +346,13 @@ namespace Services
 
         public async Task<bool> RemoveMemberAsync(int teamId, int studentId)
         {
+            // [LIFECYCLE GUARD]
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester?.Status == CampusConstants.SemesterStatus.ReviewMiddle || currentSemester?.Status == CampusConstants.SemesterStatus.Closed)
+            {
+                throw new InvalidOperationException("Kỳ học đã chốt hoặc kết thúc. Không thể xóa thành viên khỏi nhóm.");
+            }
+
             var result = await _teamMemberRepository.RemoveMemberAsync(teamId, studentId);
             if (result)
             {

@@ -135,7 +135,7 @@ public class AuthService : IAuthService
                     // 2.1 Check if student is from an ended semester
                     if (whitelistEntry.Role?.RoleName == CampusConstants.Roles.Student)
                     {
-                        if (whitelistEntry.Semester == null || whitelistEntry.Semester.Status != "Active")
+                        if (whitelistEntry.Semester == null || whitelistEntry.Semester.Status == CampusConstants.SemesterStatus.Closed)
                         {
                             throw new UnauthorizedAccessException("Học kỳ bạn tham gia đã kết thúc. Bạn không thể đăng nhập vào hệ thống lúc này.");
                         }

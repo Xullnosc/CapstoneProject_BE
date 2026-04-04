@@ -73,6 +73,15 @@ namespace BusinessObjects
             public const string Mentor = "Mentor";
         }
 
+        public static class SemesterStatus
+        {
+            public const string Upcoming = "Upcoming";
+            public const string Active = "Active";
+            public const string ReviewThesis = "Review Thesis";
+            public const string ReviewMiddle = "Review Middle Semester";
+            public const string Closed = "Closed";
+        }
+
         public static class TeamStatus
         {
             public const string Pending = "Pending"; // Matches DB enum

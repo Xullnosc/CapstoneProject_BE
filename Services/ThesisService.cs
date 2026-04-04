@@ -137,6 +137,17 @@ namespace Services
                 fileUrl = await _cloudinaryHelper.UploadFileAsync(req.File);
 
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester == null)
+            {
+                throw new InvalidOperationException("Không tìm thấy kỳ học hiện tại để nộp đề tài.");
+            }
+
+            // [LIFECYCLE GUARD] Chỉ cho phép nộp mới trong giai đoạn Active
+            if (currentSemester.Status != CampusConstants.SemesterStatus.Active)
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Không thể nộp đề tài mới.");
+            }
+
             var hasAssignedMentor =
                 team?.MentorId.HasValue == true || team?.MentorId2.HasValue == true;
 
@@ -226,6 +237,21 @@ namespace Services
             var thesis = await _thesisRepository.GetThesisByIdWithHistoriesAsync(thesisId);
             if (thesis == null)
                 throw new KeyNotFoundException("Thesis not found.");
+
+            // [LIFECYCLE GUARD] Chặn update nếu kỳ học đã bước vào giai đoạn Review Middle Semester hoặc Closed
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester != null)
+            {
+                var blockedStatuses = new[] { 
+                    CampusConstants.SemesterStatus.ReviewMiddle, 
+                    CampusConstants.SemesterStatus.Closed,
+                    CampusConstants.SemesterStatus.Upcoming 
+                };
+                if (blockedStatuses.Contains(currentSemester.Status))
+                {
+                    throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Không thể cập nhật đề tài.");
+                }
+            }
 
             // Only the owner can update
             if (thesis.UserId != user.UserId)
