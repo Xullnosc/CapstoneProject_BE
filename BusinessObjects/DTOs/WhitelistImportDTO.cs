@@ -22,6 +22,8 @@ namespace BusinessObjects.DTOs
 
         public string? SemesterCode { get; set; }
 
+        public string? SemesterName { get; set; }
+
         public int? SemesterId { get; set; }
 
         public bool IsMarked { get; set; }

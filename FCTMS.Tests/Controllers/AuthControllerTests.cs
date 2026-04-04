@@ -12,6 +12,7 @@ namespace FCTMS.Tests.Controllers
         private readonly Mock<ILogger<AuthController>> _mockLogger;
         private readonly Mock<IWebHostEnvironment> _mockEnv;
         private readonly Mock<Repositories.IAccessLogRepository> _mockAccessLogRepository;
+        private readonly Mock<ICaptchaService> _mockCaptchaService;
         private readonly AuthController _controller;
 
         public AuthControllerTests()
@@ -20,12 +21,17 @@ namespace FCTMS.Tests.Controllers
             _mockLogger = new Mock<ILogger<AuthController>>();
             _mockEnv = new Mock<IWebHostEnvironment>();
             _mockAccessLogRepository = new Mock<Repositories.IAccessLogRepository>();
+            _mockCaptchaService = new Mock<ICaptchaService>();
+            
             _mockEnv.Setup(e => e.EnvironmentName).Returns("Development");
+            _mockCaptchaService.Setup(c => c.VerifyCaptchaAsync(It.IsAny<string>())).ReturnsAsync(true);
+
             _controller = new AuthController(
                 _mockAuthService.Object, 
                 _mockLogger.Object, 
                 _mockEnv.Object, 
-                _mockAccessLogRepository.Object);
+                _mockAccessLogRepository.Object,
+                _mockCaptchaService.Object);
             // Ensure Response.Cookies is available so SetRefreshTokenCookie does not throw (Login/LoginWithCredentials return Ok)
             _controller.ControllerContext = new ControllerContext
             {

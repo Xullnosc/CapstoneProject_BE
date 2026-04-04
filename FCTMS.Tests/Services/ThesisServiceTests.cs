@@ -28,6 +28,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ILecturerRepository> _mockLecturerRepository;
         private readonly Mock<ITeamInvitationRepository> _mockTeamInvitationRepository;
         private readonly Mock<IMapper> _mockMapper;
+        private readonly Mock<ISystemParameterService> _mockSystemParameterService;
         private readonly ThesisService _thesisService;
 
         public ThesisServiceTests()
@@ -41,6 +42,15 @@ namespace FCTMS.Tests.Services
             _mockLecturerRepository = new Mock<ILecturerRepository>();
             _mockTeamInvitationRepository = new Mock<ITeamInvitationRepository>();
             _mockMapper = new Mock<IMapper>();
+            _mockSystemParameterService = new Mock<ISystemParameterService>();
+
+            // Default: registration open, 10MB limit — keeps all existing tests green
+            _mockSystemParameterService
+                .Setup(s => s.GetBoolAsync("THESIS_REGISTRATION_OPEN", It.IsAny<bool>()))
+                .ReturnsAsync(true);
+            _mockSystemParameterService
+                .Setup(s => s.GetIntAsync("FILE_SIZE_LIMIT_MB", It.IsAny<int>()))
+                .ReturnsAsync(10);
 
             _thesisService = new ThesisService(
                 _mockThesisRepository.Object,
@@ -51,7 +61,8 @@ namespace FCTMS.Tests.Services
                 _mockSemesterRepository.Object,
                 _mockLecturerRepository.Object,
                 _mockTeamInvitationRepository.Object,
-                _mockMapper.Object
+                _mockMapper.Object,
+                _mockSystemParameterService.Object
             );
         }
 

@@ -48,10 +48,6 @@ namespace Services.Helpers
                 [NormalizeHeaderKey("Student Code")] = CampusConstants.WhitelistImportColumns.StudentCode,
                 [NormalizeHeaderKey(CampusConstants.WhitelistImportColumns.FullName)] = CampusConstants.WhitelistImportColumns.FullName,
                 [NormalizeHeaderKey("Full Name")] = CampusConstants.WhitelistImportColumns.FullName,
-                [NormalizeHeaderKey(CampusConstants.WhitelistImportColumns.SemesterCode)] = CampusConstants.WhitelistImportColumns.SemesterCode,
-                [NormalizeHeaderKey("Semester Code")] = CampusConstants.WhitelistImportColumns.SemesterCode,
-                [NormalizeHeaderKey("Semester")] = CampusConstants.WhitelistImportColumns.SemesterCode,
-                [NormalizeHeaderKey(CampusConstants.WhitelistImportColumns.Campus)] = CampusConstants.WhitelistImportColumns.Campus,
             };
 
             const int headerRow = 3;
@@ -82,7 +78,6 @@ namespace Services.Helpers
                 CampusConstants.WhitelistImportColumns.Email,
                 CampusConstants.WhitelistImportColumns.StudentCode,
                 CampusConstants.WhitelistImportColumns.FullName,
-                CampusConstants.WhitelistImportColumns.SemesterCode,
             };
 
             foreach (var col in requiredHeaders)
@@ -129,16 +124,6 @@ namespace Services.Helpers
                         continue;
                     }
 
-                    var semesterCode = worksheet
-                        .Cells[row, headerMap[CampusConstants.WhitelistImportColumns.SemesterCode]]
-                        .Text.Trim();
-
-                    if (string.IsNullOrWhiteSpace(semesterCode))
-                    {
-                        result.Errors.Add(new ImportError { Row = row, Column = CampusConstants.WhitelistImportColumns.SemesterCode, Message = "SemesterCode cannot be empty" });
-                        continue;
-                    }
-
                     var whitelistDto = new WhitelistImportDTO
                     {
                         RowNumber = row,
@@ -149,7 +134,6 @@ namespace Services.Helpers
                             .Text.Trim(),
                         RoleId = 3,  // Always set to Student role
                         Role = "Student",
-                        SemesterCode = semesterCode,
                     };
 
                     // Validate FullName is not empty

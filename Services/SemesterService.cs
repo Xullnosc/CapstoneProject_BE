@@ -489,13 +489,13 @@ namespace Services
             return new PagedResult<WhitelistDTO>(items, total, page, pageSize);
         }
 
-        public async Task<List<WhitelistDTO>> GetOrphanedStudentsAsync(int semesterId)
+        public async Task<PagedResult<WhitelistDTO>> GetOrphanedStudentsAsync(int semesterId, int page, int pageSize)
         {
             var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
             if (semester == null) throw new KeyNotFoundException($"Semester {semesterId} not found");
 
-            var orphaned = await _semesterRepository.GetOrphanedStudentsAsync(semesterId);
-            var dtos = _mapper.Map<List<WhitelistDTO>>(orphaned);
+            var pagedOrphaned = await _semesterRepository.GetOrphanedStudentsAsync(semesterId, page, pageSize);
+            var dtos = _mapper.Map<List<WhitelistDTO>>(pagedOrphaned.Items);
 
             // Populate avatars (same pattern as GetWhitelistsPaginatedAsync)
             var emails = dtos
@@ -526,7 +526,7 @@ namespace Services
                 wl.Campus = CampusConstants.MapCodeToFullName(wl.Campus);
             }
 
-            return dtos.OrderBy(w => w.FullName ?? w.Email).ToList();
+            return new PagedResult<WhitelistDTO>(dtos, pagedOrphaned.TotalCount, page, pageSize);
         }
 
         public async Task InvalidateSemesterCacheAsync(int? id = null)

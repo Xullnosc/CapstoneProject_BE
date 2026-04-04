@@ -225,7 +225,7 @@ namespace CapstoneProject_BE.Controllers
                     }
                 }
 
-                var importResult = await _importService.ImportWhitelistFromExcel(stream, uploaderEmail, rowOverrides);
+                var importResult = await _importService.ImportWhitelistFromExcel(stream, id, uploaderEmail, rowOverrides);
 
                 if (excludedRowNumbers != null && excludedRowNumbers.Count > 0)
                 {
@@ -243,7 +243,7 @@ namespace CapstoneProject_BE.Controllers
 
                 if (commitFlag)
                 {
-                    await _importService.SaveWhitelistBatchAsync(importResult, file.FileName, uploaderEmail);
+                    await _importService.SaveWhitelistBatchAsync(importResult, id, file.FileName, uploaderEmail);
                     return Ok(importResult);
                 }
 
@@ -296,12 +296,15 @@ namespace CapstoneProject_BE.Controllers
             }
         }
         [HttpGet("{id}/orphaned-students")]
-        [Authorize(Roles = CampusConstants.Roles.HOD)]
-        public async Task<IActionResult> GetOrphanedStudents(int id)
+        [Authorize(Roles = CampusConstants.Roles.HOD + "," + CampusConstants.Roles.Admin)]
+        public async Task<IActionResult> GetOrphanedStudents(
+            int id,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
             try
             {
-                var orphaned = await _semesterService.GetOrphanedStudentsAsync(id);
+                var orphaned = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize);
                 return Ok(orphaned);
             }
             catch (KeyNotFoundException ex)

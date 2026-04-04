@@ -7,9 +7,10 @@ namespace Services
     {
         Task<ImportResult<WhitelistImportDTO>> ImportWhitelistFromExcel(
             Stream excelStream,
+            int semesterId,
             string uploaderEmail,
             List<WhitelistRowOverrideDTO>? rowOverrides = null);
 
-        Task SaveWhitelistBatchAsync(ImportResult<WhitelistImportDTO> importResult, string fileUrl, string uploaderEmail);
+        Task SaveWhitelistBatchAsync(ImportResult<WhitelistImportDTO> importResult, int semesterId, string fileUrl, string uploaderEmail);
     }
 }

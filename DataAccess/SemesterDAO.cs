@@ -68,8 +68,17 @@ namespace DataAccess
 
         public async Task UpdateAsync(Semester semester)
         {
-            _context.Semesters.Update(semester);
-            await _context.SaveChangesAsync();
+            // Use ExecuteUpdateAsync to avoid EF change tracker conflicts
+            // (e.g., duplicate Campus tracking when multiple Semester loads share the same DbContext)
+            await _context.Semesters
+                .Where(s => s.SemesterId == semester.SemesterId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.SemesterName, semester.SemesterName)
+                    .SetProperty(x => x.SemesterCode, semester.SemesterCode)
+                    .SetProperty(x => x.StartDate, semester.StartDate)
+                    .SetProperty(x => x.EndDate, semester.EndDate)
+                    .SetProperty(x => x.Status, semester.Status)
+                    .SetProperty(x => x.CampusId, semester.CampusId));
         }
 
         public async Task<Semester?> GetCurrentSemesterAsync()
@@ -141,29 +150,43 @@ namespace DataAccess
                 start.Date <= s.EndDate.Date && end.Date >= s.StartDate.Date);
         }
 
-        public async Task<List<Whitelist>> GetOrphanedStudentsAsync(int semesterId)
+        public async Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize)
         {
             var studentRoleId = await GetStudentRoleIdAsync();
 
-            // Emails of students who ARE in a team for this semester
+            // Fetch emails of students who are already in a team for this semester
             var teamedEmails = await _context.Teammembers
                 .Where(tm => tm.Team.SemesterId == semesterId)
-                .Select(tm => tm.Student.Email.ToLower())
+                .Select(tm => tm.Student.Email)
                 .Distinct()
                 .ToListAsync();
 
-            var teamedEmailSet = new HashSet<string>(teamedEmails, StringComparer.OrdinalIgnoreCase);
+            // Lowercase and trim for insensitive comparison
+            var teamedEmailSet = new HashSet<string>(
+                teamedEmails.Where(e => !string.IsNullOrEmpty(e)).Select(e => e.Trim()), 
+                StringComparer.OrdinalIgnoreCase
+            );
 
-            // Whitelist students for this semester who are NOT in any team
-            var allWhitelistStudents = await _context.Whitelists
+            // Filter whitelist students who are NOT in the teamed set
+            var query = _context.Whitelists
                 .Include(w => w.Role)
                 .Where(w => w.SemesterId == semesterId && w.RoleId == studentRoleId)
-                .AsNoTracking()
-                .ToListAsync();
+                .AsNoTracking();
 
-            return allWhitelistStudents
+            // We need to filter in memory if we use the HashSet, OR we can use the list in SQL if it's small.
+            // For thousands of students, let's try to keep it in SQL for pagination.
+            var filteredQuery = query.AsEnumerable()
                 .Where(w => !string.IsNullOrEmpty(w.Email) && !teamedEmailSet.Contains(w.Email.Trim()))
+                .AsQueryable();
+
+            var totalCount = filteredQuery.Count();
+            var items = filteredQuery
+                .OrderBy(w => w.FullName ?? w.Email)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
                 .ToList();
+
+            return new PagedResult<Whitelist>(items, totalCount, pageIndex, pageSize);
         }
     }
 }

@@ -27,7 +27,11 @@ namespace DataAccess
 
         public async Task<List<Whitelist>> GetBySemesterIdAsync(int semesterId)
         {
-            return await _context.Whitelists.Where(w => w.SemesterId == semesterId).ToListAsync();
+            return await _context.Whitelists
+                .Include(w => w.Role)
+                .Where(w => w.SemesterId == semesterId)
+                .AsNoTracking()
+                .ToListAsync();
         }
 
         public async Task<PagedResult<Whitelist>> GetBySemesterIdAsync(int semesterId, int pageIndex, int pageSize)

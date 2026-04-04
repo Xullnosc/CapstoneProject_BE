@@ -4,6 +4,8 @@ using BusinessObjects.Models;
 using CapstoneProject_BE.Extensions;
 using DataAccess;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -143,6 +145,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ISystemParameterService, SystemParameterService>();
 builder.Services.AddScoped<ISystemErrorLogService, SystemErrorLogService>();
 builder.Services.AddScoped<ICampusService, CampusService>();
+builder.Services.AddScoped<ICaptchaService, CaptchaService>();
 
 // AI Services (BYOK/BYOA — keys configured via environment variables or the admin settings UI)
 builder.Services.AddAIServices(builder.Configuration, aiOverridePath);
@@ -259,6 +262,44 @@ builder.Services.AddAuthorization(options =>
     );
 });
 
+// Configure Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+    
+    options.OnRejected = async (context, token) =>
+    {
+        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+        var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        logger.LogWarning($"Request rejected by Rate Limiter. IP: {ip}, Path: {context.HttpContext.Request.Path}");
+        await context.HttpContext.Response.WriteAsync("Too many requests. Please try again later.", token);
+    };
+
+    // Global rate limiter for basic protection (100 requests per IP per minute)
+    options.AddPolicy("Global", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown_ip",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 100,
+                QueueLimit = 0,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+
+    // Strict rate limiter for sensitive endpoints (e.g. login, propose thesis)
+    options.AddPolicy("Strict", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown_ip",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 5,
+                QueueLimit = 0,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+});
+
 var app = builder.Build();
 
 // Allow enabling Swagger in non-development environments via config or env var.
@@ -297,10 +338,12 @@ if (
 }
 app.UseCors("AllowReactApp");
 
+app.UseRateLimiter(); // Add RateLimiter middleware before Auth
+
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers();
+app.MapControllers().RequireRateLimiting("Global");
 
 // Root endpoint: redirect to Swagger when Swagger is enabled, otherwise return a simple status JSON.
 app.MapGet(

@@ -30,6 +30,25 @@ namespace CapstoneProject_BE.Controllers
                 return StatusCode(500, new { message = "An error occurred while retrieving system parameters.", details = ex.Message });
             }
         }
+
+        [HttpGet("public/config")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetPublicConfig()
+        {
+            try
+            {
+                var isOpen = await _systemParameterService.GetBoolAsync("THESIS_REGISTRATION_OPEN", true);
+                var fileSizeLimit = await _systemParameterService.GetIntAsync("FILE_SIZE_LIMIT_MB", 10);
+                var captchaParam = await _systemParameterService.GetParameterByKeyAsync("CAPTCHA_SITE_KEY");
+                var captchaSiteKey = captchaParam?.Value ?? "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
+
+                return Ok(new { isOpen, fileSizeLimit, captchaSiteKey });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while checking public config.", details = ex.Message });
+            }
+        }
         
         [HttpPut("params/{key}")]
         [Authorize(Roles = "Admin")]
