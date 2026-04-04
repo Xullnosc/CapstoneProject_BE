@@ -104,6 +104,7 @@ namespace Services
             team.Teammembers.Add(member);
 
             var createdTeam = await _teamRepository.CreateAsync(team);
+            await _semesterService.InvalidateSemesterCacheAsync(currentSemester.SemesterId);
             return MapToDTO(createdTeam);
         }
 

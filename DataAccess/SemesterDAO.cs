@@ -68,8 +68,17 @@ namespace DataAccess
 
         public async Task UpdateAsync(Semester semester)
         {
-            _context.Semesters.Update(semester);
-            await _context.SaveChangesAsync();
+            // Use ExecuteUpdateAsync to avoid EF change tracker conflicts
+            // (e.g., duplicate Campus tracking when multiple Semester loads share the same DbContext)
+            await _context.Semesters
+                .Where(s => s.SemesterId == semester.SemesterId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.SemesterName, semester.SemesterName)
+                    .SetProperty(x => x.SemesterCode, semester.SemesterCode)
+                    .SetProperty(x => x.StartDate, semester.StartDate)
+                    .SetProperty(x => x.EndDate, semester.EndDate)
+                    .SetProperty(x => x.Status, semester.Status)
+                    .SetProperty(x => x.CampusId, semester.CampusId));
         }
 
         public async Task<Semester?> GetCurrentSemesterAsync()

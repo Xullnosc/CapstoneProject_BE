@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Repositories;
 using Services;
 using Services.DTOs;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace capstone_be.Controllers;
 
@@ -14,13 +15,15 @@ public class AuthController : ControllerBase
     private readonly ILogger<AuthController> _logger;
     private readonly IWebHostEnvironment _env;
     private readonly Repositories.IAccessLogRepository _accessLogRepository;
+    private readonly ICaptchaService _captchaService;
 
-    public AuthController(IAuthService authService, ILogger<AuthController> logger, IWebHostEnvironment env, IAccessLogRepository accessLogRepository)
+    public AuthController(IAuthService authService, ILogger<AuthController> logger, IWebHostEnvironment env, IAccessLogRepository accessLogRepository, ICaptchaService captchaService)
     {
         _authService = authService;
         _logger = logger;
         _env = env;
         _accessLogRepository = accessLogRepository;
+        _captchaService = captchaService;
     }
 
     private string GetIpAddress()
@@ -31,6 +34,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("Strict")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDTO request)
     {
         try
@@ -41,6 +45,12 @@ public class AuthController : ControllerBase
             {
                 Console.WriteLine($"Login failed. IdToken is empty. Campus: {request.Campus}");
                 return BadRequest(new { message = "IdToken is required" });
+            }
+
+            var captchaToken = Request.Headers["X-Captcha-Token"].ToString();
+            if (!await _captchaService.VerifyCaptchaAsync(captchaToken))
+            {
+                return BadRequest(new { message = "Captcha validation failed" });
             }
 
             var result = await _authService.GoogleLoginAsync(request);
@@ -80,12 +90,19 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login/credentials")]
+    [EnableRateLimiting("Strict")]
     public async Task<IActionResult> LoginWithCredentials([FromBody] CredentialLoginRequestDTO request)
     {
         try
         {
             if (request == null)
                 return BadRequest(new { message = "Request body is null" });
+
+            var captchaToken = Request.Headers["X-Captcha-Token"].ToString();
+            if (!await _captchaService.VerifyCaptchaAsync(captchaToken))
+            {
+                return BadRequest(new { message = "Captcha validation failed" });
+            }
 
             var result = await _authService.CredentialLoginAsync(request);
             SetRefreshTokenCookie(result.RefreshToken, result.RefreshTokenExpiresAt);
