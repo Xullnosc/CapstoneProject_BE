@@ -225,7 +225,7 @@ namespace CapstoneProject_BE.Controllers
                     }
                 }
 
-                var importResult = await _importService.ImportWhitelistFromExcel(stream, uploaderEmail, rowOverrides);
+                var importResult = await _importService.ImportWhitelistFromExcel(stream, id, uploaderEmail, rowOverrides);
 
                 if (excludedRowNumbers != null && excludedRowNumbers.Count > 0)
                 {
@@ -243,7 +243,7 @@ namespace CapstoneProject_BE.Controllers
 
                 if (commitFlag)
                 {
-                    await _importService.SaveWhitelistBatchAsync(importResult, file.FileName, uploaderEmail);
+                    await _importService.SaveWhitelistBatchAsync(importResult, id, file.FileName, uploaderEmail);
                     return Ok(importResult);
                 }
 
