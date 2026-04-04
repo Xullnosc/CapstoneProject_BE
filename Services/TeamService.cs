@@ -177,15 +177,40 @@ namespace Services
 
             if (team.LeaderId != leaderId)
             {
-                throw new Exception("Only the team leader can disband the team.");
+                throw new UnauthorizedAccessException("Only the team leader can disband the team.");
             }
 
-            // TODO: Check if team has matched topic (when Topic module implemented)
-            // if (team.TopicId != null && !semesterEnded) throw ...
+            // 1. Handle associated theses
+            var leaderTheses = await _thesisRepository.GetThesesByUserIdAsync(leaderId);
+            var teamTheses = leaderTheses.Where(t => t.TeamId == teamId).ToList();
 
+            foreach (var thesis in teamTheses)
+            {
+                if (string.Equals(thesis.Status, "Published", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("Cannot disband a team that has an approved (Published) thesis.");
+                }
+
+                var cancellable = new[] { "Reviewing", "Registered", "On Mentor Inviting", "Need Update" };
+                if (cancellable.Contains(thesis.Status, StringComparer.OrdinalIgnoreCase))
+                {
+                    thesis.Status = "Cancelled";
+                    thesis.UpdateDate = DateTime.UtcNow;
+                    await _thesisRepository.UpdateThesisAsync(thesis);
+                }
+            }
+
+            // 2. Remove all members
+            await _teamMemberRepository.RemoveAllMembersFromTeamAsync(teamId);
+
+            // 3. Mark team status
             team.Status = CampusConstants.TeamStatus.Disbanded;
             team.UpdatedAt = DateTime.UtcNow;
             await _teamRepository.UpdateAsync(team);
+            
+            // 4. Invalidate cache
+            await _semesterService.InvalidateSemesterCacheAsync(team.SemesterId);
+
             return true;
         }
 

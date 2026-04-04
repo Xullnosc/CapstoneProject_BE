@@ -52,6 +52,8 @@ namespace DataAccess
             return await _context
                 .Semesters.Include(s => s.Teams)
                     .ThenInclude(t => t.Teammembers)
+                .Include(s => s.Teams)
+                    .ThenInclude(t => t.Leader)
                 .Include(s => s.Campus)
                 .Include(s => s.Whitelists)
                     .ThenInclude(w => w.Role)
