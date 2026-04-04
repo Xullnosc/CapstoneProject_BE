@@ -82,11 +82,9 @@ namespace FCTMS.Tests.Services
         private void SetupSemester(string semesterCode, int semesterId)
         {
             _mockSemesterRepository.Setup(x => x.GetStudentRoleIdAsync()).ReturnsAsync(3);
-            _mockSemesterRepository.Setup(x => x.GetSemesterByCodeAsync(semesterCode)).ReturnsAsync(new Semester
-            {
-                SemesterId = semesterId,
-                SemesterCode = semesterCode,
-            });
+            var semester = new Semester { SemesterId = semesterId, SemesterCode = semesterCode, CampusId = 1 };
+            _mockSemesterRepository.Setup(x => x.GetSemesterByCodeAsync(semesterCode)).ReturnsAsync(semester);
+            _mockSemesterRepository.Setup(x => x.GetSemesterByIdAsync(semesterId)).ReturnsAsync(semester);
         }
 
         [Fact]
@@ -113,7 +111,7 @@ namespace FCTMS.Tests.Services
                 Errors = new List<ImportError>()
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
 
             context.Whitelists.Should().ContainSingle();
             context.Users.Should().ContainSingle(user => user.Email == "student@example.com" && user.RoleId == 3 && user.CampusId == 1 && user.Campus == CampusConstants.HoaLac);
@@ -136,7 +134,7 @@ namespace FCTMS.Tests.Services
                 Errors = new List<ImportError>()
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
 
             _mockRedisService.Verify(x => x.RemoveByPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         }
@@ -178,7 +176,7 @@ namespace FCTMS.Tests.Services
                 Errors = new List<ImportError>()
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
 
             context.Whitelists.Should().BeEmpty();
             context.Users.Count(user => user.Email == "lecturer@example.com").Should().Be(1);
@@ -229,7 +227,7 @@ namespace FCTMS.Tests.Services
                 }
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
 
             context.Users.Should().ContainSingle(user => user.Email == "student@example.com" && user.StudentCode == "NEW001" && user.FullName == "Updated Name");
             context.Whitelists.Should().ContainSingle(whitelist => whitelist.Email == "student@example.com" && whitelist.StudentCode == "NEW001");
@@ -303,7 +301,7 @@ namespace FCTMS.Tests.Services
                 }
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
 
             context.Users.Should().ContainSingle(user => user.Email == "keep@example.com");
             context.Whitelists.Should().ContainSingle(whitelist => whitelist.Email == "keep@example.com");
@@ -341,7 +339,7 @@ namespace FCTMS.Tests.Services
                 Errors = new List<ImportError>()
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
 
             context.Whitelists.Should().ContainSingle(w => w.Email == "duplicate@example.com");
             context.Users.Should().ContainSingle(u => u.Email == "duplicate@example.com");
@@ -398,7 +396,7 @@ namespace FCTMS.Tests.Services
                 Errors = new List<ImportError>()
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
 
             context.Whitelists.Count(w => w.Email == "student@example.com").Should().Be(1);
             context.Whitelists.Single(w => w.Email == "student@example.com").SemesterId.Should().Be(1);
@@ -434,7 +432,7 @@ namespace FCTMS.Tests.Services
             };
 
             // Act
-            await service.SaveWhitelistBatchAsync(importResult, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
 
             // Assert - verify logging occurred at start and end
             _mockLogger.Verify(
@@ -463,7 +461,6 @@ namespace FCTMS.Tests.Services
             ws.Cells[3, 2].Value = CampusConstants.WhitelistImportColumns.Email;
             ws.Cells[3, 3].Value = CampusConstants.WhitelistImportColumns.StudentCode;
             ws.Cells[3, 4].Value = CampusConstants.WhitelistImportColumns.FullName;
-            ws.Cells[3, 5].Value = CampusConstants.WhitelistImportColumns.SemesterCode;
 
             configureRows(ws);
 
@@ -496,11 +493,10 @@ namespace FCTMS.Tests.Services
                 ws.Cells[4, 2].Value = "lecturer@example.com";
                 ws.Cells[4, 3].Value = "ST001";
                 ws.Cells[4, 4].Value = "Conflict Student";
-                ws.Cells[4, 5].Value = "SP25";
             });
 
             using var stream = new MemoryStream(excelBytes);
-            var result = await service.ImportWhitelistFromExcel(stream, "hod@example.com");
+            var result = await service.ImportWhitelistFromExcel(stream, 1, "hod@example.com");
 
             result.Items.Should().ContainSingle(item => item.Email == "lecturer@example.com" && item.IsMarked == true);
         }
@@ -531,7 +527,6 @@ namespace FCTMS.Tests.Services
                 ws.Cells[4, 2].Value = "lecturer@example.com";
                 ws.Cells[4, 3].Value = "ST001";
                 ws.Cells[4, 4].Value = "Conflict Student";
-                ws.Cells[4, 5].Value = "SP25";
             });
 
             // Override row 4 to use a different email that does not conflict.
@@ -546,7 +541,7 @@ namespace FCTMS.Tests.Services
             };
 
             using var stream = new MemoryStream(excelBytes);
-            var result = await service.ImportWhitelistFromExcel(stream, "hod@example.com", overrides);
+            var result = await service.ImportWhitelistFromExcel(stream, 1, "hod@example.com", overrides);
 
             result.Items.Should().ContainSingle();
             result.Items.Single().IsMarked.Should().BeFalse("the override replaced the conflicting email");
@@ -575,7 +570,6 @@ namespace FCTMS.Tests.Services
                 ws.Cells[4, 2].Value = "lecturer1@example.com";
                 ws.Cells[4, 3].Value = "ST001";
                 ws.Cells[4, 4].Value = "Conflict Student";
-                ws.Cells[4, 5].Value = "SP25";
             });
 
             // Override still provides another conflicting email (also a non-student).
@@ -585,7 +579,7 @@ namespace FCTMS.Tests.Services
             };
 
             using var stream = new MemoryStream(excelBytes);
-            var result = await service.ImportWhitelistFromExcel(stream, "hod@example.com", overrides);
+            var result = await service.ImportWhitelistFromExcel(stream, 1, "hod@example.com", overrides);
 
             result.Items.Single().IsMarked.Should().BeTrue("the override email still belongs to a non-student role");
         }
@@ -603,19 +597,17 @@ namespace FCTMS.Tests.Services
             using var package = new OfficeOpenXml.ExcelPackage();
             var ws = package.Workbook.Worksheets.Add("Import");
 
-            // Use alias-style headers and omit Campus entirely.
+            // Use alias-style headers.
             ws.Cells[3, 2].Value = "E-mail";
             ws.Cells[3, 3].Value = "Student Code";
             ws.Cells[3, 4].Value = "Full Name";
-            ws.Cells[3, 5].Value = "Semester Code";
 
             ws.Cells[4, 2].Value = "student1@example.com";
             ws.Cells[4, 3].Value = "ST100";
             ws.Cells[4, 4].Value = "Student One";
-            ws.Cells[4, 5].Value = "SP25";
 
             using var stream = new MemoryStream(package.GetAsByteArray());
-            var result = await service.ImportWhitelistFromExcel(stream, "hod@example.com");
+            var result = await service.ImportWhitelistFromExcel(stream, 1, "hod@example.com");
 
             result.Items.Should().ContainSingle();
             result.Items.Single().Email.Should().Be("student1@example.com");
