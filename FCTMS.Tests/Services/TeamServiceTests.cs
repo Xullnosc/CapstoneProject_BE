@@ -86,6 +86,7 @@ namespace FCTMS.Tests.Services
             team.Status.Should().Be("Disbanded");
             _mockTeamRepository.Verify(r => r.UpdateAsync(team), Times.Once);
             _mockTeamMemberRepository.Verify(r => r.RemoveAllMembersFromTeamAsync(teamId), Times.Once);
+            _mockSemesterService.Verify(s => s.InvalidateSemesterCacheAsync(1), Times.Once);
         }
 
         [Fact]
@@ -101,7 +102,7 @@ namespace FCTMS.Tests.Services
         }
 
         [Fact]
-        public async Task DisbandTeamAsync_ThrowsException_WhenNotLeader()
+        public async Task DisbandTeamAsync_ThrowsUnauthorizedAccessException_WhenNotLeader()
         {
             // Arrange
             var team = new Team { TeamId = 1, LeaderId = 100 };
@@ -112,6 +113,109 @@ namespace FCTMS.Tests.Services
             
             // Act & Assert
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _teamService.DisbandTeamAsync(1, 99));
+        }
+
+        [Fact]
+        public async Task DisbandTeamAsync_ThrowsInvalidOperationException_WhenThesisIsPublished()
+        {
+            // Arrange
+            int teamId = 1;
+            int leaderId = 100;
+            var team = new Team { TeamId = teamId, LeaderId = leaderId };
+            var thesis = new Thesis { TeamId = teamId, Status = "Published" };
+
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync())
+                .ReturnsAsync(new Semester { Status = "Open" });
+            _mockThesisRepository.Setup(r => r.GetThesesByUserIdAsync(leaderId))
+                .ReturnsAsync(new List<Thesis> { thesis });
+
+            // Act & Assert
+            await Assert.ThrowsAsync<InvalidOperationException>(() => _teamService.DisbandTeamAsync(teamId, leaderId));
+        }
+
+        [Fact]
+        public async Task UpdateTeamAsync_ShouldUpdateNameAndDescription_WhenValid()
+        {
+            // Arrange
+            int teamId = 1;
+            int leaderId = 1;
+            var updateDto = new UpdateTeamDTO
+            {
+                TeamName = "Updated Name",
+                Description = "Updated Description",
+            };
+
+            var existingTeam = new Team
+            {
+                TeamId = teamId,
+                LeaderId = leaderId,
+                TeamName = "Old Name",
+                Description = "Old Description",
+                Teammembers = new List<Teammember>()
+            };
+
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync())
+                .ReturnsAsync(new Semester { Status = "Open" });
+
+            // Act
+            var result = await _teamService.UpdateTeamAsync(teamId, leaderId, updateDto);
+
+            // Assert
+            result.TeamName.Should().Be("Updated Name");
+            result.Description.Should().Be("Updated Description");
+            _mockTeamRepository.Verify(x => x.UpdateAsync(existingTeam), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateTeamAsync_ShouldUploadAvatar_WhenFileProvided()
+        {
+            // Arrange
+            int teamId = 1;
+            int leaderId = 1;
+            var mockFile = new Mock<IFormFile>();
+            var updateDto = new UpdateTeamDTO
+            {
+                TeamName = "Updated Name",
+                Description = "Updated Description",
+                AvatarFile = mockFile.Object
+            };
+
+            var existingTeam = new Team
+            {
+                TeamId = teamId,
+                LeaderId = leaderId,
+                TeamAvatar = "old_url",
+                Teammembers = new List<Teammember>()
+            };
+
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
+            _mockCloudinaryHelper.Setup(x => x.UploadImageAsync(mockFile.Object)).ReturnsAsync("new_secure_url");
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync())
+                .ReturnsAsync(new Semester { Status = "Open" });
+
+            // Act
+            var result = await _teamService.UpdateTeamAsync(teamId, leaderId, updateDto);
+
+            // Assert
+            result.TeamAvatar.Should().Be("new_secure_url");
+            existingTeam.TeamAvatar.Should().Be("new_secure_url");
+            _mockCloudinaryHelper.Verify(x => x.UploadImageAsync(mockFile.Object), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateTeamAsync_ShouldThrow_WhenTeamNotFound()
+        {
+            // Arrange
+            int teamId = 99;
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync((Team)null!);
+
+            // Act
+            Func<Task> act = async () => await _teamService.UpdateTeamAsync(teamId, 1, new UpdateTeamDTO());
+
+            // Assert
+            await act.Should().ThrowAsync<KeyNotFoundException>().WithMessage("Team not found");
         }
 
         [Fact]
