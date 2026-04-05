@@ -76,5 +76,14 @@ namespace DataAccess
                 .Include(m => m.Team)
                 .AnyAsync(m => m.StudentId == studentId && m.Team.SemesterId == semesterId && m.Team.Status != CampusConstants.TeamStatus.Disbanded);
         }
+
+        public async Task<bool> RemoveAllMembersFromTeamAsync(int teamId)
+        {
+            await _context.Teammembers
+                .Where(m => m.TeamId == teamId)
+                .ExecuteDeleteAsync();
+            
+            return true;
+        }
     }
 }

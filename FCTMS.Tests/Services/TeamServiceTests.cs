@@ -63,11 +63,16 @@ namespace FCTMS.Tests.Services
             {
                 TeamId = teamId,
                 LeaderId = leaderId,
-                Status = "Insufficient"
+                Status = "Insufficient",
+                SemesterId = 1
             };
             _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId))
                 .ReturnsAsync(team);
             _mockTeamRepository.Setup(r => r.UpdateAsync(team))
+                .ReturnsAsync(true);
+            _mockThesisRepository.Setup(r => r.GetThesesByUserIdAsync(leaderId))
+                .ReturnsAsync(new List<Thesis>());
+            _mockTeamMemberRepository.Setup(r => r.RemoveAllMembersFromTeamAsync(teamId))
                 .ReturnsAsync(true);
 
             // Act
@@ -77,6 +82,8 @@ namespace FCTMS.Tests.Services
             result.Should().BeTrue();
             team.Status.Should().Be("Disbanded");
             _mockTeamRepository.Verify(r => r.UpdateAsync(team), Times.Once);
+            _mockTeamMemberRepository.Verify(r => r.RemoveAllMembersFromTeamAsync(teamId), Times.Once);
+            _mockSemesterService.Verify(s => s.InvalidateSemesterCacheAsync(1), Times.Once);
         }
 
         [Fact]
@@ -92,14 +99,31 @@ namespace FCTMS.Tests.Services
         }
 
         [Fact]
-        public async Task DisbandTeamAsync_ThrowsException_WhenNotLeader()
+        public async Task DisbandTeamAsync_ThrowsUnauthorizedAccessException_WhenNotLeader()
         {
             // Arrange
             var team = new Team { TeamId = 1, LeaderId = 999 };
             _mockTeamRepository.Setup(r => r.GetByIdAsync(1))
                 .ReturnsAsync(team);
             // Act & Assert
-            await Assert.ThrowsAsync<Exception>(() => _teamService.DisbandTeamAsync(1, 1));
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _teamService.DisbandTeamAsync(1, 1));
+        }
+
+        [Fact]
+        public async Task DisbandTeamAsync_ThrowsInvalidOperationException_WhenThesisIsPublished()
+        {
+            // Arrange
+            int teamId = 1;
+            int leaderId = 100;
+            var team = new Team { TeamId = teamId, LeaderId = leaderId };
+            var thesis = new Thesis { TeamId = teamId, Status = "Published" };
+
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
+            _mockThesisRepository.Setup(r => r.GetThesesByUserIdAsync(leaderId))
+                .ReturnsAsync(new List<Thesis> { thesis });
+
+            // Act & Assert
+            await Assert.ThrowsAsync<InvalidOperationException>(() => _teamService.DisbandTeamAsync(teamId, leaderId));
         }
 
         [Fact]

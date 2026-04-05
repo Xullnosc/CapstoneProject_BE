@@ -35,6 +35,10 @@ namespace BusinessObjects.DTOs
         public string? Status { get; set; }
         public int MemberCount { get; set; }
         public bool IsSpecial { get; set; }
+        public string? TeamAvatar { get; set; }
+        public string? LeaderAvatar { get; set; }
+        public string? LeaderEmail { get; set; }
+        public string? LeaderName { get; set; }
     }
 
     public class WhitelistDTO
