@@ -266,7 +266,7 @@ namespace FCTMS.Tests.Controllers
                 new WhitelistDTO { WhitelistId = 1, Email = "orphan@fpt.edu.vn", FullName = "Orphan Student" }
             };
 
-            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>()))
+            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>()))
                 .ReturnsAsync(new PagedResult<WhitelistDTO>(orphaned, orphaned.Count, 1, 10));
 
             // Act
@@ -284,7 +284,7 @@ namespace FCTMS.Tests.Controllers
         {
             // Arrange
             int id = 99;
-            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>()))
+            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>()))
                 .ThrowsAsync(new KeyNotFoundException("Semester 99 not found"));
 
             // Act
@@ -300,7 +300,7 @@ namespace FCTMS.Tests.Controllers
         {
             // Arrange
             int id = 1;
-            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>()))
+            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>()))
                 .ThrowsAsync(new Exception("DB error"));
 
             // Act

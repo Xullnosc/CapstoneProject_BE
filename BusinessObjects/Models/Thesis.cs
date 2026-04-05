@@ -40,9 +40,13 @@ public partial class Thesis
 
     public int CampusId { get; set; }
 
+    public int? OriginalAuthorId { get; set; }
+
     public virtual Campus Campus { get; set; } = null!;
 
     public virtual User User { get; set; } = null!;
+
+    public virtual User? OriginalAuthor { get; set; }
 
     public virtual Semester? Semester { get; set; }
 

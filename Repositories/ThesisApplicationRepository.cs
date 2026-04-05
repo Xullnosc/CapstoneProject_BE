@@ -41,5 +41,8 @@ namespace Repositories
 
         public async Task RejectAllPendingByThesisIdExceptAsync(string thesisId, int exceptId)
             => await _dao.RejectAllPendingByThesisIdExceptAsync(thesisId, exceptId);
+
+        public async Task CancelAllPendingByTeamIdExceptAsync(int teamId, int exceptId)
+            => await _dao.CancelAllPendingByTeamIdExceptAsync(teamId, exceptId);
     }
 }

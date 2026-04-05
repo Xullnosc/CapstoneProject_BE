@@ -1,5 +1,5 @@
-using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BusinessObjects.Models;
 
@@ -12,8 +12,11 @@ public partial class Lecturer
     public string? FullName { get; set; }
 
     public string? Avatar { get; set; }
-
+    
+    [NotMapped]
     public string? Campus { get; set; }
+
+    public bool IsHod { get; set; }
 
     public int CampusId { get; set; }
 

@@ -101,32 +101,45 @@ namespace DataAccess
         public async Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(
             string? status,
             int? userId,
+            int? teamId = null,
             int? semesterId = null,
             bool? isLocked = null,
             bool lecturerOnly = false,
             int? excludeUserId = null
         )
         {
-            var query = _context
-                .Theses.AsNoTracking()
-                .Include(t => t.User)
-                    .ThenInclude(u => u.Role)
-                .AsQueryable();
-
-            if (!string.IsNullOrWhiteSpace(status))
-                query = query.Where(t => t.Status == status);
-
+            var query = _context.Theses.AsNoTracking().Include(t => t.User).AsQueryable();
+ 
+            if (!string.IsNullOrEmpty(status))
+            {
+                if (string.Equals(status, "Verified", StringComparison.OrdinalIgnoreCase))
+                {
+                    var verifiedStatuses = new[] { "Published", "Need Update" };
+                    query = query.Where(t => verifiedStatuses.Contains(t.Status));
+                }
+                else
+                {
+                    query = query.Where(t => t.Status == status);
+                }
+            }
+ 
             if (userId.HasValue)
+            {
                 query = query.Where(t => t.UserId == userId.Value);
-
-            if (excludeUserId.HasValue)
-                query = query.Where(t => t.UserId != excludeUserId.Value);
-
+            }
+ 
+            if (teamId.HasValue)
+            {
+                query = query.Where(t => t.TeamId == teamId.Value);
+            }
             if (semesterId.HasValue)
                 query = query.Where(t => t.SemesterId == semesterId.Value);
 
             if (isLocked.HasValue)
                 query = query.Where(t => t.IsLocked == isLocked.Value);
+
+            if (excludeUserId.HasValue)
+                query = query.Where(t => t.UserId != excludeUserId.Value);
 
             if (lecturerOnly)
                 query = query.Where(t => t.User.Role != null && t.User.Role.RoleName == "Lecturer");
@@ -211,17 +224,25 @@ namespace DataAccess
                     t.UserId == leaderId
                     && (
                         t.Status == "On Mentor Inviting"
-                        || t.Status == "Approved"
-                        || t.Status == "Published"
+                       
+                        || t.Status == "Registered"
                     )
                 );
-
+ 
             if (semesterId.HasValue)
             {
                 query = query.Where(t => t.SemesterId == semesterId.Value);
             }
-
+ 
             return await query.FirstOrDefaultAsync();
+        }
+ 
+        public async Task<IEnumerable<Thesis>> GetThesesByTeamIdAsync(int teamId)
+        {
+            return await _context.Theses
+                .AsNoTracking()
+                .Where(t => t.TeamId == teamId)
+                .ToListAsync();
         }
     }
 }

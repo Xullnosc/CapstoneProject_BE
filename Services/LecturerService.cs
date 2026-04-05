@@ -18,6 +18,7 @@ namespace Services
         private readonly ISemesterRepository _semesterRepository;
         private readonly IRedisService _redisService;
         private readonly ICampusContextService _campusContextService;
+        private readonly ISystemUserCredentialRepository _credentialRepository;
 
         public LecturerService(
             ILecturerRepository lecturerRepository,
@@ -25,7 +26,8 @@ namespace Services
             IWhitelistRepository whitelistRepository,
             ISemesterRepository semesterRepository,
             IRedisService redisService,
-            ICampusContextService campusContextService)
+            ICampusContextService campusContextService,
+            ISystemUserCredentialRepository credentialRepository)
         {
             _lecturerRepository = lecturerRepository;
             _userRepository = userRepository;
@@ -33,6 +35,7 @@ namespace Services
             _semesterRepository = semesterRepository;
             _redisService = redisService;
             _campusContextService = campusContextService;
+            _credentialRepository = credentialRepository;
         }
 
         public async Task<IEnumerable<Lecturer>> GetAllLecturersAsync()
@@ -55,8 +58,6 @@ namespace Services
 
             foreach (var l in lecturers)
             {
-                l.Campus = CampusConstants.MapCodeToFullName(l.Campus);
-                
                 string emailKey = l.Email.Trim();
                 bool hasNoAvatar = string.IsNullOrWhiteSpace(l.Avatar) || l.Avatar == "N/A";
                 
@@ -97,7 +98,6 @@ namespace Services
 
             foreach (var l in items)
             {
-                l.Campus = CampusConstants.MapCodeToFullName(l.Campus);
                 if (string.IsNullOrWhiteSpace(l.Avatar) || l.Avatar == "N/A")
                 {
                     if (avatarDict.TryGetValue(l.Email.Trim(), out var avatar))
@@ -129,8 +129,6 @@ namespace Services
 
             foreach (var l in lecturers)
             {
-                l.Campus = CampusConstants.MapCodeToFullName(l.Campus);
-
                 string emailKey = l.Email.Trim().ToLowerInvariant();
                 bool hasNoAvatar = string.IsNullOrWhiteSpace(l.Avatar) || l.Avatar == "N/A";
 
@@ -167,9 +165,6 @@ namespace Services
                 throw new InvalidOperationException("Super Admin phải cung cấp CampusId hợp lệ.");
             }
 
-            // Synchronize legacy Campus string
-            lecturer.Campus = CampusConstants.MapIdToFullName(lecturer.CampusId);
-
             lecturer.CreatedAt = DateTime.UtcNow;
             lecturer.UpdatedAt = DateTime.UtcNow;
             
@@ -187,20 +182,10 @@ namespace Services
 
             // Normalize data
             if (lecturer.Email != null) lecturer.Email = lecturer.Email.Trim();
-            
-            // If campusId changed, sync the name
-            if (lecturer.CampusId > 0 && existing.CampusId != lecturer.CampusId)
-            {
-                existing.CampusId = lecturer.CampusId;
-                existing.Campus = CampusConstants.MapIdToFullName(lecturer.CampusId);
-            }
-            else if (!string.IsNullOrEmpty(lecturer.Campus))
-            {
-                existing.Campus = CampusConstants.MapCodeToFullName(lecturer.Campus);
-            }
 
             bool statusChanged = existing.IsActive != lecturer.IsActive;
-            bool infoChanged = (existing.Email != null && !existing.Email.Equals(lecturer.Email, StringComparison.OrdinalIgnoreCase)) || 
+            string? oldEmail = existing.Email;
+            bool infoChanged = (oldEmail != null && !oldEmail.Equals(lecturer.Email, StringComparison.OrdinalIgnoreCase)) || 
                                (existing.FullName != null && !existing.FullName.Equals(lecturer.FullName, StringComparison.OrdinalIgnoreCase));
 
             // Update existing tracked entity
@@ -214,7 +199,7 @@ namespace Services
 
             if (statusChanged || (existing.IsActive && infoChanged))
             {
-                await SyncLecturerWithWhitelists(existing, existing.IsActive);
+                await SyncLecturerWithWhitelists(existing, existing.IsActive, oldEmail);
             }
         }
 
@@ -239,7 +224,17 @@ namespace Services
             }
         }
 
-        private async Task SyncLecturerWithWhitelists(Lecturer lecturer, bool shouldBePresent)
+        public async Task ToggleReviewerAsync(int id, bool isReviewer)
+        {
+            var lecturer = await _lecturerRepository.GetByIdAsync(id);
+            if (lecturer != null && lecturer.IsReviewer != isReviewer)
+            {
+                lecturer.IsReviewer = isReviewer;
+                await _lecturerRepository.UpdateAsync(lecturer);
+            }
+        }
+
+        private async Task SyncLecturerWithWhitelists(Lecturer lecturer, bool shouldBePresent, string? oldEmail = null)
         {
             if (string.IsNullOrWhiteSpace(lecturer.Email)) return;
 
@@ -247,18 +242,55 @@ namespace Services
             var lecturerRole = roles.FirstOrDefault(r => string.Equals(r.RoleName, CampusConstants.Roles.Lecturer, StringComparison.OrdinalIgnoreCase));
             if (lecturerRole == null) return;
 
-            string? mappedCampus = CampusConstants.MapCodeToFullName(lecturer.Campus);
-
             // Fetch all whitelists globally with the lecturer role
             var globalWhitelists = await _whitelistRepository.GetByRoleAsync(lecturerRole.RoleId);
             
-            // Look for an existing global entry for this email (where SemesterId is null)
+            bool changed = false;
+
+            // Handle email change if oldEmail provided
+            if (!string.IsNullOrEmpty(oldEmail) && !oldEmail.Equals(lecturer.Email, StringComparison.OrdinalIgnoreCase))
+            {
+                // 1. Update all Whitelist entries matching oldEmail
+                var whitelistsToUpdate = globalWhitelists.Where(w => 
+                    !string.IsNullOrEmpty(w.Email) && 
+                    w.Email.Trim().Equals(oldEmail.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+                
+                foreach (var w in whitelistsToUpdate)
+                {
+                    w.Email = lecturer.Email;
+                    w.FullName = lecturer.FullName; // Sync info too
+                    w.Avatar = lecturer.Avatar;
+                    await _whitelistRepository.UpdateAsync(w);
+                }
+
+                // 2. Update User table
+                var user = await _userRepository.GetByEmailAsync(oldEmail);
+                if (user != null)
+                {
+                    user.Email = lecturer.Email;
+                    user.FullName = lecturer.FullName;
+                    user.Avatar = lecturer.Avatar;
+                    await _userRepository.UpdateAsync(user);
+
+                    // 3. Update SystemUserCredential (Username)
+                    var credential = await _credentialRepository.GetByUserIdAsync(user.UserId);
+                    if (credential != null)
+                    {
+                        credential.Username = lecturer.Email;
+                        await _credentialRepository.UpdateAsync(credential);
+                    }
+                }
+                
+                changed = true;
+                // Re-fetch global whitelists for the next step (syncing presence)
+                globalWhitelists = await _whitelistRepository.GetByRoleAsync(lecturerRole.RoleId);
+            }
+
+            // Look for an existing global entry for the CURRENT email (where SemesterId is null)
             var existingEntry = globalWhitelists.FirstOrDefault(w => 
                 !string.IsNullOrEmpty(w.Email) && 
                 w.Email.Trim().Equals(lecturer.Email.Trim(), StringComparison.OrdinalIgnoreCase) && 
                 w.SemesterId == null);
-
-            bool changed = false;
 
             if (shouldBePresent)
             {
@@ -269,7 +301,6 @@ namespace Services
                         Email = lecturer.Email,
                         FullName = lecturer.FullName,
                         Avatar = lecturer.Avatar,
-                        Campus = CampusConstants.MapIdToFullName(lecturer.CampusId),
                         CampusId = lecturer.CampusId,
                         RoleId = lecturerRole.RoleId,
                         SemesterId = null, // Global lecturer whitelist
@@ -279,16 +310,13 @@ namespace Services
                 }
                 else
                 {
-                    var mappedFullName = CampusConstants.MapIdToFullName(lecturer.CampusId);
                     if (existingEntry.FullName != lecturer.FullName || 
                         existingEntry.Avatar != lecturer.Avatar || 
-                        existingEntry.CampusId != lecturer.CampusId ||
-                        existingEntry.Campus != mappedFullName)
+                        existingEntry.CampusId != lecturer.CampusId)
                     {
                         existingEntry.FullName = lecturer.FullName;
                         existingEntry.Avatar = lecturer.Avatar;
                         existingEntry.CampusId = lecturer.CampusId;
-                        existingEntry.Campus = mappedFullName;
                         await _whitelistRepository.UpdateAsync(existingEntry);
                         changed = true;
                     }

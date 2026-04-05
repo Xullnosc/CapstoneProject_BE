@@ -26,6 +26,13 @@ namespace BusinessObjects.DTOs
         public int MemberCount { get; set; }
         public bool IsSpecial { get; set; }
         public DateTime CreatedAt { get; set; }
+
+        public string? TopicId { get; set; }
+        public string? TopicName { get; set; }
+        public string? TopicDescription { get; set; }
+        public string? TopicStatus { get; set; }
+        public string? TopicFileUrl { get; set; }
+
         public List<TeamMemberDTO> Members { get; set; }
     }
 

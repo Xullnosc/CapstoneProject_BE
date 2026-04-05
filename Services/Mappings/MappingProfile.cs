@@ -109,7 +109,7 @@ namespace Services.Mappings
                 .ForMember(dest => dest.Avatar, opt => opt.MapFrom(src => src.Avatar))
                 .ForMember(
                     dest => dest.Campus,
-                    opt => opt.MapFrom(src => CampusConstants.MapCodeToFullName(src.Campus))
+                    opt => opt.MapFrom(src => src.CampusNavigation != null ? src.CampusNavigation.CampusName : null)
                 )
                 .ForMember(dest => dest.StudentCode, opt => opt.MapFrom(src => src.StudentCode))
                 .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))

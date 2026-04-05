@@ -415,7 +415,7 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync((Semester?)null);
 
             // Act
-            Func<Task> act = async () => await _semesterService.GetOrphanedStudentsAsync(id, 1, 10);
+            Func<Task> act = async () => await _semesterService.GetOrphanedStudentsAsync(id, 1, 10, null);
 
             // Assert
             await act.Should().ThrowAsync<KeyNotFoundException>()
@@ -441,13 +441,13 @@ namespace FCTMS.Tests.Services
             };
 
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
-            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(id, page, pageSize)).ReturnsAsync(pagedOrphaned);
+            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(id, page, pageSize, It.IsAny<string?>())).ReturnsAsync(pagedOrphaned);
             _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(orphanedWhitelists)).Returns(orphanedDTOs);
             _mockUserRepository.Setup(u => u.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
                 .ReturnsAsync(new List<User> { new User { Email = "orphan@fpt.edu.vn", Avatar = "avatar.png" } });
 
             // Act
-            var result = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize);
+            var result = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize, null);
 
             // Assert
             result.Should().NotBeNull();
@@ -468,11 +468,11 @@ namespace FCTMS.Tests.Services
             var pagedOrphaned = new PagedResult<Whitelist>(new List<Whitelist>(), 0, page, pageSize);
 
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
-            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(id, page, pageSize)).ReturnsAsync(pagedOrphaned);
+            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(id, page, pageSize, It.IsAny<string?>())).ReturnsAsync(pagedOrphaned);
             _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(It.IsAny<List<Whitelist>>())).Returns(new List<WhitelistDTO>());
 
             // Act
-            var result = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize);
+            var result = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize, null);
 
             // Assert
             result.Should().NotBeNull();

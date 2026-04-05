@@ -15,5 +15,6 @@ namespace Services
         Task UpdateLecturerAsync(Lecturer lecturer);
         Task DeleteLecturerAsync(int id);
         Task ToggleLecturerStatusAsync(int id, bool isActive);
+        Task ToggleReviewerAsync(int id, bool isReviewer);
     }
 }

@@ -142,11 +142,11 @@ namespace Services
                 throw new Exception("Mentor is not found in the global lecturer pool or semester whitelist.");
             }
 
-            // If it's a student in whitelist, we reject if we specifically want a mentor (lecturer role)
-            // But usually, lecturers are managed in the Lecturers table now.
-            if (globalLecturer == null && whitelistEntry != null && whitelistEntry.RoleId != 2)
+            // If it's a student in whitelist, we reject if we specifically want a mentor (lecturer/HOD role)
+            // HOD = 1, Lecturer = 2
+            if (globalLecturer == null && whitelistEntry != null && whitelistEntry.RoleId != 1 && whitelistEntry.RoleId != 2)
             {
-                throw new Exception("Invited user is not a lecturer.");
+                throw new Exception("Invited user is not a lecturer or HOD.");
             }
 
             var mentor = await _userRepo.GetByEmailAsync(mentorEmail);
@@ -160,7 +160,7 @@ namespace Services
                     FullName = globalLecturer?.FullName ?? whitelistEntry?.FullName ?? "Lecturer",
                     Avatar = globalLecturer?.Avatar ?? whitelistEntry?.Avatar ?? "",
                     RoleId = 2, // Default to Lecturer role id
-                    Campus = globalLecturer?.Campus ?? whitelistEntry?.Campus,
+                    CampusId = globalLecturer?.CampusId ?? whitelistEntry?.CampusId,
                     IsAuthorized = true,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -168,9 +168,11 @@ namespace Services
             }
             else
             {
-                // Check if the user is actually a lecturer
-                if (mentor.Role?.RoleName != CampusConstants.Roles.Lecturer && mentor.RoleId != 2) 
-                    throw new Exception("Invited user is not a lecturer.");
+                // Check if the user is actually a lecturer or HOD
+                if (mentor.Role?.RoleName != CampusConstants.Roles.Lecturer && 
+                    mentor.Role?.RoleName != CampusConstants.Roles.HOD &&
+                    mentor.RoleId != 1 && mentor.RoleId != 2) 
+                    throw new Exception("Invited user is not a lecturer or HOD.");
             }
             
             if (mentor.UserId == leaderId) throw new Exception("You cannot invite yourself.");

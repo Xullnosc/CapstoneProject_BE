@@ -15,19 +15,25 @@ namespace Services
         private readonly ITeamRepository _teamRepo;
         private readonly ISemesterRepository _semesterRepo;
         private readonly ITeamInvitationRepository _teamInvRepo;
+        private readonly IUserRepository _userRepo;
+        private readonly ILecturerRepository _lecturerRepo;
 
         public ThesisApplicationService(
             IThesisApplicationRepository appRepo,
             IThesisRepository thesisRepo,
             ITeamRepository teamRepo,
             ISemesterRepository semesterRepo,
-            ITeamInvitationRepository teamInvRepo)
+            ITeamInvitationRepository teamInvRepo,
+            IUserRepository userRepo,
+            ILecturerRepository lecturerRepo)
         {
             _appRepo = appRepo;
             _thesisRepo = thesisRepo;
             _teamRepo = teamRepo;
             _semesterRepo = semesterRepo;
             _teamInvRepo = teamInvRepo;
+            _userRepo = userRepo;
+            _lecturerRepo = lecturerRepo;
         }
 
         public async Task<ThesisApplicationDTO> SubmitApplicationAsync(int userId, string thesisId)
@@ -239,13 +245,12 @@ namespace Services
             if (app == null)
                 throw new KeyNotFoundException("Application not found.");
 
-            // Authorization: only thesis owner or their team mentor can approve
-            var thesis = await _thesisRepo.GetThesisByIdAsync(app.ThesisId);
-            if (thesis == null)
-                throw new KeyNotFoundException("Thesis not found.");
+            if (app.Thesis == null)
+                throw new KeyNotFoundException("Thesis associated with this application not found.");
 
+            // Authorization: only thesis owner or their team mentor can approve
             bool isAuthorized = false;
-            if (thesis.UserId == userId)
+            if (app.Thesis.UserId == userId)
             {
                 isAuthorized = true;
             }
@@ -254,7 +259,7 @@ namespace Services
                 var authSemester = await _semesterRepo.GetCurrentSemesterAsync();
                 if (authSemester != null)
                 {
-                    var ownerTeam = await _teamRepo.GetTeamByStudentIdAsync(thesis.UserId, authSemester.SemesterId);
+                    var ownerTeam = await _teamRepo.GetTeamByStudentIdAsync(app.Thesis.UserId, authSemester.SemesterId);
                     if (ownerTeam != null && (ownerTeam.MentorId == userId || ownerTeam.MentorId2 == userId))
                     {
                         isAuthorized = true;
@@ -268,6 +273,13 @@ namespace Services
             if (app.Status != "Pending")
                 throw new InvalidOperationException("Only Pending applications can be approved.");
 
+            // 0. Resolve LecturerId for the approver (MentorId1 references Lecturers table)
+            var user = await _userRepo.GetByIdAsync(userId);
+            if (user == null) throw new KeyNotFoundException("Approver user not found.");
+            
+            var lecturer = await _lecturerRepo.GetByEmailAsync(user.Email);
+            if (lecturer == null) throw new KeyNotFoundException("Approver lecturer record not found. Please ensure your account is linked to a Lecturer record.");
+
             // Validate: GV is mentor of fewer than 4 teams in current semester
             var semester = await _semesterRepo.GetCurrentSemesterAsync();
             if (semester == null)
@@ -279,18 +291,23 @@ namespace Services
 
             // 1. Approve this application
             app.Status = "Approved";
+            
+            // Critical Fix: Update the thesis linked to the application with the correct LecturerId
+            // app.Thesis is already loaded via Include in GetByIdAsync
+            if (app.Thesis != null)
+            {
+                app.Thesis.TeamId = app.TeamId;
+                app.Thesis.MentorId1 = lecturer.LecturerId;
+                app.Thesis.Status = "Registered";
+            }
+
             await _appRepo.UpdateAsync(app);
 
             // 2. Reject all other Pending applications for the same thesis
             await _appRepo.RejectAllPendingByThesisIdExceptAsync(app.ThesisId, app.Id);
 
-            // 3. Assign thesis.TeamId
-            thesis.TeamId = app.TeamId;
-            thesis.MentorId1 = userId;
-
-            // 4. Set thesis status → "Registered"
-            thesis.Status = "Registered";
-            await _thesisRepo.UpdateThesisAsync(thesis);
+            // 2.5. Cancel all other Pending applications for the SAME TEAM (other theses)
+            await _appRepo.CancelAllPendingByTeamIdExceptAsync(app.TeamId, app.Id);
 
             // 5. Set GV as team's MentorId
             var team = await _teamRepo.GetByIdAsync(app.TeamId);

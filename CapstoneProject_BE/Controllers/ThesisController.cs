@@ -114,6 +114,7 @@ namespace CapstoneProject_BE.Controllers
         public async Task<IActionResult> GetAllTheses(
             [FromQuery] string? status,
             [FromQuery] int? userId,
+            [FromQuery] int? teamId,
             [FromQuery] string? searchTitle,
             [FromQuery] int? semesterId,
             [FromQuery] bool? isLocked,
@@ -142,6 +143,7 @@ namespace CapstoneProject_BE.Controllers
                 var theses = await _thesisService.GetFilteredThesesAsync(
                     status,
                     userId,
+                    teamId,
                     searchTitle,
                     semesterId,
                     isLocked,

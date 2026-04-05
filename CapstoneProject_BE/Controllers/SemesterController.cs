@@ -358,11 +358,12 @@ namespace CapstoneProject_BE.Controllers
         public async Task<IActionResult> GetOrphanedStudents(
             int id,
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 10)
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? search = null)
         {
             try
             {
-                var orphaned = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize);
+                var orphaned = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize, search);
                 return Ok(orphaned);
             }
             catch (KeyNotFoundException ex)

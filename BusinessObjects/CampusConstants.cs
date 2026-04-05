@@ -47,8 +47,37 @@ namespace BusinessObjects
                 3 => HoChiMinh,
                 4 => CanTho,
                 5 => QuyNhon,
-                _ => "Unknown"
+                _ => "Global"
             };
+        }
+
+        public static string MapIdToCode(int campusId)
+        {
+            return campusId switch
+            {
+                1 => "HO",
+                2 => "DN",
+                3 => "HCM",
+                4 => "CT",
+                5 => "QN",
+                _ => "Global"
+            };
+        }
+
+        public static int? MapToId(string? campus)
+        {
+            if (string.IsNullOrWhiteSpace(campus)) return null;
+
+            var normalized = campus.Trim().ToUpper();
+
+            // Try match by Full Name or common codes
+            if (normalized.Contains("HÒA LẠC") || normalized == "HL" || normalized == "HO") return 1;
+            if (normalized.Contains("ĐÀ NẴNG") || normalized == "DN") return 2;
+            if (normalized.Contains("HỒ CHÍ MINH") || normalized == "HCM" || normalized == "SG") return 3;
+            if (normalized.Contains("CẦN THƠ") || normalized == "CT") return 4;
+            if (normalized.Contains("QUY NHƠN") || normalized == "QN") return 5;
+
+            return null;
         }
 
         public static class Roles

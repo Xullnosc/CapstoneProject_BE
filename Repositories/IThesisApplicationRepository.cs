@@ -15,5 +15,6 @@ namespace Repositories
         Task UpdateAsync(ThesisApplication app);
         Task<(List<ThesisApplication> Items, int TotalCount)> GetByThesisIdPagedAsync(string thesisId, string? status, string? search, int page, int limit);
         Task RejectAllPendingByThesisIdExceptAsync(string thesisId, int exceptId);
+        Task CancelAllPendingByTeamIdExceptAsync(int teamId, int exceptId);
     }
 }

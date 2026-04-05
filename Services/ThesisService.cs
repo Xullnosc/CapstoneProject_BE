@@ -87,9 +87,14 @@ namespace Services
 
             // Resolve target user (HOD can propose for another lecturer)
             User targetUser = user;
-            bool isHodActing = (user.Role?.RoleName == CampusConstants.Roles.HOD || user.Role?.RoleName == CampusConstants.Roles.Admin) && req.AuthorId.HasValue;
+            bool isStaff = user.Role?.RoleName == CampusConstants.Roles.Lecturer || 
+                           user.Role?.RoleName == CampusConstants.Roles.HOD || 
+                           user.Role?.RoleName == CampusConstants.Roles.Admin;
+
+            bool isHodActingForOther = (user.Role?.RoleName == CampusConstants.Roles.HOD || user.Role?.RoleName == CampusConstants.Roles.Admin) && 
+                                       req.AuthorId.HasValue && req.AuthorId != user.UserId;
             
-            if (isHodActing)
+            if (isHodActingForOther)
             {
                 var author = await _userRepository.GetByIdAsync(req.AuthorId!.Value);
                 if (author == null) throw new Exception("Author user not found.");
@@ -105,10 +110,12 @@ namespace Services
                 t.Status != "Cancelled" && t.Status != "Rejected"
             );
             
-            // Skip multiple-check for HOD-submitted topics or if target is Lecturer
-            bool isTargetLecturer = targetUser.Role?.RoleName == CampusConstants.Roles.Lecturer;
+            // Skip multiple-check for HOD-submitted topics or if target is Lecturer/HOD/Admin
+            bool isTargetStaff = targetUser.Role?.RoleName == CampusConstants.Roles.Lecturer || 
+                                 targetUser.Role?.RoleName == CampusConstants.Roles.HOD || 
+                                 targetUser.Role?.RoleName == CampusConstants.Roles.Admin;
             
-            if (hasActiveThesis && !isTargetLecturer)
+            if (hasActiveThesis && !isTargetStaff)
             {
                 throw new InvalidOperationException(
                     "This user has already proposed a thesis. They cannot propose more than one."
@@ -116,7 +123,7 @@ namespace Services
             }
 
             // Students must be the team leader and the team must have at least 4 members.
-            if (!isTargetLecturer)
+            if (!isTargetStaff)
             {
                 // Check if thesis registration is open
                 var isRegistrationOpen = await _systemParameterService.GetBoolAsync("THESIS_REGISTRATION_OPEN", true);
@@ -135,9 +142,16 @@ namespace Services
                     );
 
                 if (!team.IsSpecial && team.Teammembers.Count < 4)
-                    throw new InvalidOperationException(
-                        $"Target team must have at least 4 members to propose a thesis unless marked as special. Current members: {team.Teammembers.Count}."
-                    );
+                     throw new InvalidOperationException(
+                         $"Target team must have at least 4 members to propose a thesis unless marked as special. Current members: {team.Teammembers.Count}."
+                     );
+
+                // [NEW] Check if team already has a Registered thesis
+                var teamTheses = await _thesisRepository.GetThesesByTeamIdAsync(team.TeamId);
+                if (teamTheses.Any(t => string.Equals(t.Status, "Registered", StringComparison.OrdinalIgnoreCase)))
+                {
+                    throw new InvalidOperationException("Team của bạn đã được đăng ký vào một đề tài khác. Không thể nộp thêm đề tài mới.");
+                }
             }
 
             string? fileUrl = null;
@@ -179,7 +193,7 @@ namespace Services
                 UserId = targetUser.UserId,
                 FileUrl = fileUrl,
                 Status =
-                    isTargetLecturer || isHodActing
+                    isTargetStaff || isHodActingForOther
                         ? "Reviewing"
                         : (hasAssignedMentor ? "Reviewing" : "On Mentor Inviting"),
                 SemesterId = currentSemester?.SemesterId,
@@ -193,10 +207,11 @@ namespace Services
                 EnterpriseName = req.IsFromEnterprise ? req.EnterpriseName : null,
                 IsApplied = req.IsApplied,
                 IsAppUsed = req.IsAppUsed,
+                OriginalAuthorId = targetUser.UserId,
             };
 
-            // Set TeamId based on role (Lecturers don't have teams)
-            if (!isTargetLecturer)
+            // Set TeamId based on role (Staff don't have teams)
+            if (!isTargetStaff)
             {
                 if (team != null)
                 {
@@ -405,7 +420,10 @@ namespace Services
             var ownerIds = new HashSet<int>();
             var teamIds = new HashSet<int>();
 
-            if (user.Role?.RoleName == CampusConstants.Roles.Lecturer)
+            bool isStaff = user.Role?.RoleName == CampusConstants.Roles.Lecturer || 
+                           user.Role?.RoleName == CampusConstants.Roles.HOD;
+
+            if (isStaff)
             {
                 // Lecturer view: see their own proposals
                 ownerIds.Add(user.UserId);
@@ -757,13 +775,21 @@ namespace Services
             // HOD decision is FINAL (Priority 1)
             if (status.HodDecision != null)
             {
-                thesis.Status = string.Equals(
+                var isPass = string.Equals(
                     status.HodDecision.Decision,
                     "Pass",
                     StringComparison.OrdinalIgnoreCase
-                )
-                    ? "Published"
-                    : "Need Update";
+                );
+                
+                if (isPass)
+                {
+                    thesis.Status = thesis.TeamId.HasValue ? "Registered" : "Published";
+                }
+                else
+                {
+                    thesis.Status = "Need Update";
+                }
+
                 thesis.UpdateDate = DateTime.UtcNow;
                 await _thesisRepository.UpdateThesisAsync(thesis);
                 return;
@@ -772,7 +798,7 @@ namespace Services
             // Reviewer decisions (Priority 2)
             if (string.Equals(status.OverallStatus, "Pass", StringComparison.OrdinalIgnoreCase))
             {
-                thesis.Status = "Published";
+                thesis.Status = thesis.TeamId.HasValue ? "Registered" : "Published";
             }
             else if (
                 string.Equals(status.OverallStatus, "Fail", StringComparison.OrdinalIgnoreCase)
@@ -805,16 +831,16 @@ namespace Services
                 StringComparison.OrdinalIgnoreCase
             );
 
-            // 1. Check if HOD
-            if (isHodRole)
-            {
-                return "HOD";
-            }
-
-            // 2. Check if the user is the proposer
+            // 1. Check if the user is the proposer
             if (user.UserId == thesis.UserId)
             {
                 return "AUTHOR";
+            }
+
+            // 2. Check if HOD
+            if (isHodRole)
+            {
+                return "HOD";
             }
 
             // 3. Check for specified Lecturer roles (Mentor or Reviewer)
@@ -913,6 +939,7 @@ namespace Services
         public async Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(
             string? status,
             int? userId,
+            int? teamId = null,
             string? searchTitle = null,
             int? semesterId = null,
             bool? isLocked = null,
@@ -947,6 +974,7 @@ namespace Services
             var theses = await _thesisRepository.GetAllThesesFilteredAsync(
                 status,
                 userId,
+                teamId,
                 semesterId,
                 isLocked,
                 lecturerOnly,

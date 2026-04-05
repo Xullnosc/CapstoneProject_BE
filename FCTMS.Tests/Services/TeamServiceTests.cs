@@ -219,7 +219,7 @@ namespace FCTMS.Tests.Services
             _mockWhitelistRepository.Setup(r => r.IsWhitelistedInSemesterAsync("test@edu.vn", 1)).ReturnsAsync(true);
             _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team)null);
             _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1)).ReturnsAsync(new List<string>());
-            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => { t.TeamId = 1; return t; });
+            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => { t.TeamId = 1; return t; }!);
 
             // Act
             var result = await _teamService.CreateTeamAsync(userId, createDto);
@@ -242,7 +242,7 @@ namespace FCTMS.Tests.Services
             _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team)null);
             _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1))
                 .ReturnsAsync(new List<string> { "SP25_SE_01", "SP25_SE_02", "SP25_SE_15" });
-            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => { t.TeamId = 1; return t; });
+            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => { t.TeamId = 1; return t; }!);
 
             // Act
             var result = await _teamService.CreateTeamAsync(userId, createDto);
@@ -374,7 +374,7 @@ namespace FCTMS.Tests.Services
                 });
             _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(It.IsAny<int>(), 1)).ReturnsAsync((Team?)null);
             _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1)).ReturnsAsync(new List<string>());
-            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => { t.TeamId = 1; return t; });
+            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => { t.TeamId = 1; return t; }!);
 
             // Act
             var result = await _teamService.ForceCreateTeamAsync(hodUserId, dto);

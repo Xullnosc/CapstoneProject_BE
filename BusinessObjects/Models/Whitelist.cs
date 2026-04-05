@@ -17,8 +17,6 @@ public partial class Whitelist
 
     public string? Avatar { get; set; }
 
-    public string? Campus { get; set; }
-
     public int CampusId { get; set; }
 
     public virtual Campus CampusNavigation { get; set; } = null!;
