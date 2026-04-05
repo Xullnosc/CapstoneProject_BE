@@ -122,7 +122,7 @@ namespace FCTMS.Tests.Services
             // Assert
             result.Should().NotBeNull();
             result.SemesterCode.Should().Be("SP26");
-            _mockSemesterRepository.Verify(r => r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == "Upcoming")), Times.Once);
+            _mockSemesterRepository.Verify(r => r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == "Open")), Times.Once);
         }
 
         [Fact]
@@ -184,7 +184,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SU26", SemesterName = "Summer 2026" };
 
-            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
+            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Open" };
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
 
@@ -208,7 +208,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026" };
 
-            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
+            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Open" };
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
             
@@ -234,7 +234,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026" };
 
-            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
+            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Open" };
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
 

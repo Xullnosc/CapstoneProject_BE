@@ -75,11 +75,32 @@ namespace BusinessObjects
 
         public static class SemesterStatus
         {
-            public const string Upcoming = "Upcoming";
-            public const string Active = "Active";
-            public const string ReviewThesis = "Review Thesis";
-            public const string ReviewMiddle = "Review Middle Semester";
+            /// <summary>Mở — Thực hiện được tất cả hoạt động nhóm và đề tài.</summary>
+            public const string Open = "Open";
+
+            /// <summary>Đang giữa kỳ — Chỉ phục vụ review giữa kỳ. Không tạo nhóm/đề tài.</summary>
+            public const string InProgress = "In Progress";
+
+            /// <summary>Đóng — Chỉ xem, không thao tác gì.</summary>
             public const string Closed = "Closed";
+
+            // ── Backward compatibility aliases (các giá trị cũ trong DB) ──────────
+            public const string Active = "Active";               // → Open
+            public const string Upcoming = "Upcoming";           // → Open
+            public const string ReviewThesis = "Review Thesis";  // → InProgress
+            public const string ReviewMiddle = "Review Middle Semester"; // → InProgress
+
+            /// <summary>Kiểm tra semester có đang ở giai đoạn Mở không (cho phép mọi hoạt động).</summary>
+            public static bool IsOpenStage(string? status) =>
+                status == Open || status == Active || status == Upcoming;
+
+            /// <summary>Kiểm tra semester đang bị khóa (chỉ review giữa kỳ).</summary>
+            public static bool IsLockedStage(string? status) =>
+                status == InProgress || status == ReviewThesis || status == ReviewMiddle;
+
+            /// <summary>Kiểm tra semester đã đóng (chỉ xem).</summary>
+            public static bool IsClosedStage(string? status) =>
+                status == Closed;
         }
 
         public static class TeamStatus

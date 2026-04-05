@@ -63,12 +63,15 @@ namespace FCTMS.Tests.Services
             {
                 TeamId = teamId,
                 LeaderId = leaderId,
-                Status = "Insufficient"
+                Status = "Insufficient",
+                Semester = new Semester { Status = "Open" }
             };
             _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId))
                 .ReturnsAsync(team);
             _mockTeamRepository.Setup(r => r.UpdateAsync(team))
                 .ReturnsAsync(true);
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync())
+                .ReturnsAsync(new Semester { Status = "Open" });
 
             // Act
             var result = await _teamService.DisbandTeamAsync(teamId, leaderId);
@@ -95,7 +98,10 @@ namespace FCTMS.Tests.Services
         public async Task DisbandTeamAsync_ThrowsException_WhenNotLeader()
         {
             // Arrange
-            var team = new Team { TeamId = 1, LeaderId = 999 };
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync())
+                .ReturnsAsync(new Semester { Status = "Open" });
+
+            var team = new Team { TeamId = 1, LeaderId = 999, Semester = new Semester { Status = "Open" } };
             _mockTeamRepository.Setup(r => r.GetByIdAsync(1))
                 .ReturnsAsync(team);
             // Act & Assert
@@ -120,10 +126,12 @@ namespace FCTMS.Tests.Services
                 LeaderId = leaderId,
                 TeamName = "Old Name",
                 Description = "Old Description",
-                Teammembers = new List<Teammember>()
+                Teammembers = new List<Teammember>(),
+                Semester = new Semester { Status = "Open" }
             };
 
             _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { Status = "Open" });
 
             // Act
             var result = await _teamService.UpdateTeamAsync(teamId, leaderId, updateDto);
@@ -153,11 +161,13 @@ namespace FCTMS.Tests.Services
                 TeamId = teamId,
                 LeaderId = leaderId,
                 TeamAvatar = "old_url",
-                Teammembers = new List<Teammember>()
+                Teammembers = new List<Teammember>(),
+                Semester = new Semester { Status = "Open" }
             };
 
             _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
             _mockCloudinaryHelper.Setup(x => x.UploadImageAsync(mockFile.Object)).ReturnsAsync("new_secure_url");
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { Status = "Open" });
 
             // Act
             var result = await _teamService.UpdateTeamAsync(teamId, leaderId, updateDto);
@@ -194,10 +204,12 @@ namespace FCTMS.Tests.Services
             {
                 TeamId = teamId,
                 LeaderId = leaderId,
-                Teammembers = new List<Teammember>()
+                Teammembers = new List<Teammember>(),
+                Semester = new Semester { Status = "Open" }
             };
 
             _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { Status = "Open" });
 
             // Act
             Func<Task> act = async () => await _teamService.UpdateTeamAsync(teamId, otherUserId, new UpdateTeamDTO());
@@ -212,7 +224,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             int userId = 1;
             var createDto = new CreateTeamDTO { TeamName = "New Team" };
-            var semester = new Semester { SemesterId = 1, SemesterCode = "FA24", Status = CampusConstants.SemesterStatus.Active };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "FA24", Status = CampusConstants.SemesterStatus.Open };
             
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { UserId = userId, Email = "test@edu.vn" });
@@ -234,7 +246,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             int userId = 2;
             var createDto = new CreateTeamDTO { TeamName = "Team 2" };
-            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25", Status = CampusConstants.SemesterStatus.Active };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25", Status = CampusConstants.SemesterStatus.Open };
             
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { UserId = userId, Email = "test@edu.vn" });
@@ -462,4 +474,3 @@ namespace FCTMS.Tests.Services
         #endregion
     }
 }
-

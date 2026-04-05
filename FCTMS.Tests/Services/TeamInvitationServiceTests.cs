@@ -108,14 +108,14 @@ namespace FCTMS.Tests.Services
             int inviterId = 2;
             string studentEmail = "student@example.com";
 
-            var team = new Team { TeamId = teamId, LeaderId = inviterId, TeamName = "My Team", Teammembers = new List<Teammember>() };
+            var team = new Team { TeamId = teamId, LeaderId = inviterId, TeamName = "My Team", Teammembers = new List<Teammember>(), Semester = new Semester { Status = "Open" } };
             var inviter = new User { UserId = inviterId, FullName = "Inviter" };
             var student = new User { UserId = 3, Email = studentEmail, FullName = "Student", StudentCode = "S123" };
 
             _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
             _mockUserRepository.Setup(r => r.SearchUsersAsync(studentEmail)).ReturnsAsync(new List<User> { student });
             _mockUserRepository.Setup(r => r.GetByIdAsync(inviterId)).ReturnsAsync(inviter);
-            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1, Status = "Open" });
             _mockTeamMemberRepository.Setup(r => r.IsStudentInTeamAsync(student.UserId, 1)).ReturnsAsync(false);
             _mockInvitationRepository.Setup(r => r.GetByTeamAndStudentAsync(teamId, student.UserId)).ReturnsAsync((Teaminvitation?)null);
 
@@ -143,7 +143,8 @@ namespace FCTMS.Tests.Services
         [Fact]
         public async Task SendInvitationAsync_NotLeader_ThrowsUnauthorizedAccessException()
         {
-            var team = new Team { TeamId = 1, LeaderId = 99 }; // Different leader
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1, Status = "Open" });
+            var team = new Team { TeamId = 1, LeaderId = 99, Semester = new Semester { Status = "Open" } }; // Different leader
             _mockTeamRepository.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(team);
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _service.SendInvitationAsync(1, 1, "test@email.com"));
         }
@@ -151,9 +152,11 @@ namespace FCTMS.Tests.Services
         [Fact]
         public async Task SendInvitationAsync_StudentNotFound_ThrowsKeyNotFoundException()
         {
-            var team = new Team { TeamId = 1, LeaderId = 1, Teammembers = new List<Teammember>() };
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1, Status = "Open" });
+            var team = new Team { TeamId = 1, LeaderId = 1, Teammembers = new List<Teammember>(), Semester = new Semester { Status = "Open" } };
             _mockTeamRepository.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(team);
             _mockUserRepository.Setup(r => r.SearchUsersAsync(It.IsAny<string>())).ReturnsAsync(new List<User>()); // No users found
+            _mockWhitelistRepository.Setup(r => r.GetByEmailAsync(It.IsAny<string>())).ReturnsAsync((Whitelist?)null); // Nor in whitelist
 
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.SendInvitationAsync(1, 1, "unknown@email.com"));
         }
@@ -182,7 +185,7 @@ namespace FCTMS.Tests.Services
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.CancelInvitationAsync(1, 1));
         }
 
-         [Fact]
+        [Fact]
         public async Task CancelInvitationAsync_NotInviter_ThrowsUnauthorizedAccessException()
         {
              var invitation = new Teaminvitation { InvitationId = 1, InvitedBy = 55 };
@@ -199,8 +202,8 @@ namespace FCTMS.Tests.Services
             int studentId = 3;
             int teamId = 10;
             var invitation = new Teaminvitation { InvitationId = invitationId, StudentId = studentId, TeamId = teamId, Status = CampusConstants.InvitationStatus.Pending };
-            var team = new Team { TeamId = teamId, Teammembers = new List<Teammember> { new Teammember { StudentId = 1 } }, Status = CampusConstants.TeamStatus.Insufficient };
-            var currentSemester = new Semester { SemesterId = 1 };
+            var team = new Team { TeamId = teamId, Teammembers = new List<Teammember> { new Teammember { StudentId = 1 } }, Status = CampusConstants.TeamStatus.Insufficient, Semester = new Semester { Status = "Open" } };
+            var currentSemester = new Semester { SemesterId = 1, Status = "Open" };
 
             _mockInvitationRepository.Setup(r => r.GetByIdAsync(invitationId)).ReturnsAsync(invitation);
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
@@ -248,7 +251,7 @@ namespace FCTMS.Tests.Services
         {
             var invitation = new Teaminvitation { InvitationId = 1, StudentId = 1, Status = CampusConstants.InvitationStatus.Pending };
             _mockInvitationRepository.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(invitation);
-            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1, Status = "Open" });
             _mockTeamMemberRepository.Setup(r => r.IsStudentInTeamAsync(1, 1)).ReturnsAsync(true);
 
             await Assert.ThrowsAsync<InvalidOperationException>(() => _service.AcceptInvitationAsync(1, 1));
@@ -259,7 +262,7 @@ namespace FCTMS.Tests.Services
         {
             var invitation = new Teaminvitation { InvitationId = 1, StudentId = 1, Status = CampusConstants.InvitationStatus.Pending, TeamId = 10 };
             _mockInvitationRepository.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(invitation);
-            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1, Status = "Open" });
             _mockTeamMemberRepository.Setup(r => r.IsStudentInTeamAsync(1, 1)).ReturnsAsync(false);
             _mockTeamRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync((Team?)null);
 
@@ -270,10 +273,10 @@ namespace FCTMS.Tests.Services
         public async Task AcceptInvitationAsync_TeamFull_ThrowsInvalidOperationException()
         {
             var invitation = new Teaminvitation { InvitationId = 1, StudentId = 1, Status = CampusConstants.InvitationStatus.Pending, TeamId = 10 };
-            var team = new Team { TeamId = 10, Teammembers = new List<Teammember> { new(), new(), new(), new(), new() } }; // 5 members
+            var team = new Team { TeamId = 10, Teammembers = new List<Teammember> { new(), new(), new(), new(), new() }, Semester = new Semester { Status = "Open" } }; // 5 members
 
             _mockInvitationRepository.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(invitation);
-            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1, Status = "Open" });
             _mockTeamMemberRepository.Setup(r => r.IsStudentInTeamAsync(1, 1)).ReturnsAsync(false);
             _mockTeamRepository.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(team);
 
@@ -311,7 +314,7 @@ namespace FCTMS.Tests.Services
             int teamId = 1;
             int inviterId = 2;
             string studentEmail = "new_student@example.com";
-            var team = new Team { TeamId = teamId, LeaderId = inviterId, TeamName = "My Team", Teammembers = new List<Teammember>() };
+            var team = new Team { TeamId = teamId, LeaderId = inviterId, TeamName = "My Team", Teammembers = new List<Teammember>(), Semester = new Semester { Status = "Open" } };
             var whitelistEntry = new Whitelist { Email = studentEmail, FullName = "New Student", RoleId = 1, StudentCode = "S456" };
 
             _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
@@ -319,7 +322,7 @@ namespace FCTMS.Tests.Services
             _mockWhitelistRepository.Setup(r => r.GetByEmailAsync(studentEmail)).ReturnsAsync(whitelistEntry);
             _mockUserRepository.Setup(r => r.AddAsync(It.IsAny<User>())).ReturnsAsync(new User { UserId = 5, Email = studentEmail });
             _mockUserRepository.Setup(r => r.GetByIdAsync(inviterId)).ReturnsAsync(new User { FullName = "Inviter" });
-            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1, Status = "Open" });
             _mockTeamMemberRepository.Setup(r => r.IsStudentInTeamAsync(5, 1)).ReturnsAsync(false);
             _mockInvitationRepository.Setup(r => r.GetByTeamAndStudentAsync(teamId, 5)).ReturnsAsync((Teaminvitation?)null);
             _mockInvitationRepository.Setup(r => r.CreateAsync(It.IsAny<Teaminvitation>())).ReturnsAsync(new Teaminvitation { InvitationId = 101 });
@@ -340,12 +343,12 @@ namespace FCTMS.Tests.Services
             // Arrange
             int teamId = 1;
             int studentId = 3;
-            var team = new Team { TeamId = teamId, LeaderId = 1, Teammembers = new List<Teammember>() };
+            var team = new Team { TeamId = teamId, LeaderId = 1, Teammembers = new List<Teammember>(), Semester = new Semester { Status = "Open" } };
             var student = new User { UserId = studentId, Email = "test@test.com" };
 
             _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
             _mockUserRepository.Setup(r => r.SearchUsersAsync(It.IsAny<string>())).ReturnsAsync(new List<User> { student });
-            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1, Status = "Open" });
             _mockTeamMemberRepository.Setup(r => r.IsStudentInTeamAsync(studentId, 1)).ReturnsAsync(false);
             _mockInvitationRepository.Setup(r => r.GetByTeamAndStudentAsync(teamId, studentId)).ReturnsAsync(new Teaminvitation());
 
@@ -359,12 +362,12 @@ namespace FCTMS.Tests.Services
             // Arrange
             int teamId = 1;
             int studentId = 3;
-            var team = new Team { TeamId = teamId, LeaderId = 1, Teammembers = new List<Teammember>() };
+            var team = new Team { TeamId = teamId, LeaderId = 1, Teammembers = new List<Teammember>(), Semester = new Semester { Status = "Open" } };
             var student = new User { UserId = studentId, Email = "test@test.com" };
 
             _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
             _mockUserRepository.Setup(r => r.SearchUsersAsync(It.IsAny<string>())).ReturnsAsync(new List<User> { student });
-            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1, Status = "Open" });
             _mockTeamMemberRepository.Setup(r => r.IsStudentInTeamAsync(studentId, 1)).ReturnsAsync(true);
 
             // Act & Assert
@@ -375,8 +378,9 @@ namespace FCTMS.Tests.Services
         public async Task SendInvitationAsync_TeamIsFull_ThrowsInvalidOperationException()
         {
             // Arrange
-            var team = new Team { TeamId = 1, LeaderId = 1, Teammembers = new List<Teammember> { new(), new(), new(), new(), new() } };
+            var team = new Team { TeamId = 1, LeaderId = 1, Teammembers = new List<Teammember> { new(), new(), new(), new(), new() }, Semester = new Semester { Status = "Open" } };
             _mockTeamRepository.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(team);
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1, Status = "Open" });
 
             // Act & Assert
             await Assert.ThrowsAsync<InvalidOperationException>(() => _service.SendInvitationAsync(1, 1, "test@test.com"));
