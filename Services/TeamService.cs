@@ -54,10 +54,10 @@ namespace Services
                  throw new InvalidOperationException("Không tìm thấy kỳ học hiện tại.");
             }
 
-            // [LIFECYCLE GUARD] Chỉ cho phép tạo nhóm trong giai đoạn Active
-            if (currentSemester.Status != CampusConstants.SemesterStatus.Active)
+            // [LIFECYCLE GUARD] Chỉ cho phép tạo nhóm khi kỳ học ở trạng thái Open
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
             {
-                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Không thể tạo nhóm mới.");
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Chỉ có thể tạo nhóm khi kỳ học đang mở (Open).");
             }
 
             // 2. Validate User is whitelisted for current semester
@@ -181,11 +181,11 @@ namespace Services
             var team = await _teamRepository.GetByIdAsync(teamId);
             if (team == null) return false;
 
-            // [LIFECYCLE GUARD]
+            // [LIFECYCLE GUARD] Chỉ cho phép giải tán nhóm khi kỳ học ở trạng thái Open
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
-            if (currentSemester?.Status == CampusConstants.SemesterStatus.ReviewMiddle || currentSemester?.Status == CampusConstants.SemesterStatus.Closed)
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester?.Status))
             {
-                throw new InvalidOperationException("Kỳ học đã chốt hoặc kết thúc. Không thể giải tán nhóm.");
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester?.Status}'. Chỉ có thể giải tán nhóm khi kỳ học đang mở (Open).");
             }
 
             if (team.LeaderId != leaderId)
@@ -296,11 +296,11 @@ namespace Services
             var team = await _teamRepository.GetByIdAsync(teamId);
             if (team == null) throw new KeyNotFoundException("Team not found");
 
-            // [LIFECYCLE GUARD]
+            // [LIFECYCLE GUARD] Chỉ cho phép cập nhật thông tin nhóm khi kỳ học ở trạng thái Open
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
-            if (currentSemester?.Status == CampusConstants.SemesterStatus.ReviewMiddle || currentSemester?.Status == CampusConstants.SemesterStatus.Closed)
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester?.Status))
             {
-                throw new InvalidOperationException("Kỳ học đã chốt hoặc kết thúc. Không thể cập nhật thông tin nhóm.");
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester?.Status}'. Chỉ có thể cập nhật thông tin nhóm khi kỳ học đang mở (Open).");
             }
 
             if (team.LeaderId != leaderId)
@@ -327,11 +327,11 @@ namespace Services
             var team = await _teamRepository.GetByIdAsync(teamId);
             if (team == null) return false;
 
-            // [LIFECYCLE GUARD]
+            // [LIFECYCLE GUARD] Chỉ cho phép thay đổi nhóm trưởng khi kỳ học ở trạng thái Open
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
-            if (currentSemester?.Status == CampusConstants.SemesterStatus.ReviewMiddle || currentSemester?.Status == CampusConstants.SemesterStatus.Closed)
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester?.Status))
             {
-                throw new InvalidOperationException("Kỳ học đã chốt hoặc kết thúc. Không thể thay đổi nhóm trưởng.");
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester?.Status}'. Chỉ có thể thay đổi nhóm trưởng khi kỳ học đang mở (Open).");
             }
 
             if (team.LeaderId != currentLeaderId)
@@ -372,11 +372,11 @@ namespace Services
 
         public async Task<bool> RemoveMemberAsync(int teamId, int studentId)
         {
-            // [LIFECYCLE GUARD]
+            // [LIFECYCLE GUARD] Chỉ cho phép xóa thành viên khỏi nhóm khi kỳ học ở trạng thái Open
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
-            if (currentSemester?.Status == CampusConstants.SemesterStatus.ReviewMiddle || currentSemester?.Status == CampusConstants.SemesterStatus.Closed)
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester?.Status))
             {
-                throw new InvalidOperationException("Kỳ học đã chốt hoặc kết thúc. Không thể xóa thành viên khỏi nhóm.");
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester?.Status}'. Chỉ có thể xóa thành viên khỏi nhóm khi kỳ học đang mở (Open).");
             }
 
             var result = await _teamMemberRepository.RemoveMemberAsync(teamId, studentId);

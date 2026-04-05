@@ -82,6 +82,7 @@ namespace DataAccess
             await _context.Teammembers
                 .Where(m => m.TeamId == teamId)
                 .ExecuteDeleteAsync();
+
             
             return true;
         }

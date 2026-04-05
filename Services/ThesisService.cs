@@ -155,10 +155,10 @@ namespace Services
                 throw new InvalidOperationException("Không tìm thấy kỳ học hiện tại để nộp đề tài.");
             }
 
-            // [LIFECYCLE GUARD] Chỉ cho phép nộp mới trong giai đoạn Active
-            if (currentSemester.Status != CampusConstants.SemesterStatus.Active)
+            // [LIFECYCLE GUARD] Chỉ cho phép nộp mới trong giai đoạn Open
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
             {
-                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Không thể nộp đề tài mới.");
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Chỉ có thể nộp đề tài mới khi kỳ học đang mở (Open).");
             }
 
             var hasAssignedMentor =
@@ -251,19 +251,11 @@ namespace Services
             if (thesis == null)
                 throw new KeyNotFoundException("Thesis not found.");
 
-            // [LIFECYCLE GUARD] Chặn update nếu kỳ học đã bước vào giai đoạn Review Middle Semester hoặc Closed
+            // [LIFECYCLE GUARD] Chỉ cho phép sửa/revision đề tài ở giai đoạn Open
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
-            if (currentSemester != null)
+            if (currentSemester != null && !CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
             {
-                var blockedStatuses = new[] { 
-                    CampusConstants.SemesterStatus.ReviewMiddle, 
-                    CampusConstants.SemesterStatus.Closed,
-                    CampusConstants.SemesterStatus.Upcoming 
-                };
-                if (blockedStatuses.Contains(currentSemester.Status))
-                {
-                    throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Không thể cập nhật đề tài.");
-                }
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Chỉ có thể cập nhật đề tài khi kỳ học đang mở (Open).");
             }
 
             // Only the owner can update
@@ -367,6 +359,13 @@ namespace Services
                     "You are not authorized to cancel this thesis."
                 );
 
+            // [LIFECYCLE GUARD] Chỉ cho phép hủy đề tài ở giai đoạn Open
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester != null && !CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Không thể hủy đề tài.");
+            }
+
             // Only cancel if not already matched or published
             // UPDATED: Allow cancellation if 'Need Update'
             var cancellable = new[]
@@ -388,6 +387,7 @@ namespace Services
 
             return _mapper.Map<ThesisDTO>(thesis);
         }
+
 
         /// <summary>
         /// Get all theses owned by the logged-in student.

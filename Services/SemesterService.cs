@@ -268,8 +268,8 @@ namespace Services
 
             var semester = _mapper.Map<Semester>(semesterCreateDTO);
             semester.CampusId = campusId;
-            // Force Status to Upcoming. Must be started manually.
-            semester.Status = "Upcoming";
+            // Semester bắt đầu ở trạng thái 'Open' — tất cả hoạt động được phép.
+            semester.Status = CampusConstants.SemesterStatus.Open;
             var createdSemester = await _semesterRepository.CreateSemesterAsync(semester);
 
             await InvalidateSemesterCacheAsync();
@@ -284,10 +284,10 @@ namespace Services
                 throw new KeyNotFoundException($"Semester with ID {semesterCreateDTO.SemesterId} not found.");
             }
 
-            // Only allow editing metadata if the semester hasn't started yet (Upcoming)
-            if (!string.Equals(currentSemester.Status?.Trim(), CampusConstants.SemesterStatus.Upcoming, StringComparison.OrdinalIgnoreCase))
+            // Chỉ cho phép sửa metadata khi kỳ học đang mở (Open)
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status?.Trim()))
             {
-                throw new InvalidOperationException("Chỉ có thể chỉnh sửa thông tin của kỳ học đang ở trạng thái 'Upcoming'. Trạng thái hiện tại: " + currentSemester.Status);
+                throw new InvalidOperationException($"Chỉ có thể chỉnh sừa thông tin kỳ học khi đang ở trạng thái 'Open'. Trạng thái hiện tại: {currentSemester.Status}");
             }
 
             await ValidateSemesterLogicAsync(semesterCreateDTO);
@@ -334,79 +334,73 @@ namespace Services
         }
 
         /// <summary>
-        /// Activates a target semester (Upcoming -> Active).
+        /// [DEPRECATED] Semester không còn dùng trạng thái 'Upcoming'.
+        /// Semester tạo ra là 'Open' ngay. Method này giữ lại để backward compat nếu có record cũ.
         /// </summary>
+        [Obsolete("Semester no longer uses Upcoming status. Kept for backward compatibility only.")]
         public async Task StartSemesterAsync(int id)
         {
             var semester = await _semesterRepository.GetSemesterByIdSimpleAsync(id);
             if (semester == null) throw new KeyNotFoundException($"Semester {id} not found");
 
-            if (!string.Equals(semester.Status?.Trim(), CampusConstants.SemesterStatus.Upcoming, StringComparison.OrdinalIgnoreCase))
+            // Hỗ trợ cả Upcoming lẫn các record cũ khác (Active/Open)
+            if (!CampusConstants.SemesterStatus.IsOpenStage(semester.Status?.Trim()) &&
+                !string.Equals(semester.Status?.Trim(), CampusConstants.SemesterStatus.Upcoming, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException($"Chỉ có thể bắt đầu kỳ học khi trạng thái là 'Upcoming'. Trạng thái hiện tại: {semester.Status}");
+                throw new InvalidOperationException($"Không thể bắt đầu kỳ học. Trạng thái hiện tại: {semester.Status}");
             }
 
-            semester.Status = CampusConstants.SemesterStatus.Active;
+            semester.Status = CampusConstants.SemesterStatus.Open;
             await _semesterRepository.UpdateSemesterAsync(semester);
-
             await InvalidateSemesterCacheAsync(id);
         }
 
         /// <summary>
-        /// Transitions semester from Active to Review Thesis (Locks new submissions).
+        /// Chuyển kỳ học từ Open → In Progress (Chốt đề tài — khóa tất cả đăng ký mới).
         /// </summary>
         public async Task LockSubmissionAsync(int id)
         {
             var semester = await _semesterRepository.GetSemesterByIdSimpleAsync(id);
             if (semester == null) throw new KeyNotFoundException($"Semester {id} not found");
 
-            if (!string.Equals(semester.Status?.Trim(), CampusConstants.SemesterStatus.Active, StringComparison.OrdinalIgnoreCase))
+            if (!CampusConstants.SemesterStatus.IsOpenStage(semester.Status?.Trim()))
             {
-                throw new InvalidOperationException($"Chỉ có thể chốt nộp đề tài khi kỳ học đang 'Active'. Trạng thái hiện tại: {semester.Status}");
+                throw new InvalidOperationException($"Chỉ có thể chốt đề tài khi kỳ học đang mở (Open). Trạng thái hiện tại: {semester.Status}");
             }
 
-            semester.Status = CampusConstants.SemesterStatus.ReviewThesis;
+            semester.Status = CampusConstants.SemesterStatus.InProgress;
             await _semesterRepository.UpdateSemesterAsync(semester);
-
             await InvalidateSemesterCacheAsync(id);
         }
 
         /// <summary>
-        /// Transitions semester from Review Thesis to Review Middle Semester (Locks all updates).
+        /// [DEPRECATED] Không còn dùng — Lifecycle đã đơn giản hóa xuống 3 stage.
+        /// Chỉ giữ lại để backward compat với frontend chưa cập nhật.
         /// </summary>
+        [Obsolete("Use LockSubmissionAsync instead. This method is deprecated in the 3-stage lifecycle.")]
         public async Task LockAllUpdatesAsync(int id)
         {
-            var semester = await _semesterRepository.GetSemesterByIdSimpleAsync(id);
-            if (semester == null) throw new KeyNotFoundException($"Semester {id} not found");
-
-            if (!string.Equals(semester.Status?.Trim(), CampusConstants.SemesterStatus.ReviewThesis, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException($"Chỉ có thể chốt chỉnh sửa khi kỳ học đang 'Review Thesis'. Trạng thái hiện tại: {semester.Status}");
-            }
-
-            semester.Status = CampusConstants.SemesterStatus.ReviewMiddle;
-            await _semesterRepository.UpdateSemesterAsync(semester);
-
-            await InvalidateSemesterCacheAsync(id);
+            // No-op in new 3-stage lifecycle. Redirect to CloseSemesterAsync if needed.
+            throw new InvalidOperationException("LockAllUpdates is deprecated. Use LockSubmission (Open→InProgress) then CloseSemester (InProgress→Closed).");
         }
 
         /// <summary>
-        /// Ends a semester by moving it to Closed status.
+        /// Kết thúc kỳ học — chuyển sang Closed (chỉ xem).
+        /// Hỗ trợ cả InProgress lẫn các giá trị cũ (Review Thesis, Review Middle Semester) để backward compat.
         /// </summary>
-
         public async Task CloseSemesterAsync(int id)
         {
             var semester = await _semesterRepository.GetSemesterByIdSimpleAsync(id);
             if (semester == null) throw new KeyNotFoundException($"Semester {id} not found");
 
-            if (!string.Equals(semester.Status?.Trim(), CampusConstants.SemesterStatus.ReviewMiddle, StringComparison.OrdinalIgnoreCase))
+            // Chỉ cho phép đóng từ trạng thái Locked (InProgress / legacy Review states)
+            if (!CampusConstants.SemesterStatus.IsLockedStage(semester.Status?.Trim()))
             {
-                 throw new InvalidOperationException($"Phải chốt dữ liệu giữa kỳ ({CampusConstants.SemesterStatus.ReviewMiddle}) trước khi đóng kỳ học. Trạng thái hiện tại: {semester.Status}");
+                throw new InvalidOperationException($"Phải chốt đề tài (In Progress) trước khi đóng kỳ học. Trạng thái hiện tại: {semester.Status}");
             }
 
             semester.Status = CampusConstants.SemesterStatus.Closed;
             await _semesterRepository.UpdateSemesterAsync(semester);
-
             await InvalidateSemesterCacheAsync(id);
         }
 

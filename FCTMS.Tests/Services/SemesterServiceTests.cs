@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using FluentAssertions;
@@ -122,7 +122,7 @@ namespace FCTMS.Tests.Services
             // Assert
             result.Should().NotBeNull();
             result.SemesterCode.Should().Be("SP26");
-            _mockSemesterRepository.Verify(r => r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == "Upcoming")), Times.Once);
+            _mockSemesterRepository.Verify(r => r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == "Open")), Times.Once);
         }
 
         [Fact]
@@ -184,7 +184,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SU26", SemesterName = "Summer 2026" };
 
-            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
+            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Open" };
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
 
@@ -208,7 +208,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026" };
 
-            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
+            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Open" };
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
             
@@ -234,7 +234,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026" };
 
-            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
+            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Open" };
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
 
@@ -549,7 +549,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             var dto = new SemesterCreateDTO { SemesterCode = "FA27", SemesterName = "Fall 2027" };
             var mappedSemester = new Semester { SemesterCode = "FA27" };
-            var savedSemester = new Semester { SemesterId = 5, SemesterCode = "FA27", Status = "Upcoming" };
+            var savedSemester = new Semester { SemesterId = 5, SemesterCode = "FA27", Status = CampusConstants.SemesterStatus.Open };
 
             _mockSemesterRepository.Setup(r => r.GetSemesterByCodeAsync("FA27")).ReturnsAsync((Semester?)null);
             _mockMapper.Setup(m => m.Map<Semester>(dto)).Returns(mappedSemester);
@@ -562,7 +562,7 @@ namespace FCTMS.Tests.Services
 
             // Assert â€” Status must be Upcoming before calling CreateSemesterAsync
             _mockSemesterRepository.Verify(r =>
-                r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == "Upcoming")), Times.Once);
+                r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == CampusConstants.SemesterStatus.Open)), Times.Once);
         }
 
         [Fact]

@@ -132,7 +132,14 @@ namespace Services
             if (team.Teammembers.Count >= 5)
                 throw new InvalidOperationException("Team is full");
 
-            // 2. Find Student
+            // 2. [LIFECYCLE GUARD] Chỉ cho phép mời thành viên khi kỳ học ở trạng thái Open
+            var currentSemesterCheck = await _semesterRepository.GetCurrentSemesterAsync();
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemesterCheck?.Status))
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemesterCheck?.Status}'. Chỉ có thể mời thành viên khi kỳ học đang mở (Open).");
+            }
+
+            // 3. Find Student
             // We search by email or student code
             var users = await _userRepository.SearchUsersAsync(studentCodeOrEmail);
             // SearchUsersAsync uses 'Contains', we want exact match for invite
@@ -311,6 +318,12 @@ namespace Services
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
             if (currentSemester == null)
                 throw new Exception("Active semester not found");
+
+            // [LIFECYCLE GUARD] Chỉ cho phép tham gia nhóm khi kỳ học ở trạng thái Open
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Chỉ có thể tham gia nhóm khi kỳ học đang mở (Open).");
+            }
 
             bool alreadyInTeam = await _teamMemberRepository.IsStudentInTeamAsync(
                 studentId,
