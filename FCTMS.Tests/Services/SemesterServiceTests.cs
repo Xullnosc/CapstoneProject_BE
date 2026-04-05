@@ -10,6 +10,7 @@ using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Threading;
+using BusinessObjects;
 using Xunit;
 
 namespace FCTMS.Tests.Services
@@ -184,7 +185,7 @@ namespace FCTMS.Tests.Services
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SU26", SemesterName = "Summer 2026" };
 
             var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(updateDto.SemesterId))
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
 
             // Setup: GetSemesterByCodeAsync returns null
@@ -208,7 +209,7 @@ namespace FCTMS.Tests.Services
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026" };
 
             var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(updateDto.SemesterId))
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
             
             // Existing semester with same code but DIFFERENT ID
@@ -234,7 +235,7 @@ namespace FCTMS.Tests.Services
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026" };
 
             var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(updateDto.SemesterId))
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
 
             // Existing semester is SELF (same ID)
@@ -364,43 +365,43 @@ namespace FCTMS.Tests.Services
 
         #endregion
 
-        #region EndSemesterAsync
-
-        [Fact]
-        public async Task EndSemesterAsync_ShouldSucceed_WhenIdExists()
-        {
-            // Arrange
-            int id = 1;
-            var semester = new Semester { SemesterId = id, Status = "Active" };
-
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
-            _mockSemesterRepository.Setup(r => r.UpdateSemesterAsync(semester)).Returns(Task.CompletedTask);
-
-            // Act
-            await _semesterService.EndSemesterAsync(id);
-
-            // Assert
-            semester.Status.Should().Be("Ended");
-            _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(semester), Times.Once);
-        }
-
-
-        [Fact]
-        public async Task EndSemesterAsync_ShouldThrowKeyNotFound_WhenIdDoesNotExist()
-        {
+        #region CloseSemesterAsync
+ 
+         [Fact]
+         public async Task CloseSemesterAsync_ShouldSucceed_WhenIdExistsAndInReviewMiddle()
+         {
              // Arrange
-            int id = 99;
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync((Semester?)null);
-
-            // Act
-            Func<Task> act = async () => await _semesterService.EndSemesterAsync(id);
-
-            // Assert
-            await act.Should().ThrowAsync<KeyNotFoundException>()
-                .WithMessage($"Semester with ID {id} not found.");
-            
-            _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(It.IsAny<Semester>()), Times.Never);
-        }
+             int id = 1;
+             var semester = new Semester { SemesterId = id, Status = CampusConstants.SemesterStatus.ReviewMiddle };
+ 
+             _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(id)).ReturnsAsync(semester);
+             _mockSemesterRepository.Setup(r => r.UpdateSemesterAsync(semester)).Returns(Task.CompletedTask);
+ 
+             // Act
+             await _semesterService.CloseSemesterAsync(id);
+ 
+             // Assert
+             semester.Status.Should().Be(CampusConstants.SemesterStatus.Closed);
+             _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(semester), Times.Once);
+         }
+ 
+ 
+         [Fact]
+         public async Task CloseSemesterAsync_ShouldThrowKeyNotFound_WhenIdDoesNotExist()
+         {
+              // Arrange
+             int id = 99;
+             _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(id)).ReturnsAsync((Semester?)null);
+ 
+             // Act
+             Func<Task> act = async () => await _semesterService.CloseSemesterAsync(id);
+ 
+             // Assert
+             await act.Should().ThrowAsync<KeyNotFoundException>()
+                 .WithMessage($"Semester {id} not found");
+             
+             _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(It.IsAny<Semester>()), Times.Never);
+         }
 
         #endregion
 

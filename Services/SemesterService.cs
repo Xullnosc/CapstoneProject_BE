@@ -247,6 +247,12 @@ namespace Services
             }
         }
 
+        public async Task<SemesterDTO?> GetCurrentSemesterAsync()
+        {
+            var semester = await _semesterRepository.GetCurrentSemesterAsync();
+            return _mapper.Map<SemesterDTO>(semester);
+        }
+
         public async Task<SemesterDTO> CreateSemesterAsync(SemesterCreateDTO semesterCreateDTO)
         {
             await ValidateSemesterLogicAsync(semesterCreateDTO);
@@ -272,15 +278,16 @@ namespace Services
 
         public async Task UpdateSemesterAsync(SemesterCreateDTO semesterCreateDTO)
         {
-            var currentSemester = await _semesterRepository.GetSemesterByIdAsync(semesterCreateDTO.SemesterId);
+            var currentSemester = await _semesterRepository.GetSemesterByIdSimpleAsync(semesterCreateDTO.SemesterId);
             if (currentSemester == null)
             {
                 throw new KeyNotFoundException($"Semester with ID {semesterCreateDTO.SemesterId} not found.");
             }
 
-            if (string.Equals(currentSemester.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            // Only allow editing metadata if the semester hasn't started yet (Upcoming)
+            if (!string.Equals(currentSemester.Status?.Trim(), CampusConstants.SemesterStatus.Upcoming, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("On-going semesters cannot be edited.");
+                throw new InvalidOperationException("Chỉ có thể chỉnh sửa thông tin của kỳ học đang ở trạng thái 'Upcoming'. Trạng thái hiện tại: " + currentSemester.Status);
             }
 
             await ValidateSemesterLogicAsync(semesterCreateDTO);
@@ -327,101 +334,80 @@ namespace Services
         }
 
         /// <summary>
-        /// Activates a target semester and automatically ends all currently active semesters.
-        /// Archives data from ending semesters before deactivation.
+        /// Activates a target semester (Upcoming -> Active).
         /// </summary>
-        /// <param name="id">ID of the semester to activate</param>
-        /// <exception cref="KeyNotFoundException">Thrown when semester with given ID is not found</exception>
         public async Task StartSemesterAsync(int id)
         {
-            var options = new System.Transactions.TransactionOptions
+            var semester = await _semesterRepository.GetSemesterByIdSimpleAsync(id);
+            if (semester == null) throw new KeyNotFoundException($"Semester {id} not found");
+
+            if (!string.Equals(semester.Status?.Trim(), CampusConstants.SemesterStatus.Upcoming, StringComparison.OrdinalIgnoreCase))
             {
-                Timeout = TimeSpan.FromSeconds(30)
-            };
-            using var transaction = new System.Transactions.TransactionScope(
-                System.Transactions.TransactionScopeOption.Required,
-                options,
-                System.Transactions.TransactionScopeAsyncFlowOption.Enabled);
-            try
-            {
-                var targetSemester = await _semesterRepository.GetSemesterByIdAsync(id);
-                if (targetSemester == null) throw new KeyNotFoundException($"Semester {id} not found");
-
-                // 1. Deactivate all other active semesters
-                var allSemesters = await _semesterRepository.GetAllSemestersAsync();
-                var currentActiveIds = allSemesters.Where(s => s.Status == "Active").Select(s => s.SemesterId).ToList();
-
-                foreach (var activeId in currentActiveIds)
-                {
-                    if (activeId == id) continue; // If target is already active, skip
-
-                    // Reuse EndSemesterAsync to Archive and Deactivate
-                    // Nested TransactionScope works fine (Ambient transaction)
-                    await EndSemesterAsync(activeId);
-                }
-
-                // 2. Activate target semester
-                // CRITICAL FIX: Reload fresh entity to ensure tracking state is clean before Update
-                var semesterToActivate = await _semesterRepository.GetSemesterByIdAsync(id);
-                if (semesterToActivate != null && semesterToActivate.Status != "Active")
-                {
-                    semesterToActivate.Status = "Active";
-                    // Detach navigation properties to prevent EF tracking conflicts
-                    semesterToActivate.Teams = null!;
-                    semesterToActivate.Whitelists = null!;
-                    await _semesterRepository.UpdateSemesterAsync(semesterToActivate);
-                }
-
-                transaction.Complete();
-                await InvalidateSemesterCacheAsync(id);
+                throw new InvalidOperationException($"Chỉ có thể bắt đầu kỳ học khi trạng thái là 'Upcoming'. Trạng thái hiện tại: {semester.Status}");
             }
-            catch (Exception)
-            {
-                throw;
-            }
+
+            semester.Status = CampusConstants.SemesterStatus.Active;
+            await _semesterRepository.UpdateSemesterAsync(semester);
+
+            await InvalidateSemesterCacheAsync(id);
         }
 
+        /// <summary>
+        /// Transitions semester from Active to Review Thesis (Locks new submissions).
+        /// </summary>
+        public async Task LockSubmissionAsync(int id)
+        {
+            var semester = await _semesterRepository.GetSemesterByIdSimpleAsync(id);
+            if (semester == null) throw new KeyNotFoundException($"Semester {id} not found");
 
+            if (!string.Equals(semester.Status?.Trim(), CampusConstants.SemesterStatus.Active, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Chỉ có thể chốt nộp đề tài khi kỳ học đang 'Active'. Trạng thái hiện tại: {semester.Status}");
+            }
+
+            semester.Status = CampusConstants.SemesterStatus.ReviewThesis;
+            await _semesterRepository.UpdateSemesterAsync(semester);
+
+            await InvalidateSemesterCacheAsync(id);
+        }
 
         /// <summary>
-        /// Ends a semester by deactivating it and archiving its associated data (teams and whitelists).
+        /// Transitions semester from Review Thesis to Review Middle Semester (Locks all updates).
         /// </summary>
-        /// <param name="id">ID of the semester to end</param>
-        /// <exception cref="KeyNotFoundException">Thrown when semester with given ID is not found</exception>
-        public async Task EndSemesterAsync(int id)
+        public async Task LockAllUpdatesAsync(int id)
         {
-            var options = new System.Transactions.TransactionOptions
-            {
-                Timeout = TimeSpan.FromSeconds(30)
-            };
-            using var transaction = new System.Transactions.TransactionScope(
-                System.Transactions.TransactionScopeOption.Required,
-                options,
-                System.Transactions.TransactionScopeAsyncFlowOption.Enabled);
-            try
-            {
-                var semester = await _semesterRepository.GetSemesterByIdAsync(id);
-                if (semester == null)
-                {
-                    throw new KeyNotFoundException($"Semester with ID {id} not found.");
-                }
+            var semester = await _semesterRepository.GetSemesterByIdSimpleAsync(id);
+            if (semester == null) throw new KeyNotFoundException($"Semester {id} not found");
 
-                // 1. Mark as Ended (Always succeed)
-                semester.Status = "Ended";
-                // Detach navigation properties to prevent EF tracking conflicts
-                semester.Teams = null!;
-                semester.Whitelists = null!;
-                await _semesterRepository.UpdateSemesterAsync(semester);
-
-                // 2. End Semester directly (teams stay in DB)
-                transaction.Complete();
-                await InvalidateSemesterCacheAsync(id);
-            }
-            catch (Exception)
+            if (!string.Equals(semester.Status?.Trim(), CampusConstants.SemesterStatus.ReviewThesis, StringComparison.OrdinalIgnoreCase))
             {
-                // Transaction will auto-rollback if not completed
-                throw;
+                throw new InvalidOperationException($"Chỉ có thể chốt chỉnh sửa khi kỳ học đang 'Review Thesis'. Trạng thái hiện tại: {semester.Status}");
             }
+
+            semester.Status = CampusConstants.SemesterStatus.ReviewMiddle;
+            await _semesterRepository.UpdateSemesterAsync(semester);
+
+            await InvalidateSemesterCacheAsync(id);
+        }
+
+        /// <summary>
+        /// Ends a semester by moving it to Closed status.
+        /// </summary>
+
+        public async Task CloseSemesterAsync(int id)
+        {
+            var semester = await _semesterRepository.GetSemesterByIdSimpleAsync(id);
+            if (semester == null) throw new KeyNotFoundException($"Semester {id} not found");
+
+            if (!string.Equals(semester.Status?.Trim(), CampusConstants.SemesterStatus.ReviewMiddle, StringComparison.OrdinalIgnoreCase))
+            {
+                 throw new InvalidOperationException($"Phải chốt dữ liệu giữa kỳ ({CampusConstants.SemesterStatus.ReviewMiddle}) trước khi đóng kỳ học. Trạng thái hiện tại: {semester.Status}");
+            }
+
+            semester.Status = CampusConstants.SemesterStatus.Closed;
+            await _semesterRepository.UpdateSemesterAsync(semester);
+
+            await InvalidateSemesterCacheAsync(id);
         }
 
         public async Task<PagedResult<WhitelistDTO>> GetWhitelistsPaginatedAsync(int semesterId, int page, int pageSize, string? role = null, string? search = null)

@@ -35,6 +35,7 @@ namespace Services
 
         public async Task<ImportResult<WhitelistImportDTO>> ImportWhitelistFromExcel(
             Stream excelStream,
+            int semesterId,
             string uploaderEmail,
             List<WhitelistRowOverrideDTO>? rowOverrides = null)
         {
@@ -61,16 +62,16 @@ namespace Services
                 }
             }
 
-            return await PrepareImportResultAsync(result, uploaderEmail);
+            return await PrepareImportResultAsync(result, semesterId, uploaderEmail);
         }
 
-        public async Task SaveWhitelistBatchAsync(ImportResult<WhitelistImportDTO> importResult, string fileUrl, string uploaderEmail)
+        public async Task SaveWhitelistBatchAsync(ImportResult<WhitelistImportDTO> importResult, int semesterId, string fileUrl, string uploaderEmail)
         {
             if (importResult == null) throw new ArgumentNullException(nameof(importResult));
             if (string.IsNullOrEmpty(fileUrl)) throw new ArgumentException("fileUrl is required", nameof(fileUrl));
             if (string.IsNullOrWhiteSpace(uploaderEmail)) throw new ArgumentException("uploaderEmail is required", nameof(uploaderEmail));
 
-            var preparedResult = await PrepareImportResultAsync(importResult, uploaderEmail);
+            var preparedResult = await PrepareImportResultAsync(importResult, semesterId, uploaderEmail);
 
             // Filter out marked (conflicting) items — they'll appear in errors but won't block the rest
             var markedItems = preparedResult.Items.Where(item => item.IsMarked).ToList();
@@ -138,14 +139,9 @@ namespace Services
             }
         }
 
-        private async Task<ImportResult<WhitelistImportDTO>> PrepareImportResultAsync(ImportResult<WhitelistImportDTO> importResult, string uploaderEmail)
+        private async Task<ImportResult<WhitelistImportDTO>> PrepareImportResultAsync(ImportResult<WhitelistImportDTO> importResult, int semesterId, string uploaderEmail)
         {
             if (importResult == null) throw new ArgumentNullException(nameof(importResult));
-
-            var campusId = _campusContextService.GetCurrentCampusId() 
-                ?? throw new InvalidOperationException("Yêu cầu Campus Context hợp lệ để import danh sách sinh viên. Nếu là Super Admin, hãy sử dụng tính năng chỉ định Campus.");
-
-            int studentRoleId = await _semesterRepository.GetStudentRoleIdAsync();
 
             var items = importResult.Items ?? new List<WhitelistImportDTO>();
             if (!items.Any())
@@ -153,21 +149,10 @@ namespace Services
                 return importResult;
             }
 
-            var semesterCodes = items
-                .Select(item => item.SemesterCode?.Trim())
-                .Where(code => !string.IsNullOrWhiteSpace(code))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId)
+                ?? throw new KeyNotFoundException($"Semester with id {semesterId} does not exist.");
 
-            var semesterMap = new Dictionary<string, Semester>(StringComparer.OrdinalIgnoreCase);
-            foreach (var semesterCode in semesterCodes)
-            {
-                var semester = await _semesterRepository.GetSemesterByCodeAsync(semesterCode!);
-                if (semester != null)
-                {
-                    semesterMap[semesterCode!] = semester;
-                }
-            }
+            int studentRoleId = await _semesterRepository.GetStudentRoleIdAsync();
 
             var validItems = new List<WhitelistImportDTO>();
             var seenEmails = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -177,25 +162,16 @@ namespace Services
                 item.Email = item.Email.Trim();
                 item.StudentCode = item.StudentCode?.Trim();
                 item.FullName = item.FullName?.Trim();
-                item.SemesterCode = item.SemesterCode?.Trim();
-                item.CampusId = campusId;
-                item.Campus = CampusConstants.MapIdToFullName(campusId);
+                item.SemesterId = semester.SemesterId;
+                item.SemesterCode = semester.SemesterCode;
+                item.SemesterName = semester.SemesterName;
+                item.CampusId = semester.CampusId;
+                item.Campus = CampusConstants.MapIdToFullName(semester.CampusId);
                 item.RoleId = studentRoleId;
                 item.Role = CampusConstants.Roles.Student;
                 item.IsMarked = false;
                 item.ExistingRole = null;
                 item.MarkedReason = null;
-
-                if (string.IsNullOrWhiteSpace(item.SemesterCode) || !semesterMap.TryGetValue(item.SemesterCode, out var semester))
-                {
-                    importResult.Errors.Add(new ImportError
-                    {
-                        Row = item.RowNumber,
-                        Column = CampusConstants.WhitelistImportColumns.SemesterCode,
-                        Message = $"SemesterCode '{item.SemesterCode}' does not exist in the system"
-                    });
-                    continue;
-                }
 
                 var normalizedEmail = NormalizeEmail(item.Email);
                 if (!string.IsNullOrWhiteSpace(normalizedEmail) && seenEmails.TryGetValue(normalizedEmail, out var existingEmailRow))
@@ -221,7 +197,6 @@ namespace Services
                     continue;
                 }
 
-                item.SemesterId = semester.SemesterId;
                 if (!string.IsNullOrWhiteSpace(normalizedEmail))
                 {
                     seenEmails[normalizedEmail] = item.RowNumber;

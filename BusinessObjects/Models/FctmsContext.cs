@@ -207,6 +207,7 @@ public partial class FctmsContext : DbContext
             entity.Property(e => e.SemesterCode).HasMaxLength(50);
             entity.Property(e => e.SemesterName).HasMaxLength(50);
             entity.Property(e => e.StartDate).HasColumnType("datetime");
+            entity.Property(e => e.Status).HasMaxLength(50);
 
             entity
                 .HasOne(d => d.Campus)

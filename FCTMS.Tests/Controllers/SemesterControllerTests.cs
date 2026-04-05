@@ -109,19 +109,51 @@ namespace FCTMS.Tests.Controllers
 
 
         [Fact]
-        public async Task EndSemester_ValidId_ReturnsOk()
+        public async Task CloseSemester_ValidId_ReturnsOk()
         {
              // Arrange
             int id = 1;
-            _mockSemesterService.Setup(x => x.EndSemesterAsync(id))
+            _mockSemesterService.Setup(x => x.CloseSemesterAsync(id))
                 .Returns(Task.CompletedTask);
 
             // Act
-            var result = await _controller.EndSemester(id);
+            var result = await _controller.CloseSemester(id);
 
             // Assert
             var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-            okResult.Value!.ToString().Should().Contain("ended successfully");
+            okResult.Value!.ToString().Should().Contain("closed successfully");
+        }
+
+        [Fact]
+        public async Task LockSubmission_ValidId_ReturnsOk()
+        {
+            // Arrange
+            int id = 1;
+            _mockSemesterService.Setup(x => x.LockSubmissionAsync(id))
+                .Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _controller.LockSubmission(id);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value!.ToString().Should().Contain("submission locked");
+        }
+
+        [Fact]
+        public async Task LockUpdates_ValidId_ReturnsOk()
+        {
+            // Arrange
+            int id = 1;
+            _mockSemesterService.Setup(x => x.LockAllUpdatesAsync(id))
+                .Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _controller.LockUpdates(id);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value!.ToString().Should().Contain("updates locked");
         }
 
 
@@ -157,15 +189,15 @@ namespace FCTMS.Tests.Controllers
         }
 
         [Fact]
-        public async Task EndSemester_NonExistentId_ReturnsNotFound()
+        public async Task CloseSemester_NonExistentId_ReturnsNotFound()
         {
             // Arrange
             int id = 99;
-            _mockSemesterService.Setup(x => x.EndSemesterAsync(id))
+            _mockSemesterService.Setup(x => x.CloseSemesterAsync(id))
                 .ThrowsAsync(new KeyNotFoundException("Semester not found"));
 
             // Act
-            var result = await _controller.EndSemester(id);
+            var result = await _controller.CloseSemester(id);
 
             // Assert
             var notFoundResult = result.Should().BeOfType<NotFoundObjectResult>().Subject;
@@ -173,15 +205,15 @@ namespace FCTMS.Tests.Controllers
         }
 
         [Fact]
-        public async Task EndSemester_ServiceError_ReturnsInternalServerError()
+        public async Task CloseSemester_ServiceError_ReturnsInternalServerError()
         {
             // Arrange
             int id = 1;
-            _mockSemesterService.Setup(x => x.EndSemesterAsync(id))
+            _mockSemesterService.Setup(x => x.CloseSemesterAsync(id))
                 .ThrowsAsync(new Exception("Database corruption"));
 
             // Act
-            var result = await _controller.EndSemester(id);
+            var result = await _controller.CloseSemester(id);
 
             // Assert
             var serverError = result.Should().BeOfType<ObjectResult>().Subject;
