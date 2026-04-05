@@ -65,11 +65,14 @@ namespace Services
             return await PrepareImportResultAsync(result, semesterId, uploaderEmail);
         }
 
-        public async Task SaveWhitelistBatchAsync(ImportResult<WhitelistImportDTO> importResult, int semesterId, string fileUrl, string uploaderEmail)
+        public async Task SaveWhitelistBatchAsync(ImportResult<WhitelistImportDTO> importResult, int semesterId, string fileUrl, string originalFileName, string uploaderEmail)
         {
             if (importResult == null) throw new ArgumentNullException(nameof(importResult));
-            if (string.IsNullOrEmpty(fileUrl)) throw new ArgumentException("fileUrl is required", nameof(fileUrl));
+            if (string.IsNullOrEmpty(fileUrl)) throw new ArgumentException("fileUrl cannot be empty", nameof(fileUrl));
+            if (string.IsNullOrEmpty(originalFileName)) throw new ArgumentException("originalFileName cannot be empty", nameof(originalFileName));
             if (string.IsNullOrWhiteSpace(uploaderEmail)) throw new ArgumentException("uploaderEmail is required", nameof(uploaderEmail));
+
+            if (importResult.Items == null || !importResult.Items.Any()) return;
 
             var preparedResult = await PrepareImportResultAsync(importResult, semesterId, uploaderEmail);
 
@@ -128,6 +131,19 @@ namespace Services
 
                 _logger.LogInformation("Whitelist import completed successfully. File: {fileUrl}, TotalProcessed: {totalProcessed}, UploadedBy: {uploadedBy}", 
                     fileUrl, totalProcessed, uploaderEmail);
+
+                // Save Import Batch Record
+                var batchRecord = new ImportBatch
+                {
+                    FileUrl = fileUrl,
+                    OriginalFileName = originalFileName,
+                    UploadedBy = uploaderEmail,
+                    UploadedAt = now,
+                    AffectedSemesterId = semesterId,
+                    Version = 1,
+                    Notes = $"Imported {totalProcessed} rows"
+                };
+                await _importRepository.AddImportBatchAsync(batchRecord);
 
                 await InvalidateSemesterCacheAsync(semesterIds);
             }
@@ -283,6 +299,22 @@ namespace Services
             // Clear all semester-related caches (all campuses)
             await _redisService.RemoveByPrefixAsync("fctms:semester:");
             _logger.LogInformation("Invalidated all semester caches after whitelist import");
+        }
+
+        public async Task<List<ImportBatchDTO>> GetImportBatchesBySemesterAsync(int semesterId)
+        {
+            var batches = await _importRepository.GetImportBatchesBySemesterAsync(semesterId);
+            return batches.Select(b => new ImportBatchDTO
+            {
+                ImportBatchId = b.ImportBatchId,
+                FileUrl = b.FileUrl,
+                OriginalFileName = b.OriginalFileName,
+                UploadedBy = b.UploadedBy,
+                UploadedAt = b.UploadedAt,
+                AffectedSemesterId = b.AffectedSemesterId,
+                Version = b.Version,
+                Notes = b.Notes
+            }).ToList();
         }
     }
 }
