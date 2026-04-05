@@ -39,8 +39,11 @@ public class ThesisReviewRepository : IThesisReviewRepository
         int assignedByUserId
     ) => _dao.InitializeReviewersAsync(thesisId, reviewer1Id, reviewer2Id, assignedByUserId);
 
-    public Task<List<ThesisReviewTimelineEventDTO>> GetTimelineAsync(string thesisId) =>
-        _dao.GetTimelineAsync(thesisId);
+    public Task<PagedResult<ThesisReviewTimelineEventDTO>> GetTimelineAsync(
+        string thesisId,
+        int pageIndex,
+        int pageSize
+    ) => _dao.GetTimelineAsync(thesisId, pageIndex, pageSize);
 
     public Task<ThesisReviewTimelineCommentDTO> AddCommentAsync(
         string thesisId,

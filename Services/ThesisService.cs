@@ -481,16 +481,22 @@ namespace Services
             return await _thesisReviewRepository.GetReviewStatusAsync(thesisId);
         }
 
-        public async Task<List<ThesisReviewTimelineEventDTO>> GetReviewTimelineAsync(
-            string thesisId
+        public async Task<PagedResult<ThesisReviewTimelineEventDTO>> GetReviewTimelineAsync(
+            string thesisId,
+            int pageIndex = 1,
+            int pageSize = 10
         )
         {
-            var timeline = await _thesisReviewRepository.GetTimelineAsync(thesisId);
+            var timeline = await _thesisReviewRepository.GetTimelineAsync(
+                thesisId,
+                pageIndex,
+                pageSize
+            );
 
             // Populate avatars from Lecturers table if missing or to ensure latest
-            var emails = timeline
+            var emails = timeline.Items
                 .Select(e => e.ActorEmail)
-                .Concat(timeline.SelectMany(e => e.Comments).Select(c => c.AuthorEmail))
+                .Concat(timeline.Items.SelectMany(e => e.Comments).Select(c => c.AuthorEmail))
                 .Where(e => !string.IsNullOrWhiteSpace(e))
                 .Select(e => e!.Trim())
                 .Distinct()
@@ -503,7 +509,7 @@ namespace Services
                     .Where(l => !string.IsNullOrEmpty(l.Avatar))
                     .ToDictionary(l => l.Email.Trim().ToLower(), l => l.Avatar);
 
-                foreach (var evt in timeline)
+                foreach (var evt in timeline.Items)
                 {
                     if (!string.IsNullOrEmpty(evt.ActorEmail))
                     {

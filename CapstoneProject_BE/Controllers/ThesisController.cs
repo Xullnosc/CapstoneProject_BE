@@ -189,11 +189,19 @@ namespace CapstoneProject_BE.Controllers
         /// Returns review timeline events with nested comments/replies.
         /// </summary>
         [HttpGet("{id}/review-timeline")]
-        public async Task<IActionResult> GetReviewTimeline(string id)
+        public async Task<IActionResult> GetReviewTimeline(
+            string id,
+            [FromQuery] int pageIndex = 1,
+            [FromQuery] int pageSize = 10
+        )
         {
             try
             {
-                var timeline = await _thesisService.GetReviewTimelineAsync(id);
+                var timeline = await _thesisService.GetReviewTimelineAsync(
+                    id,
+                    pageIndex,
+                    pageSize
+                );
                 return Ok(timeline);
             }
             catch (KeyNotFoundException ex)

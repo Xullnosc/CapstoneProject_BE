@@ -33,7 +33,7 @@ var thesisRepository = new ThesisRepository(thesisDao);
 var exportService = new ThesisEvaluationExportService(lecturerRepository, thesisRepository);
 var workbookBytes = await exportService.GenerateWorkbookAsync(new ReviewerSummarySheetRequestDTO());
 
-const string outputDirectory = @"D:\ExcelTests";
+const string outputDirectory = @"C:\Users\Admin\Downloads\ExcelTests";
 
 Directory.CreateDirectory(outputDirectory);
 

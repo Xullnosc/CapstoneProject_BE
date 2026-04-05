@@ -138,21 +138,29 @@ namespace DataAccess
             int? semesterId = null
         )
         {
-            var query = _context
-                .Theses.AsNoTracking()
-                .Include(t => t.Team)
-                    .ThenInclude(team => team.Teammembers)
-                        .ThenInclude(teamMember => teamMember.Student)
-                .Include(t => t.Mentor1)
-                .Include(t => t.Mentor2)
-                .Where(t => t.TeamId.HasValue && t.Team != null);
+            IQueryable<Thesis> baseQuery = _context.Theses.AsNoTracking();
 
             if (semesterId.HasValue)
             {
-                query = query.Where(t => t.SemesterId == semesterId.Value);
+                baseQuery = baseQuery.Where(t => t.SemesterId == semesterId.Value);
             }
 
-            return await query.OrderBy(t => t.Team!.TeamCode).ThenBy(t => t.ThesisId).ToListAsync();
+            return await baseQuery
+                .Include(t => t.Team)
+                    .ThenInclude(team => team.Teammembers)
+                        .ThenInclude(teamMember => teamMember.Student)
+                            .ThenInclude(student => student.AccountDetail)
+                .Include(t => t.Mentor1)
+                .Include(t => t.Mentor2)
+                .Include(t => t.ThesisReviewEvents.Where(e => !e.IsDeleted))
+                    .ThenInclude(e => e.ActorUser)
+                .Include(t => t.ThesisReviewEvents.Where(e => !e.IsDeleted))
+                    .ThenInclude(e => e.Comments.Where(c => !c.IsDeleted))
+                        .ThenInclude(c => c.AuthorUser)
+                .OrderBy(t => t.Team == null ? 1 : 0)
+                .ThenBy(t => t.Team!.TeamCode)
+                .ThenBy(t => t.ThesisId)
+                .ToListAsync();
         }
 
         public async Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id)

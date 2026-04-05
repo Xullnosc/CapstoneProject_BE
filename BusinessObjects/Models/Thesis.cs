@@ -54,4 +54,7 @@ public partial class Thesis
 
     public virtual ICollection<ThesisHistory> ThesisHistories { get; set; } =
         new List<ThesisHistory>();
+
+    public virtual ICollection<ThesisReviewEvent> ThesisReviewEvents { get; set; } =
+        new List<ThesisReviewEvent>();
 }

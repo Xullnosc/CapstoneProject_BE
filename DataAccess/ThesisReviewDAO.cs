@@ -90,6 +90,160 @@ public class ThesisReviewDAO : IThesisReviewDAO
 
         await _context.SaveChangesAsync();
 
+        // If all assigned reviewers have now submitted a decision, auto-create FINAL_DECISION
+        var allAssignedReviewers = await GetActiveAssignedReviewerIdsAsync(thesisId);
+        if (allAssignedReviewers.Count >= 2)
+        {
+            // Use the time of the last FINAL_DECISION as the boundary between rounds.
+            // Current round starts at the earliest REVIEWER_ASSIGNED event after that boundary.
+            // Using Min (not Max) ensures a reviewer who was assigned and decided before the
+            // second reviewer was even assigned is still counted in the same round.
+            var lastFinalDecisionTime =
+                await _context
+                    .ThesisReviewEvents.AsNoTracking()
+                    .Where(e =>
+                        e.ThesisId == thesisId
+                        && e.EventType == "FINAL_DECISION"
+                        && !e.IsDeleted
+                    )
+                    .MaxAsync(e => (DateTime?)e.CreatedAt) ?? DateTime.MinValue;
+
+            var roundStartTime =
+                await _context
+                    .ThesisReviewEvents.AsNoTracking()
+                    .Where(e =>
+                        e.ThesisId == thesisId
+                        && e.EventType == "REVIEWER_ASSIGNED"
+                        && e.CreatedAt > lastFinalDecisionTime
+                        && !e.IsDeleted
+                    )
+                    .MinAsync(e => (DateTime?)e.CreatedAt) ?? DateTime.MinValue;
+
+            var currentRoundDecisions = await _context
+                .ThesisReviewEvents.AsNoTracking()
+                .Where(e =>
+                    e.ThesisId == thesisId
+                    && e.EventType == "REVIEWER_DECISION"
+                    && allAssignedReviewers.Contains(e.ActorUserId)
+                    && e.CreatedAt >= roundStartTime
+                    && !e.IsDeleted
+                )
+                .OrderByDescending(e => e.CreatedAt)
+                .ThenByDescending(e => e.Id)
+                .ToListAsync();
+
+            var latestByReviewer = currentRoundDecisions
+                .GroupBy(e => e.ActorUserId)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            if (allAssignedReviewers.All(r => latestByReviewer.ContainsKey(r)))
+            {
+                var alreadyCreated = await _context
+                    .ThesisReviewEvents.AsNoTracking()
+                    .AnyAsync(e =>
+                        e.ThesisId == thesisId
+                        && e.EventType == "FINAL_DECISION"
+                        && e.ActorRole == "REVIEWER"
+                        && e.CreatedAt >= roundStartTime
+                        && !e.IsDeleted
+                    );
+
+                if (!alreadyCreated)
+                {
+                    var combinedDecision = latestByReviewer.Values.Any(e => e.Decision == "Fail")
+                        ? "Fail"
+                        : "Pass";
+
+                    var finalRound =
+                        (
+                            await _context
+                                .ThesisReviewEvents.AsNoTracking()
+                                .Where(e =>
+                                    e.ThesisId == thesisId
+                                    && e.EventType == "FINAL_DECISION"
+                                    && !e.IsDeleted
+                                )
+                                .CountAsync()
+                        ) + 1;
+
+                    var finalDecisionEvent = await CreateEventAsync(
+                        thesisId,
+                        "FINAL_DECISION",
+                        reviewerId,
+                        "REVIEWER",
+                        combinedDecision,
+                        null,
+                        finalRound
+                    );
+
+                    // Build one merged final-decision note from top-level reviewer comments only.
+                    // Replies are intentionally excluded.
+                    var reviewerNameById = await _context
+                        .Users.AsNoTracking()
+                        .Where(u => allAssignedReviewers.Contains(u.UserId))
+                        .Select(u => new { u.UserId, u.FullName })
+                        .ToDictionaryAsync(
+                            u => u.UserId,
+                            u => string.IsNullOrWhiteSpace(u.FullName)
+                                ? $"Reviewer {u.UserId}"
+                                : u.FullName!
+                        );
+
+                    var reviewerSections = new List<string>();
+                    foreach (var rev in allAssignedReviewers)
+                    {
+                        if (!latestByReviewer.TryGetValue(rev, out var revEvent))
+                            continue;
+
+                        var notes = await _context
+                            .ThesisReviewComments.AsNoTracking()
+                            .Where(c =>
+                                c.EventId == revEvent.Id
+                                && c.ParentCommentId == null
+                                && !c.IsDeleted
+                            )
+                            .OrderBy(c => c.CreatedAt)
+                            .ThenBy(c => c.Id)
+                            .Select(c => c.Body)
+                            .ToListAsync();
+
+                        if (!notes.Any())
+                            continue;
+
+                        var reviewerName = reviewerNameById.TryGetValue(rev, out var fullName)
+                            ? fullName
+                            : $"Reviewer {rev}";
+                        var combinedNote = string.Join(Environment.NewLine, notes);
+                        reviewerSections.Add($"{reviewerName}: {combinedNote}");
+                    }
+
+                    var mergedBody = string.Join(
+                        Environment.NewLine + Environment.NewLine,
+                        reviewerSections
+                    );
+
+                    if (!string.IsNullOrWhiteSpace(mergedBody))
+                    {
+                        _context.ThesisReviewComments.Add(
+                            new ThesisReviewComment
+                            {
+                                EventId = finalDecisionEvent.Id,
+                                ThesisId = thesisId,
+                                AuthorUserId = reviewerId,
+                                Body = mergedBody,
+                                CommentType = "DECISION_RATIONALE",
+                                VisibilityScope = "PUBLIC",
+                                CreatedAt = DateTime.UtcNow,
+                                IsDeleted = false,
+                            }
+                        );
+                    }
+
+                    await _context.SaveChangesAsync();
+                }
+            }
+        }
+
         return;
     }
     public async Task UpsertHodDecisionAsync(
@@ -102,13 +256,26 @@ public class ThesisReviewDAO : IThesisReviewDAO
     {
         var previous = await GetLatestHodDecisionAsync(thesisId);
 
+        var round =
+            (
+                await _context
+                    .ThesisReviewEvents.AsNoTracking()
+                    .Where(e =>
+                        e.ThesisId == thesisId
+                        && e.EventType == "FINAL_DECISION"
+                        && !e.IsDeleted
+                    )
+                    .CountAsync()
+            ) + 1;
+
         var hodEvent = await CreateEventAsync(
             thesisId,
-            "HOD_FINAL_DECISION",
+            "FINAL_DECISION",
             hodId,
             "HOD",
             decision,
-            previous
+            previous,
+            round
         );
 
         if (!string.IsNullOrWhiteSpace(note))
@@ -162,7 +329,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
             .ThesisReviewEvents.AsNoTracking()
             .Where(e =>
                 e.ThesisId == thesisId
-                && e.EventType == "HOD_FINAL_DECISION"
+                && e.EventType == "FINAL_DECISION"
                 && e.ActorRole == "HOD"
                 && !e.IsDeleted
             )
@@ -328,7 +495,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
 
         var previousHodDecisions = await _context
             .ThesisReviewEvents.Where(e =>
-                e.ThesisId == thesisId && e.EventType == "HOD_FINAL_DECISION" && !e.IsDeleted
+                e.ThesisId == thesisId && e.EventType == "FINAL_DECISION" && !e.IsDeleted
             )
             .ToListAsync();
         foreach (var hodDecision in previousHodDecisions)
@@ -341,8 +508,15 @@ public class ThesisReviewDAO : IThesisReviewDAO
         await _context.SaveChangesAsync();
     }
 
-    public async Task<List<ThesisReviewTimelineEventDTO>> GetTimelineAsync(string thesisId)
+    public async Task<PagedResult<ThesisReviewTimelineEventDTO>> GetTimelineAsync(
+        string thesisId,
+        int pageIndex,
+        int pageSize
+    )
     {
+        var safePageIndex = pageIndex < 1 ? 1 : pageIndex;
+        var safePageSize = pageSize < 1 ? 10 : Math.Min(pageSize, 50);
+
         var thesisExists = await _context
             .Theses.AsNoTracking()
             .AnyAsync(t => t.ThesisId == thesisId);
@@ -350,6 +524,10 @@ public class ThesisReviewDAO : IThesisReviewDAO
         {
             throw new KeyNotFoundException("Thesis not found.");
         }
+
+        var totalCount = await _context
+            .ThesisReviewEvents.AsNoTracking()
+            .CountAsync(e => e.ThesisId == thesisId && !e.IsDeleted);
 
         var events = await _context
             .ThesisReviewEvents.AsNoTracking()
@@ -370,16 +548,24 @@ public class ThesisReviewDAO : IThesisReviewDAO
                         ActorEmail = u.Email,
                         ActorAvatar = u.Avatar,
                         Decision = e.Decision,
+                        Round = e.Round,
                         CreatedAt = e.CreatedAt,
                     }
             )
-            .OrderBy(e => e.CreatedAt)
-            .ThenBy(e => e.EventId)
+            .OrderByDescending(e => e.CreatedAt)
+            .ThenByDescending(e => e.EventId)
+            .Skip((safePageIndex - 1) * safePageSize)
+            .Take(safePageSize)
             .ToListAsync();
 
         if (events.Count == 0)
         {
-            return events;
+            return new PagedResult<ThesisReviewTimelineEventDTO>(
+                events,
+                totalCount,
+                safePageIndex,
+                safePageSize
+            );
         }
 
         var eventIds = events.Select(e => e.EventId).ToList();
@@ -455,7 +641,12 @@ public class ThesisReviewDAO : IThesisReviewDAO
             }
         }
 
-        return events;
+        return new PagedResult<ThesisReviewTimelineEventDTO>(
+            events,
+            totalCount,
+            safePageIndex,
+            safePageSize
+        );
     }
 
     public async Task<ThesisReviewTimelineCommentDTO> AddCommentAsync(
@@ -566,7 +757,8 @@ public class ThesisReviewDAO : IThesisReviewDAO
         int actorUserId,
         string actorRole,
         string? decision,
-        string? previousDecision
+        string? previousDecision,
+        int? round = null
     )
     {
         var nextSequence =
@@ -587,6 +779,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
             Decision = decision,
             PreviousDecision = previousDecision,
             SequenceNo = nextSequence,
+            Round = round,
             CreatedAt = DateTime.UtcNow,
             IsDeleted = false,
         };
@@ -635,7 +828,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
             .ThesisReviewEvents.AsNoTracking()
             .Where(e =>
                 e.ThesisId == thesisId
-                && e.EventType == "HOD_FINAL_DECISION"
+                && e.EventType == "FINAL_DECISION"
                 && e.ActorRole == "HOD"
                 && !e.IsDeleted
             )

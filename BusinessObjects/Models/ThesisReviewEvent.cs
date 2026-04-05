@@ -21,6 +21,8 @@ public partial class ThesisReviewEvent
 
     public int SequenceNo { get; set; }
 
+    public int? Round { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }

@@ -141,6 +141,7 @@ public class ThesisEvaluationExportServiceTests
                                     Email = "s1@fpt.edu.vn",
                                     StudentCode = "SE1001",
                                     FullName = "Student One",
+                                    AccountDetail = new AccountDetail { Major = "Software Engineering" },
                                 },
                             },
                             new Teammember
@@ -151,6 +152,7 @@ public class ThesisEvaluationExportServiceTests
                                     Email = "s2@fpt.edu.vn",
                                     StudentCode = "SE1002",
                                     FullName = "Student Two",
+                                    AccountDetail = new AccountDetail { Major = "Artificial Intelligence" },
                                 },
                             },
                         ],
@@ -183,8 +185,8 @@ public class ThesisEvaluationExportServiceTests
         worksheet.Cells[3, 3].Text.Should().Be("SE1002");
         worksheet.Cells[2, 4].Text.Should().Be("Student One");
         worksheet.Cells[3, 4].Text.Should().Be("Student Two");
-        worksheet.Cells[2, 5].Text.Should().Be("101");
-        worksheet.Cells[3, 5].Text.Should().Be("102");
+        worksheet.Cells[2, 5].Text.Should().Be("Software Engineering");
+        worksheet.Cells[3, 5].Text.Should().Be("Artificial Intelligence");
 
         worksheet.MergedCells.Should().Contain("B2:B3");
         worksheet.MergedCells.Should().Contain("F2:F3");

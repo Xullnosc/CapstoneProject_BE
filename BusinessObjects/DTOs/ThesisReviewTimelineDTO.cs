@@ -14,6 +14,7 @@ public class ThesisReviewTimelineEventDTO
     public string? ActorEmail { get; set; }
     public string? ActorAvatar { get; set; }
     public string? Decision { get; set; }
+    public int? Round { get; set; }
     public DateTime CreatedAt { get; set; }
     public List<string> ChecklistResults { get; set; } = [];
     public List<ThesisReviewTimelineCommentDTO> Comments { get; set; } = [];
