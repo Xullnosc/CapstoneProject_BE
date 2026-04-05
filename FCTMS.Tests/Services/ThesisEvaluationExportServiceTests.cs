@@ -12,6 +12,7 @@ public class ThesisEvaluationExportServiceTests
 {
     private readonly Mock<ILecturerRepository> _lecturerRepository = new();
     private readonly Mock<IThesisRepository> _thesisRepository = new();
+    private readonly Mock<IChecklistRepository> _checklistRepository = new();
 
     [Fact]
     public async Task GenerateWorkbookAsync_WritesSummarySheetHeadersAndFormulas()
@@ -28,9 +29,11 @@ public class ThesisEvaluationExportServiceTests
             .Setup(repository => repository.GetThesesForEvaluationExportAsync(It.IsAny<int?>()))
             .ReturnsAsync([]);
 
+        _checklistRepository.Setup(r => r.GetAllAsync()).ReturnsAsync([]);
         var service = new ThesisEvaluationExportService(
             _lecturerRepository.Object,
-            _thesisRepository.Object
+            _thesisRepository.Object,
+            _checklistRepository.Object
         );
 
         var workbookBytes = await service.GenerateWorkbookAsync(
@@ -87,9 +90,11 @@ public class ThesisEvaluationExportServiceTests
             .Setup(repository => repository.GetThesesForEvaluationExportAsync(It.IsAny<int?>()))
             .ReturnsAsync([]);
 
+        _checklistRepository.Setup(r => r.GetAllAsync()).ReturnsAsync([]);
         var service = new ThesisEvaluationExportService(
             _lecturerRepository.Object,
-            _thesisRepository.Object
+            _thesisRepository.Object,
+            _checklistRepository.Object
         );
 
         var workbookBytes = await service.GenerateWorkbookAsync(
@@ -160,9 +165,11 @@ public class ThesisEvaluationExportServiceTests
                 },
             ]);
 
+        _checklistRepository.Setup(r => r.GetAllAsync()).ReturnsAsync([]);
         var service = new ThesisEvaluationExportService(
             _lecturerRepository.Object,
-            _thesisRepository.Object
+            _thesisRepository.Object,
+            _checklistRepository.Object
         );
 
         var workbookBytes = await service.GenerateWorkbookAsync(

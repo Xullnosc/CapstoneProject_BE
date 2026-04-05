@@ -939,7 +939,7 @@ public partial class FctmsContext : DbContext
 
             entity
                 .HasOne(d => d.Event)
-                .WithMany()
+                .WithMany(p => p.ChecklistResults)
                 .HasForeignKey(d => d.EventId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_ChecklistResults_Event");

@@ -39,4 +39,7 @@ public partial class ThesisReviewEvent
 
     public virtual ICollection<ThesisReviewComment> Comments { get; set; } =
         new List<ThesisReviewComment>();
+
+    public virtual ICollection<ThesisReviewChecklistResult> ChecklistResults { get; set; } =
+        new List<ThesisReviewChecklistResult>();
 }

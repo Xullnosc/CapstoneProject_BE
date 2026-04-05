@@ -20,14 +20,17 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
     private static readonly Color KhongDuDieuKienColor = ColorTranslator.FromHtml("#FFCCCC");
     private readonly ILecturerRepository _lecturerRepository;
     private readonly IThesisRepository _thesisRepository;
+    private readonly IChecklistRepository _checklistRepository;
 
     public ThesisEvaluationExportService(
         ILecturerRepository lecturerRepository,
-        IThesisRepository thesisRepository
+        IThesisRepository thesisRepository,
+        IChecklistRepository checklistRepository
     )
     {
         _lecturerRepository = lecturerRepository;
         _thesisRepository = thesisRepository;
+        _checklistRepository = checklistRepository;
     }
 
     public async Task<byte[]> GenerateWorkbookAsync(
@@ -38,11 +41,12 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         ArgumentNullException.ThrowIfNull(request);
 
         var reviewers = await _lecturerRepository.GetReviewersAsync();
-        var reviewerEmails = reviewers
-            .Select(reviewer => reviewer.Email)
-            .Where(email => !string.IsNullOrWhiteSpace(email))
+        var reviewerList = reviewers
+            .Where(r => !string.IsNullOrWhiteSpace(r.Email))
             .ToList();
+        var reviewerEmails = reviewerList.Select(r => r.Email).ToList();
         var theses = await _thesisRepository.GetThesesForEvaluationExportAsync(request.SemesterId);
+        var checklists = await _checklistRepository.GetAllAsync();
 
         using var package = new ExcelPackage();
         var summaryWorksheet = package.Workbook.Worksheets.Add(SummarySheetName);
@@ -51,6 +55,14 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         WriteSummaryHeaders(summaryWorksheet);
         WriteSummaryRows(summaryWorksheet, reviewerEmails);
         WriteThesisInfoSheet(thesisInfoWorksheet, theses);
+
+        var thesisList = theses.ToList();
+        foreach (var reviewer in reviewerList)
+        {
+            var sheetTitle = GetEmailPrefix(reviewer.Email) ?? reviewer.Email;
+            var reviewerWorksheet = package.Workbook.Worksheets.Add(sheetTitle);
+            WriteReviewerSheet(reviewerWorksheet, reviewer.Email, thesisList, checklists);
+        }
 
         if (summaryWorksheet.Dimension != null)
         {
@@ -304,6 +316,167 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         }
 
         worksheet.View.FreezePanes(2, 1);
+    }
+
+    private static void WriteReviewerSheet(
+        ExcelWorksheet worksheet,
+        string reviewerEmail,
+        IReadOnlyList<Thesis> allTheses,
+        IReadOnlyList<Checklist> checklists
+    )
+    {
+        // Fixed headers A-I
+        worksheet.Cells[1, 1].Value = "Ngày";
+        worksheet.Cells[1, 2].Value = "Mentor 1";
+        worksheet.Cells[1, 3].Value = "Mentor 2";
+        worksheet.Cells[1, 4].Value = "Tên đề tài (EN)";
+        worksheet.Cells[1, 5].Value = "Tền đề tài (VI)";
+        worksheet.Cells[1, 6].Value = "Comment";
+        worksheet.Cells[1, 7].Value = "Kết quả";
+        worksheet.Cells[1, 8].Value = "Yes";
+        worksheet.Cells[1, 9].Value = "No";
+
+        // Checklist headers starting at J (column 10)
+        var orderedChecklists = checklists.OrderBy(c => c.ChecklistId).ToList();
+        for (var i = 0; i < orderedChecklists.Count; i++)
+        {
+            worksheet.Cells[1, 10 + i].Value = orderedChecklists[i].Content;
+        }
+
+        var lastHeaderCol = Math.Max(9, 9 + orderedChecklists.Count);
+        ApplyHeaderStyle(worksheet.Cells[1, 1, 1, lastHeaderCol]);
+
+        // Theses assigned to this reviewer
+        var assignedTheses = allTheses
+            .Where(t =>
+                t.ThesisReviewEvents.Any(e =>
+                    (e.EventType == "REVIEWER_ASSIGNED" || e.EventType == "REVIEWER_DECISION")
+                    && string.Equals(
+                        e.ActorUser?.Email,
+                        reviewerEmail,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+            )
+            .ToList();
+
+        var firstChecklistCol = orderedChecklists.Count > 0
+            ? ColumnLetter(10)
+            : null;
+        var lastChecklistCol = orderedChecklists.Count > 0
+            ? ColumnLetter(9 + orderedChecklists.Count)
+            : null;
+
+        var row = 2;
+        foreach (var thesis in assignedTheses)
+        {
+            // Latest FINAL_DECISION for this thesis
+            var finalDecision = thesis
+                .ThesisReviewEvents.Where(e => e.EventType == "FINAL_DECISION")
+                .OrderByDescending(e => e.Round ?? 0)
+                .ThenByDescending(e => e.CreatedAt)
+                .FirstOrDefault();
+
+            // This reviewer's latest REVIEWER_DECISION
+            var reviewerDecision = thesis
+                .ThesisReviewEvents.Where(e =>
+                    e.EventType == "REVIEWER_DECISION"
+                    && string.Equals(
+                        e.ActorUser?.Email,
+                        reviewerEmail,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                .OrderByDescending(e => e.Round ?? 0)
+                .ThenByDescending(e => e.CreatedAt)
+                .FirstOrDefault();
+
+            // A: date
+            worksheet.Cells[row, 1].Value = finalDecision?.CreatedAt.ToString("d-MMM");
+
+            // B-C: mentors
+            worksheet.Cells[row, 2].Value = thesis.Mentor1?.FullName;
+            worksheet.Cells[row, 3].Value = thesis.Mentor2?.FullName;
+
+            // D-E: thesis names
+            worksheet.Cells[row, 4].Value = thesis.ThesisNameEn;
+            worksheet.Cells[row, 5].Value = thesis.ThesisNameVi;
+
+            // F: combined top-level comments from the final decision event
+            if (finalDecision != null)
+            {
+                var topLevelComments = finalDecision.Comments
+                    .Where(c => c.ParentCommentId == null && !c.IsDeleted)
+                    .OrderBy(c => c.CreatedAt)
+                    .ToList();
+                worksheet.Cells[row, 6].Value = topLevelComments.Count > 0
+                    ? string.Join(
+                        "\n\n",
+                        topLevelComments.Select(c =>
+                            $"{c.AuthorUser?.FullName ?? "Unknown"}: {c.Body}"
+                        )
+                    )
+                    : null;
+                worksheet.Cells[row, 6].Style.WrapText = true;
+            }
+
+            // G: result
+            worksheet.Cells[row, 7].Value = MapDecision(finalDecision?.Decision);
+
+            // H: Yes formula — count "X" across checklist columns
+            if (orderedChecklists.Count > 0)
+            {
+                worksheet.Cells[row, 8].Formula =
+                    $"COUNTIFS({firstChecklistCol}{row}:{lastChecklistCol}{row},\"X\")";
+
+                // I: No formula — count "o" across checklist columns
+                worksheet.Cells[row, 9].Formula =
+                    $"COUNTIFS({firstChecklistCol}{row}:{lastChecklistCol}{row},\"o\")";
+            }
+
+            // J+: checklist results from reviewer's REVIEWER_DECISION event
+            var checklistResultMap = reviewerDecision?.ChecklistResults
+                .ToDictionary(cr => cr.ChecklistId, cr => cr.IsChecked)
+                ?? new Dictionary<int, bool>();
+
+            for (var i = 0; i < orderedChecklists.Count; i++)
+            {
+                var checklist = orderedChecklists[i];
+                if (checklistResultMap.TryGetValue(checklist.ChecklistId, out var isChecked))
+                {
+                    worksheet.Cells[row, 10 + i].Value = isChecked ? "x" : "o";
+                }
+            }
+
+            row++;
+        }
+
+        var lastDataRow = Math.Max(row - 1, 1);
+        ApplyBorderStyle(worksheet.Cells[1, 1, lastDataRow, lastHeaderCol]);
+
+        if (lastDataRow > 1)
+        {
+            worksheet.Cells[1, 1, lastDataRow, lastHeaderCol].AutoFilter = true;
+        }
+
+        worksheet.View.FreezePanes(2, 1);
+
+        if (worksheet.Dimension != null)
+        {
+            worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
+        }
+    }
+
+    private static string ColumnLetter(int col)
+    {
+        var letter = string.Empty;
+        while (col > 0)
+        {
+            col--;
+            letter = (char)('A' + col % 26) + letter;
+            col /= 26;
+        }
+        return letter;
     }
 
     private static string? MapDecision(string? decision) =>
