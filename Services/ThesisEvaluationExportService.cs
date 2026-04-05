@@ -45,7 +45,14 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
             .Where(r => !string.IsNullOrWhiteSpace(r.Email))
             .ToList();
         var reviewerEmails = reviewerList.Select(r => r.Email).ToList();
-        var theses = await _thesisRepository.GetThesesForEvaluationExportAsync(request.SemesterId);
+        var allTheses = await _thesisRepository.GetThesesForEvaluationExportAsync();
+        // Filter by semester in-memory using the already-loaded Team navigation.
+        // This handles both direct Thesis.SemesterId and team-linked semester assignment.
+        IEnumerable<Thesis> theses = request.SemesterId.HasValue
+            ? allTheses.Where(t =>
+                t.SemesterId == request.SemesterId ||
+                t.Team?.SemesterId == request.SemesterId)
+            : allTheses;
         var checklists = await _checklistRepository.GetAllAsync();
 
         using var package = new ExcelPackage();
@@ -344,7 +351,7 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         }
 
         var lastHeaderCol = Math.Max(9, 9 + orderedChecklists.Count);
-        ApplyHeaderStyle(worksheet.Cells[1, 1, 1, lastHeaderCol]);
+        ApplyReviewerSheetHeaderStyle(worksheet.Cells[1, 1, 1, lastHeaderCol]);
 
         // Theses assigned to this reviewer
         var assignedTheses = allTheses
@@ -442,10 +449,10 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
             for (var i = 0; i < orderedChecklists.Count; i++)
             {
                 var checklist = orderedChecklists[i];
-                if (checklistResultMap.TryGetValue(checklist.ChecklistId, out var isChecked))
-                {
-                    worksheet.Cells[row, 10 + i].Value = isChecked ? "x" : "o";
-                }
+                var value = checklistResultMap.TryGetValue(checklist.ChecklistId, out var isChecked)
+                    ? (isChecked ? "x" : "o")
+                    : "o";
+                worksheet.Cells[row, 10 + i].Value = value;
             }
 
             row++;
@@ -599,6 +606,15 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         range.Style.WrapText = true;
         range.Style.Fill.PatternType = ExcelFillStyle.Solid;
         range.Style.Fill.BackgroundColor.SetColor(backgroundColor);
+    }
+
+    private static void ApplyReviewerSheetHeaderStyle(ExcelRange range)
+    {
+        range.Style.Font.Bold = true;
+        range.Style.Font.Color.SetColor(Color.Black);
+        range.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+        range.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
+        ApplyBorderStyle(range);
     }
 
     private static void ApplyHeaderStyle(ExcelRange range)

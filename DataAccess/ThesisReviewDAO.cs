@@ -176,8 +176,8 @@ public class ThesisReviewDAO : IThesisReviewDAO
                         finalRound
                     );
 
-                    // Build one merged final-decision note from top-level reviewer comments only.
-                    // Replies are intentionally excluded.
+                    // Build one merged final-decision note from reviewer decision comments only.
+                    // Only DECISION_RATIONALE comments are included (never replies/follow-ups).
                     var reviewerNameById = await _context
                         .Users.AsNoTracking()
                         .Where(u => allAssignedReviewers.Contains(u.UserId))
@@ -199,7 +199,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
                             .ThesisReviewComments.AsNoTracking()
                             .Where(c =>
                                 c.EventId == revEvent.Id
-                                && c.ParentCommentId == null
+                                && c.CommentType == "DECISION_RATIONALE"
                                 && !c.IsDeleted
                             )
                             .OrderBy(c => c.CreatedAt)

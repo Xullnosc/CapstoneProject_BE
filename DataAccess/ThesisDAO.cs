@@ -134,18 +134,12 @@ namespace DataAccess
             return await query.OrderByDescending(t => t.UpdateDate).ToListAsync();
         }
 
-        public async Task<IEnumerable<Thesis>> GetThesesForEvaluationExportAsync(
-            int? semesterId = null
-        )
+        public async Task<IEnumerable<Thesis>> GetThesesForEvaluationExportAsync()
         {
-            IQueryable<Thesis> baseQuery = _context.Theses.AsNoTracking();
-
-            if (semesterId.HasValue)
-            {
-                baseQuery = baseQuery.Where(t => t.SemesterId == semesterId.Value);
-            }
-
-            return await baseQuery
+            // Semester filtering is done in-memory by the service using the loaded Team navigation.
+            return await _context.Theses
+                .AsNoTracking()
+                .IgnoreQueryFilters()
                 .Include(t => t.Team)
                     .ThenInclude(team => team.Teammembers)
                         .ThenInclude(teamMember => teamMember.Student)

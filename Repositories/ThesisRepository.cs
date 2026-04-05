@@ -45,9 +45,8 @@ namespace Repositories
                 excludeUserId
             );
 
-        public Task<IEnumerable<Thesis>> GetThesesForEvaluationExportAsync(
-            int? semesterId = null
-        ) => _thesisDAO.GetThesesForEvaluationExportAsync(semesterId);
+        public Task<IEnumerable<Thesis>> GetThesesForEvaluationExportAsync()
+            => _thesisDAO.GetThesesForEvaluationExportAsync();
 
         public Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id) =>
             _thesisDAO.GetThesisByIdWithHistoriesAsync(id);

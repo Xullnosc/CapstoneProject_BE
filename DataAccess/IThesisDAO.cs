@@ -24,7 +24,7 @@ namespace DataAccess
             bool lecturerOnly = false,
             int? excludeUserId = null
         );
-        Task<IEnumerable<Thesis>> GetThesesForEvaluationExportAsync(int? semesterId = null);
+        Task<IEnumerable<Thesis>> GetThesesForEvaluationExportAsync();
         Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id);
         Task AddThesisHistoryAsync(ThesisHistory history);
         Task<IEnumerable<Thesis>> GetThesesByOwnerOrTeamAsync(

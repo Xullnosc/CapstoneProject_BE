@@ -20,11 +20,13 @@ namespace CapstoneProject_BE.Controllers
     {
         private readonly ISemesterService _semesterService;
         private readonly IImportService _importService;
+        private readonly IThesisEvaluationExportService _thesisEvaluationExportService;
 
-        public SemesterController(ISemesterService semesterService, IImportService importService)
+        public SemesterController(ISemesterService semesterService, IImportService importService, IThesisEvaluationExportService thesisEvaluationExportService)
         {
             _semesterService = semesterService;
             _importService = importService;
+            _thesisEvaluationExportService = thesisEvaluationExportService;
         }
 
         [HttpGet]
@@ -353,6 +355,27 @@ namespace CapstoneProject_BE.Controllers
                 return NotFound(new { message = ex.Message });
             }
         }
+        [HttpGet("{id}/export/evaluation")]
+        [Authorize(Roles = CampusConstants.Roles.HOD + "," + CampusConstants.Roles.Admin)]
+        public async Task<IActionResult> ExportEvaluation(int id, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var request = new ReviewerSummarySheetRequestDTO { SemesterId = id };
+                var bytes = await _thesisEvaluationExportService.GenerateWorkbookAsync(request, cancellationToken);
+                var fileName = $"thesis-evaluation-semester-{id}.xlsx";
+                return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (OperationCanceledException)
+            {
+                return StatusCode(499);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while generating the export.", detail = ex.Message });
+            }
+        }
+
         [HttpGet("{id}/orphaned-students")]
         [Authorize(Roles = CampusConstants.Roles.HOD + "," + CampusConstants.Roles.Admin)]
         public async Task<IActionResult> GetOrphanedStudents(

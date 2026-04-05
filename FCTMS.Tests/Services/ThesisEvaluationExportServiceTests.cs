@@ -26,7 +26,7 @@ public class ThesisEvaluationExportServiceTests
             ]);
 
         _thesisRepository
-            .Setup(repository => repository.GetThesesForEvaluationExportAsync(It.IsAny<int?>()))
+            .Setup(repository => repository.GetThesesForEvaluationExportAsync())
             .ReturnsAsync([]);
 
         _checklistRepository.Setup(r => r.GetAllAsync()).ReturnsAsync([]);
@@ -87,7 +87,7 @@ public class ThesisEvaluationExportServiceTests
             ]);
 
         _thesisRepository
-            .Setup(repository => repository.GetThesesForEvaluationExportAsync(It.IsAny<int?>()))
+            .Setup(repository => repository.GetThesesForEvaluationExportAsync())
             .ReturnsAsync([]);
 
         _checklistRepository.Setup(r => r.GetAllAsync()).ReturnsAsync([]);
@@ -120,7 +120,7 @@ public class ThesisEvaluationExportServiceTests
         ExcelPackage.License.SetNonCommercialOrganization("Capstone Project");
         _lecturerRepository.Setup(repository => repository.GetReviewersAsync()).ReturnsAsync([]);
         _thesisRepository
-            .Setup(repository => repository.GetThesesForEvaluationExportAsync(It.IsAny<int?>()))
+            .Setup(repository => repository.GetThesesForEvaluationExportAsync())
             .ReturnsAsync([
                 new Thesis
                 {
