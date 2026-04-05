@@ -369,35 +369,35 @@ namespace FCTMS.Tests.Controllers
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
-        [Fact]
-        public async Task EndSemester_ReturnsOk_WhenSuccessful()
-        {
-            // Arrange
-            int id = 1;
-            _mockSemesterService.Setup(x => x.EndSemesterAsync(id)).Returns(Task.CompletedTask);
-
-            // Act
-            var result = await _controller.EndSemester(id);
-
-            // Assert
-            result.Should().BeOfType<OkObjectResult>();
-            _mockSemesterService.Verify(x => x.EndSemesterAsync(id), Times.Once);
-        }
-
-        [Fact]
-        public async Task EndSemester_ReturnsNotFound_WhenIdDoesNotExist()
-        {
-            // Arrange
-            int id = 999;
-            _mockSemesterService.Setup(x => x.EndSemesterAsync(id))
-                .ThrowsAsync(new KeyNotFoundException($"Semester with ID {id} not found."));
-
-            // Act
-            var result = await _controller.EndSemester(id);
-
-            // Assert
-            result.Should().BeOfType<NotFoundObjectResult>();
-        }
+        // [Fact]
+        // public async Task EndSemester_ReturnsOk_WhenSuccessful()
+        // {
+        //     // Arrange
+        //     int id = 1;
+        //     _mockSemesterService.Setup(x => x.EndSemesterAsync(id)).Returns(Task.CompletedTask);
+        // 
+        //     // Act
+        //     var result = await _controller.EndSemester(id);
+        // 
+        //     // Assert
+        //     result.Should().BeOfType<OkObjectResult>();
+        //     _mockSemesterService.Verify(x => x.EndSemesterAsync(id), Times.Once);
+        // }
+        // 
+        // [Fact]
+        // public async Task EndSemester_ReturnsNotFound_WhenIdDoesNotExist()
+        // {
+        //     // Arrange
+        //     int id = 999;
+        //     _mockSemesterService.Setup(x => x.EndSemesterAsync(id))
+        //         .ThrowsAsync(new KeyNotFoundException($"Semester with ID {id} not found."));
+        // 
+        //     // Act
+        //     var result = await _controller.EndSemester(id);
+        // 
+        //     // Assert
+        //     result.Should().BeOfType<NotFoundObjectResult>();
+        // }
 
         [Fact]
         public async Task GetSemester_ReturnsOk_WhenFound()

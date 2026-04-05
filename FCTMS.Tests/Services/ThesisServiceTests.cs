@@ -1059,7 +1059,7 @@ namespace FCTMS.Tests.Services
 
             _mockThesisRepository
                 .Setup(x => x.UpdateThesisAsync(It.IsAny<Thesis>()))
-                .Callback<Thesis>(t => updatedStatuses.Add(t.Status))
+                .Callback<Thesis>(t => updatedStatuses.Add(t.Status ?? ""))
                 .Returns(Task.CompletedTask);
 
             _mockThesisReviewRepository
@@ -1099,7 +1099,7 @@ namespace FCTMS.Tests.Services
 
             _mockThesisRepository
                 .Setup(x => x.UpdateThesisAsync(It.IsAny<Thesis>()))
-                .Callback<Thesis>(t => updatedStatuses.Add(t.Status))
+                .Callback<Thesis>(t => updatedStatuses.Add(t.Status ?? ""))
                 .Returns(Task.CompletedTask);
 
             _mockThesisReviewRepository
