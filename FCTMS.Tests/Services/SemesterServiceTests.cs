@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using FluentAssertions;
@@ -494,7 +494,7 @@ namespace FCTMS.Tests.Services
             };
 
             var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(updateDto.SemesterId)).ReturnsAsync(currentSemester);
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId)).ReturnsAsync(currentSemester);
             _mockSemesterRepository.Setup(r => r.GetSemesterByCodeAsync(updateDto.SemesterCode)).ReturnsAsync((Semester?)null);
 
             var conflictSemester = new Semester { SemesterCode = "SU26", SemesterName = "Summer 2026" };
@@ -560,7 +560,7 @@ namespace FCTMS.Tests.Services
             // Act
             await _semesterService.CreateSemesterAsync(dto);
 
-            // Assert — Status must be Upcoming before calling CreateSemesterAsync
+            // Assert â€” Status must be Upcoming before calling CreateSemesterAsync
             _mockSemesterRepository.Verify(r =>
                 r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == "Upcoming")), Times.Once);
         }
@@ -581,7 +581,7 @@ namespace FCTMS.Tests.Services
         [Fact]
         public async Task GetAllSemestersAsync_ShouldReturnFromDb_WhenCacheMiss()
         {
-            // Arrange — cache returns null (miss), DB returns data
+            // Arrange â€” cache returns null (miss), DB returns data
             var semesters = new List<Semester> { new Semester { SemesterId = 1, SemesterCode = "SP26" } };
             var dtos = new List<SemesterDTO> { new SemesterDTO { SemesterId = 1, SemesterCode = "SP26" } };
 
@@ -623,7 +623,7 @@ namespace FCTMS.Tests.Services
             // Act
             var result = await _semesterService.GetOrphanedStudentsAsync(semesterId, 1, 10);
 
-            // Assert — Avatar should be populated from user lookup
+            // Assert â€” Avatar should be populated from user lookup
             result.Items.Should().HaveCount(1);
             result.Items[0].Avatar.Should().Be("avatar_url.png");
         }

@@ -1,4 +1,4 @@
-using BusinessObjects.DTOs;
+﻿using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using CapstoneProject_BE.Controllers;
 using FluentAssertions;
@@ -116,7 +116,7 @@ namespace FCTMS.Tests.Controllers
         public async Task GetAll_ShouldReturnOkWithEmptyList_WhenNoChecklistsExist()
         {
             // Arrange
-            // Service returns an empty list â€” no checklist items in the system.
+            // Service returns an empty list Ã¢â‚¬â€ no checklist items in the system.
             _mockService.Setup(x => x.GetAllAsync()).ReturnsAsync(new List<ChecklistDTO>());
 
             // Act
@@ -226,5 +226,8 @@ namespace FCTMS.Tests.Controllers
             // GetById has no try-catch, so the exception propagates to the caller.
             await act.Should().ThrowAsync<Exception>().WithMessage("Connection pool exhausted");
         }
+
     }
 }
+
+

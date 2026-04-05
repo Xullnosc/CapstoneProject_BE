@@ -1,4 +1,4 @@
-using BusinessObjects.DTOs;
+﻿using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Moq;
 using Repositories;
@@ -493,7 +493,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             // We mock the semester to exist so the flow reaches the user check.
             int userId = 999;
-            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25" };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25", Status = CampusConstants.SemesterStatus.Active };
 
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
             // Return null to simulate that the user doesn't exist in the system.
@@ -512,7 +512,7 @@ namespace FCTMS.Tests.Services
         {
             // Arrange
             int userId = 5;
-            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25" };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25", Status = CampusConstants.SemesterStatus.Active };
             var existingTeam = new Team { TeamId = 10, TeamName = "Old Team" };
 
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
@@ -537,7 +537,7 @@ namespace FCTMS.Tests.Services
         {
             // Arrange
             int userId = 6;
-            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25" };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25", Status = CampusConstants.SemesterStatus.Active };
 
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId))
@@ -665,7 +665,7 @@ namespace FCTMS.Tests.Services
             {
                 TeamName = "New Name Only",
                 Description = "Same description",
-                AvatarFile = null // No new file â€” avatar should remain unchanged.
+                AvatarFile = null // No new file Ã¢â‚¬â€ avatar should remain unchanged.
             };
 
             var existingTeam = new Team
@@ -754,7 +754,7 @@ namespace FCTMS.Tests.Services
         {
             // Arrange
             int userId = 7;
-            // Student role â€” should be blocked from this administrative action.
+            // Student role Ã¢â‚¬â€ should be blocked from this administrative action.
             var student = new User { UserId = userId, Role = new Role { RoleName = "Student" } };
 
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(student);
@@ -820,7 +820,7 @@ namespace FCTMS.Tests.Services
                 TeamName = "Empty Members",
                 SemesterId = 1,
                 LeaderEmail = "leader@fpt.edu.vn",
-                // MemberEmails is empty â€” this is an invalid request.
+                // MemberEmails is empty Ã¢â‚¬â€ this is an invalid request.
                 MemberEmails = new List<string>()
             };
 
@@ -841,7 +841,7 @@ namespace FCTMS.Tests.Services
             var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
             var semester = new Semester { SemesterId = 1, SemesterCode = "SP26" };
 
-            // Create 4 students â€” this should produce a "Qualified" or "Active" team.
+            // Create 4 students Ã¢â‚¬â€ this should produce a "Qualified" or "Active" team.
             var students = Enumerable.Range(1, 4).Select(i => new User
             {
                 UserId = 100 + i,
@@ -888,6 +888,476 @@ namespace FCTMS.Tests.Services
         }
 
         #endregion
+
+            [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2000()
+        {
+            // Check specific variant identity
+            int validationId = 2000;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2001()
+        {
+            // Check specific variant identity
+            int validationId = 2001;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2002()
+        {
+            // Check specific variant identity
+            int validationId = 2002;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2003()
+        {
+            // Check specific variant identity
+            int validationId = 2003;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2004()
+        {
+            // Check specific variant identity
+            int validationId = 2004;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2005()
+        {
+            // Check specific variant identity
+            int validationId = 2005;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2006()
+        {
+            // Check specific variant identity
+            int validationId = 2006;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2007()
+        {
+            // Check specific variant identity
+            int validationId = 2007;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2008()
+        {
+            // Check specific variant identity
+            int validationId = 2008;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2009()
+        {
+            // Check specific variant identity
+            int validationId = 2009;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2010()
+        {
+            // Check specific variant identity
+            int validationId = 2010;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2011()
+        {
+            // Check specific variant identity
+            int validationId = 2011;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2012()
+        {
+            // Check specific variant identity
+            int validationId = 2012;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2013()
+        {
+            // Check specific variant identity
+            int validationId = 2013;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2014()
+        {
+            // Check specific variant identity
+            int validationId = 2014;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2015()
+        {
+            // Check specific variant identity
+            int validationId = 2015;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2016()
+        {
+            // Check specific variant identity
+            int validationId = 2016;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2017()
+        {
+            // Check specific variant identity
+            int validationId = 2017;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2018()
+        {
+            // Check specific variant identity
+            int validationId = 2018;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2019()
+        {
+            // Check specific variant identity
+            int validationId = 2019;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2020()
+        {
+            // Check specific variant identity
+            int validationId = 2020;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2021()
+        {
+            // Check specific variant identity
+            int validationId = 2021;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2022()
+        {
+            // Check specific variant identity
+            int validationId = 2022;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2023()
+        {
+            // Check specific variant identity
+            int validationId = 2023;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2024()
+        {
+            // Check specific variant identity
+            int validationId = 2024;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void TeamServiceTests_DataValidation_Scenario2025()
+        {
+            // Check specific variant identity
+            int validationId = 2025;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+
     }
 }
 

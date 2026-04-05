@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -110,7 +110,7 @@ namespace FCTMS.Tests.Controllers
             var request = new LoginRequestDTO { IdToken = "valid-token", Campus = "Hanoi" };
 
             _mockAuthService.Setup(x => x.GoogleLoginAsync(request))
-                .ThrowsAsync(new UnauthorizedAccessException("Tài khoản của bạn thuộc cơ sở Danang. Vui lòng chọn đúng cơ sở khi đăng nhập."));
+                .ThrowsAsync(new UnauthorizedAccessException("TÃ i khoáº£n cá»§a báº¡n thuá»™c cÆ¡ sá»Ÿ Danang. Vui lÃ²ng chá»n Ä‘Ãºng cÆ¡ sá»Ÿ khi Ä‘Äƒng nháº­p."));
 
             // Act
             var result = await _controller.Login(request);
@@ -384,7 +384,7 @@ namespace FCTMS.Tests.Controllers
         [Fact]
         public async Task LoginWithCredentials_Success_ReturnsOk()
         {
-            // Arrange — uses CredentialLoginAsync (the actual interface method name)
+            // Arrange â€” uses CredentialLoginAsync (the actual interface method name)
             var request = new CredentialLoginRequestDTO { Username = "admin", Password = "pass123" };
             var loginResult = new LoginResultDTO
             {
@@ -469,16 +469,16 @@ namespace FCTMS.Tests.Controllers
         [Fact]
         public async Task Logout_ServiceThrows_StillReturnsOk()
         {
-            // Arrange — logout is best-effort; errors should not surface to the caller
+            // Arrange â€” logout is best-effort; errors should not surface to the caller
             var context = new DefaultHttpContext();
             _controller.ControllerContext = new ControllerContext { HttpContext = context };
             _mockAuthService.Setup(x => x.RevokeRefreshTokenAsync(It.IsAny<string?>()))
                 .ThrowsAsync(new Exception("Revoke failed"));
 
-            // Act — should not propagate the exception
+            // Act â€” should not propagate the exception
             Func<Task> act = async () => await _controller.Logout();
 
-            // Assert — directly calling the controller sidesteps middleware, so the exception will throw
+            // Assert â€” directly calling the controller sidesteps middleware, so the exception will throw
             await act.Should().ThrowAsync<Exception>();
         }
 
@@ -503,5 +503,8 @@ namespace FCTMS.Tests.Controllers
             var ok = result.Should().BeOfType<OkObjectResult>().Subject;
             ok.Value.Should().NotBeNull();
         }
+
     }
 }
+
+

@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 
 namespace FCTMS.Tests.Controllers;
 
@@ -248,7 +248,7 @@ public class AdminControllerTests
     [Fact]
     public async Task CreateOrUpdateHod_WithMinimalDto_ReturnsOk()
     {
-        // Arrange — only required fields
+        // Arrange â€” only required fields
         var dto = new CreateOrUpdateHodDTO
         {
             Email = "minimal@fpt.edu.vn",
@@ -290,7 +290,7 @@ public class AdminControllerTests
     [Fact]
     public async Task CreateOrUpdateHod_NetworkError_Returns500()
     {
-        // Arrange — simulate transient network/DB error
+        // Arrange â€” simulate transient network/DB error
         var dto = new CreateOrUpdateHodDTO { FullName = "HOD", Email = "e@e.com", Username = "u", Password = "p" };
         _mockAdminService.Setup(x => x.CreateOrUpdateHodAsync(dto))
             .ThrowsAsync(new System.Net.Http.HttpRequestException("Network timeout"));
@@ -298,7 +298,7 @@ public class AdminControllerTests
         // Act
         var result = await _controller.CreateOrUpdateHod(dto);
 
-        // Assert — generic exceptions become 500
+        // Assert â€” generic exceptions become 500
         var status = result.Should().BeOfType<ObjectResult>().Subject;
         status.StatusCode.Should().Be(500);
     }
@@ -351,5 +351,8 @@ public class AdminControllerTests
         var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         bad.Value!.GetType().GetProperty("message")!
             .GetValue(bad.Value).Should().Be("Username already exists");
+
     }
 }
+
+
