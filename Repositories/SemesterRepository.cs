@@ -21,6 +21,7 @@ namespace Repositories
             => await _semesterDAO.GetAllAsync(pageIndex, pageSize);
 
         public async Task<Semester?> GetSemesterByIdAsync(int id) => await _semesterDAO.GetByIdAsync(id);
+        public async Task<Semester?> GetSemesterByIdSimpleAsync(int id) => await _semesterDAO.GetByIdSimpleAsync(id);
 
         public async Task<Semester> CreateSemesterAsync(Semester semester) => await _semesterDAO.AddAsync(semester);
 
@@ -38,6 +39,8 @@ namespace Repositories
 
         public async Task<Semester?> IsOverlapAsync(DateTime start, DateTime end, int? excludeId) 
             => await _semesterDAO.IsOverlapAsync(start, end, excludeId);
+        
+        public async Task<bool> HasActiveSemesterAsync() => await _semesterDAO.HasActiveSemesterAsync();
 
         public async Task<bool> SemesterExistsAsync(int semesterId)
         {

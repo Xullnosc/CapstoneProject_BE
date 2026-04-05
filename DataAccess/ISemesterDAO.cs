@@ -10,6 +10,7 @@ namespace DataAccess
         Task<List<Semester>> GetAllAsync();
         Task<PagedResult<Semester>> GetAllAsync(int pageIndex, int pageSize);
         Task<Semester?> GetByIdAsync(int id);
+        Task<Semester?> GetByIdSimpleAsync(int id);
         Task<Semester> AddAsync(Semester semester);
         Task UpdateAsync(Semester semester);
         Task<Semester?> GetCurrentSemesterAsync();
@@ -18,6 +19,7 @@ namespace DataAccess
         Task<List<Role>> GetAllRolesAsync();
         Task<PagedResult<Role>> GetAllRolesAsync(int pageIndex, int pageSize);
         Task<Semester?> IsOverlapAsync(DateTime start, DateTime end, int? excludeId);
+        Task<bool> HasActiveSemesterAsync();
         Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize);
     }
 }

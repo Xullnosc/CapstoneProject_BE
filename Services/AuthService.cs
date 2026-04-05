@@ -132,10 +132,11 @@ public class AuthService : IAuthService
                 }
                 else
                 {
-                    // 2.1 Check if student is from an ended semester
+                    // 2.1 [LIFECYCLE GUARD] Block student login khi kỳ học đã Đóng (Closed)
+                    // Cho phép đăng nhập ở cả Open và In Progress (review giữa kỳ)
                     if (whitelistEntry.Role?.RoleName == CampusConstants.Roles.Student)
                     {
-                        if (whitelistEntry.Semester == null || whitelistEntry.Semester.Status != "Active")
+                        if (whitelistEntry.Semester == null || CampusConstants.SemesterStatus.IsClosedStage(whitelistEntry.Semester.Status))
                         {
                             throw new UnauthorizedAccessException("Học kỳ bạn tham gia đã kết thúc. Bạn không thể đăng nhập vào hệ thống lúc này.");
                         }

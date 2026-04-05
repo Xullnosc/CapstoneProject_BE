@@ -10,6 +10,7 @@ namespace Repositories
         Task<List<Semester>> GetAllSemestersAsync();
         Task<PagedResult<Semester>> GetAllSemestersAsync(int pageIndex, int pageSize);
         Task<Semester?> GetSemesterByIdAsync(int id);
+        Task<Semester?> GetSemesterByIdSimpleAsync(int id);
         Task<Semester> CreateSemesterAsync(Semester semester);
         Task UpdateSemesterAsync(Semester semester);
         Task<Semester?> GetCurrentSemesterAsync();
@@ -17,6 +18,7 @@ namespace Repositories
         Task<int> GetStudentRoleIdAsync();
         Task<List<Role>> GetAllRolesAsync();
         Task<Semester?> IsOverlapAsync(DateTime start, DateTime end, int? excludeId);
+        Task<bool> HasActiveSemesterAsync();
         Task<bool> SemesterExistsAsync(int semesterId);
         Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize);
     }

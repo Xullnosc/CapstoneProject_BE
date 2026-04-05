@@ -10,6 +10,7 @@ using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Threading;
+using BusinessObjects;
 using Xunit;
 
 namespace FCTMS.Tests.Services
@@ -121,7 +122,7 @@ namespace FCTMS.Tests.Services
             // Assert
             result.Should().NotBeNull();
             result.SemesterCode.Should().Be("SP26");
-            _mockSemesterRepository.Verify(r => r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == "Upcoming")), Times.Once);
+            _mockSemesterRepository.Verify(r => r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == "Open")), Times.Once);
         }
 
         [Fact]
@@ -183,8 +184,8 @@ namespace FCTMS.Tests.Services
             // Arrange
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SU26", SemesterName = "Summer 2026" };
 
-            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(updateDto.SemesterId))
+            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Open" };
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
 
             // Setup: GetSemesterByCodeAsync returns null
@@ -207,8 +208,8 @@ namespace FCTMS.Tests.Services
             // Arrange
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026" };
 
-            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(updateDto.SemesterId))
+            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Open" };
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
             
             // Existing semester with same code but DIFFERENT ID
@@ -233,8 +234,8 @@ namespace FCTMS.Tests.Services
             // Arrange
             var updateDto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SP26", SemesterName = "Spring 2026" };
 
-            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(updateDto.SemesterId))
+            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Open" };
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId))
                 .ReturnsAsync(currentSemester);
 
             // Existing semester is SELF (same ID)
@@ -364,43 +365,43 @@ namespace FCTMS.Tests.Services
 
         #endregion
 
-        #region EndSemesterAsync
-
-        [Fact]
-        public async Task EndSemesterAsync_ShouldSucceed_WhenIdExists()
-        {
-            // Arrange
-            int id = 1;
-            var semester = new Semester { SemesterId = id, Status = "Active" };
-
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
-            _mockSemesterRepository.Setup(r => r.UpdateSemesterAsync(semester)).Returns(Task.CompletedTask);
-
-            // Act
-            await _semesterService.EndSemesterAsync(id);
-
-            // Assert
-            semester.Status.Should().Be("Ended");
-            _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(semester), Times.Once);
-        }
-
-
-        [Fact]
-        public async Task EndSemesterAsync_ShouldThrowKeyNotFound_WhenIdDoesNotExist()
-        {
+        #region CloseSemesterAsync
+ 
+         [Fact]
+         public async Task CloseSemesterAsync_ShouldSucceed_WhenIdExistsAndInReviewMiddle()
+         {
              // Arrange
-            int id = 99;
-            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync((Semester?)null);
-
-            // Act
-            Func<Task> act = async () => await _semesterService.EndSemesterAsync(id);
-
-            // Assert
-            await act.Should().ThrowAsync<KeyNotFoundException>()
-                .WithMessage($"Semester with ID {id} not found.");
-            
-            _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(It.IsAny<Semester>()), Times.Never);
-        }
+             int id = 1;
+             var semester = new Semester { SemesterId = id, Status = CampusConstants.SemesterStatus.ReviewMiddle };
+ 
+             _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(id)).ReturnsAsync(semester);
+             _mockSemesterRepository.Setup(r => r.UpdateSemesterAsync(semester)).Returns(Task.CompletedTask);
+ 
+             // Act
+             await _semesterService.CloseSemesterAsync(id);
+ 
+             // Assert
+             semester.Status.Should().Be(CampusConstants.SemesterStatus.Closed);
+             _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(semester), Times.Once);
+         }
+ 
+ 
+         [Fact]
+         public async Task CloseSemesterAsync_ShouldThrowKeyNotFound_WhenIdDoesNotExist()
+         {
+              // Arrange
+             int id = 99;
+             _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(id)).ReturnsAsync((Semester?)null);
+ 
+             // Act
+             Func<Task> act = async () => await _semesterService.CloseSemesterAsync(id);
+ 
+             // Assert
+             await act.Should().ThrowAsync<KeyNotFoundException>()
+                 .WithMessage($"Semester {id} not found");
+             
+             _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(It.IsAny<Semester>()), Times.Never);
+         }
 
         #endregion
 
@@ -479,6 +480,153 @@ namespace FCTMS.Tests.Services
             result.TotalCount.Should().Be(0);
         }
 
-        #endregion
+        [Fact]
+        public async Task UpdateSemesterAsync_ShouldThrow_WhenDatesOverlapWithAnotherSemester()
+        {
+            // Arrange
+            var updateDto = new SemesterCreateDTO
+            {
+                SemesterId = 1,
+                SemesterCode = "SP26",
+                SemesterName = "Spring 2026",
+                StartDate = new DateTime(2026, 1, 1),
+                EndDate = new DateTime(2026, 5, 1)
+            };
+
+            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId)).ReturnsAsync(currentSemester);
+            _mockSemesterRepository.Setup(r => r.GetSemesterByCodeAsync(updateDto.SemesterCode)).ReturnsAsync((Semester?)null);
+
+            var conflictSemester = new Semester { SemesterCode = "SU26", SemesterName = "Summer 2026" };
+            _mockSemesterRepository
+                .Setup(r => r.IsOverlapAsync(updateDto.StartDate, updateDto.EndDate, updateDto.SemesterId))
+                .ReturnsAsync(conflictSemester);
+
+            // Act
+            Func<Task> act = async () => await _semesterService.UpdateSemesterAsync(updateDto);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*overlap*");
+            _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(It.IsAny<Semester>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task UpdateSemesterAsync_ShouldThrow_WhenSemesterNotFound()
+        {
+            // Arrange
+            var updateDto = new SemesterCreateDTO { SemesterId = 999, SemesterCode = "XX" };
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(999)).ReturnsAsync((Semester?)null);
+
+            // Act
+            Func<Task> act = async () => await _semesterService.UpdateSemesterAsync(updateDto);
+
+            // Assert
+            await act.Should().ThrowAsync<KeyNotFoundException>();
+        }
+
+        // [Fact]
+        // public async Task EndSemesterAsync_ShouldSetStatusToEnded_AndInvalidateCache()
+        // {
+        //     // Arrange
+        //     int id = 5;
+        //     var semester = new Semester { SemesterId = id, Status = "Active", CampusId = 1 };
+        //     _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
+        // 
+        //     // Act
+        //     await _semesterService.EndSemesterAsync(id);
+        // 
+        //     // Assert
+        //     semester.Status.Should().Be("Ended");
+        //     _mockSemesterRepository.Verify(r => r.UpdateSemesterAsync(semester), Times.Once);
+        //     // Cache should be invalidated when semester changes
+        //     _mockRedisService.Verify(r => r.RemoveByPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+        // }
+
+        [Fact]
+        public async Task CreateSemesterAsync_ShouldSetStatusUpcoming_BeforeSaving()
+        {
+            // Arrange
+            var dto = new SemesterCreateDTO { SemesterCode = "FA27", SemesterName = "Fall 2027" };
+            var mappedSemester = new Semester { SemesterCode = "FA27" };
+            var savedSemester = new Semester { SemesterId = 5, SemesterCode = "FA27", Status = CampusConstants.SemesterStatus.Open };
+
+            _mockSemesterRepository.Setup(r => r.GetSemesterByCodeAsync("FA27")).ReturnsAsync((Semester?)null);
+            _mockMapper.Setup(m => m.Map<Semester>(dto)).Returns(mappedSemester);
+            _mockSemesterRepository.Setup(r => r.CreateSemesterAsync(mappedSemester)).ReturnsAsync(savedSemester);
+            _mockMapper.Setup(m => m.Map<SemesterDTO>(savedSemester))
+                .Returns(new SemesterDTO { SemesterId = 5, SemesterCode = "FA27" });
+
+            // Act
+            await _semesterService.CreateSemesterAsync(dto);
+
+            // Assert â€” Status must be Upcoming before calling CreateSemesterAsync
+            _mockSemesterRepository.Verify(r =>
+                r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == CampusConstants.SemesterStatus.Open)), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetSemesterByIdAsync_ShouldReturnNull_WhenIdDoesNotExist()
+        {
+            // Arrange
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(9999)).ReturnsAsync((Semester?)null);
+
+            // Act
+            var result = await _semesterService.GetSemesterByIdAsync(9999);
+
+            // Assert
+            result.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task GetAllSemestersAsync_ShouldReturnFromDb_WhenCacheMiss()
+        {
+            // Arrange â€” cache returns null (miss), DB returns data
+            var semesters = new List<Semester> { new Semester { SemesterId = 1, SemesterCode = "SP26" } };
+            var dtos = new List<SemesterDTO> { new SemesterDTO { SemesterId = 1, SemesterCode = "SP26" } };
+
+            _mockRedisService.Setup(r => r.GetObjectAsync<List<SemesterDTO>>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((List<SemesterDTO>?)null);
+            _mockSemesterRepository.Setup(r => r.GetAllSemestersAsync()).ReturnsAsync(semesters);
+            _mockMapper.Setup(m => m.Map<List<SemesterDTO>>(semesters)).Returns(dtos);
+
+            // Act
+            var result = await _semesterService.GetAllSemestersAsync();
+
+            // Assert
+            result.Should().HaveCount(1);
+            _mockSemesterRepository.Verify(r => r.GetAllSemestersAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetOrphanedStudentsAsync_ShouldPopulateAvatarFromUserService()
+        {
+            // Arrange
+            int semesterId = 3;
+            var semester = new Semester { SemesterId = semesterId };
+            var whitelist = new List<Whitelist>
+            {
+                new Whitelist { WhitelistId = 1, Email = "a@fpt.edu.vn", FullName = "Student A" }
+            };
+            var paged = new PagedResult<Whitelist>(whitelist, 1, 1, 10);
+            var dtos = new List<WhitelistDTO>
+            {
+                new WhitelistDTO { WhitelistId = 1, Email = "a@fpt.edu.vn", FullName = "Student A" }
+            };
+
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(semesterId)).ReturnsAsync(semester);
+            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(semesterId, 1, 10)).ReturnsAsync(paged);
+            _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(whitelist)).Returns(dtos);
+            _mockUserRepository.Setup(u => u.GetUsersByEmailsAsync(It.Is<List<string>>(e => e.Contains("a@fpt.edu.vn"))))
+                .ReturnsAsync(new List<User> { new User { Email = "a@fpt.edu.vn", Avatar = "avatar_url.png" } });
+
+            // Act
+            var result = await _semesterService.GetOrphanedStudentsAsync(semesterId, 1, 10);
+
+            // Assert â€” Avatar should be populated from user lookup
+            result.Items.Should().HaveCount(1);
+            result.Items[0].Avatar.Should().Be("avatar_url.png");
+        }
     }
 }
+#endregion

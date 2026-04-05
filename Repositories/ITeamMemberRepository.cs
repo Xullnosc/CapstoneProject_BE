@@ -11,5 +11,6 @@ namespace Repositories
         Task<List<Teammember>> GetMembersByTeamIdAsync(int teamId);
         Task<Teammember?> GetMemberAsync(int teamId, int studentId);
         Task<bool> IsStudentInTeamAsync(int studentId, int semesterId);
+        Task<bool> RemoveAllMembersFromTeamAsync(int teamId);
     }
 }

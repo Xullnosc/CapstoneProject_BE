@@ -150,6 +150,17 @@ namespace Services
             }
 
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester == null)
+            {
+                throw new InvalidOperationException("Không tìm thấy kỳ học hiện tại để nộp đề tài.");
+            }
+
+            // [LIFECYCLE GUARD] Chỉ cho phép nộp mới trong giai đoạn Open
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Chỉ có thể nộp đề tài mới khi kỳ học đang mở (Open).");
+            }
+
             var hasAssignedMentor =
                 team?.MentorId.HasValue == true || team?.MentorId2.HasValue == true;
 
@@ -239,6 +250,13 @@ namespace Services
             var thesis = await _thesisRepository.GetThesisByIdWithHistoriesAsync(thesisId);
             if (thesis == null)
                 throw new KeyNotFoundException("Thesis not found.");
+
+            // [LIFECYCLE GUARD] Chỉ cho phép sửa/revision đề tài ở giai đoạn Open
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester != null && !CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Chỉ có thể cập nhật đề tài khi kỳ học đang mở (Open).");
+            }
 
             // Only the owner can update
             if (thesis.UserId != user.UserId)
@@ -341,6 +359,13 @@ namespace Services
                     "You are not authorized to cancel this thesis."
                 );
 
+            // [LIFECYCLE GUARD] Chỉ cho phép hủy đề tài ở giai đoạn Open
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester != null && !CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Không thể hủy đề tài.");
+            }
+
             // Only cancel if not already matched or published
             // UPDATED: Allow cancellation if 'Need Update'
             var cancellable = new[]
@@ -362,6 +387,7 @@ namespace Services
 
             return _mapper.Map<ThesisDTO>(thesis);
         }
+
 
         /// <summary>
         /// Get all theses owned by the logged-in student.

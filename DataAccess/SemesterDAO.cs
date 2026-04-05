@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
+using BusinessObjects;
 using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess
@@ -23,7 +24,10 @@ namespace DataAccess
                 .Include(s => s.Teams)
                 .Include(s => s.Whitelists)
                 .AsNoTracking()
-                .OrderBy(s => s.Status == "Active" ? 0 : s.Status == "Upcoming" ? 1 : 2)
+                .OrderBy(s => s.Status == CampusConstants.SemesterStatus.Open ? 0 
+                           : s.Status == CampusConstants.SemesterStatus.InProgress ? 1 
+                           : s.Status == CampusConstants.SemesterStatus.Upcoming ? 2 
+                           : s.Status == CampusConstants.SemesterStatus.Closed ? 10 : 20)
                 .ThenByDescending(s => s.StartDate)
                 .ToListAsync();
         }
@@ -38,7 +42,10 @@ namespace DataAccess
             var totalCount = await query.CountAsync();
 
             var items = await query
-                .OrderBy(s => s.Status == "Active" ? 0 : s.Status == "Upcoming" ? 1 : 2)
+                .OrderBy(s => s.Status == CampusConstants.SemesterStatus.Open ? 0 
+                           : s.Status == CampusConstants.SemesterStatus.InProgress ? 1 
+                           : s.Status == CampusConstants.SemesterStatus.Upcoming ? 2 
+                           : s.Status == CampusConstants.SemesterStatus.Closed ? 10 : 20)
                 .ThenByDescending(s => s.StartDate)
                 .Skip((pageIndex - 1) * pageSize)
                 .Take(pageSize)
@@ -52,10 +59,18 @@ namespace DataAccess
             return await _context
                 .Semesters.Include(s => s.Teams)
                     .ThenInclude(t => t.Teammembers)
+                .Include(s => s.Teams)
+                    .ThenInclude(t => t.Leader)
                 .Include(s => s.Campus)
                 .Include(s => s.Whitelists)
                     .ThenInclude(w => w.Role)
                 .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.SemesterId == id);
+        }
+
+        public async Task<Semester?> GetByIdSimpleAsync(int id)
+        {
+            return await _context.Semesters
                 .FirstOrDefaultAsync(s => s.SemesterId == id);
         }
 
@@ -83,10 +98,15 @@ namespace DataAccess
 
         public async Task<Semester?> GetCurrentSemesterAsync()
         {
-            // Priority 1: Check for explicitly ACTIVE semester (The "Golden Rule")
+            // Priority 1: Check for any "Live" semester using Stage logic from CampusConstants
             var activeSemester = await _context.Semesters
                 .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Status == "Active");
+                .FirstOrDefaultAsync(s => 
+                    s.Status == CampusConstants.SemesterStatus.Open || 
+                    s.Status == CampusConstants.SemesterStatus.InProgress ||
+                    s.Status == CampusConstants.SemesterStatus.Active || // Legacy
+                    s.Status == CampusConstants.SemesterStatus.ReviewThesis || // Legacy
+                    s.Status == CampusConstants.SemesterStatus.ReviewMiddle); // Legacy
 
             if (activeSemester != null)
             {
@@ -94,11 +114,16 @@ namespace DataAccess
             }
 
             // Priority 2: Fallback to Date Range (Backward Compatibility)
-            // If no semester is explicitly Active, we fall back to checking which semester includes 'now' in its date range.
             var now = DateTime.UtcNow;
             return await _context
                 .Semesters.AsNoTracking()
                 .FirstOrDefaultAsync(s => s.StartDate <= now && s.EndDate >= now);
+        }
+
+        public async Task<bool> HasActiveSemesterAsync()
+        {
+            // A semester is considered "Active" if it's NOT Closed.
+            return await _context.Semesters.AnyAsync(s => s.Status != CampusConstants.SemesterStatus.Closed);
         }
 
         /// <summary>
