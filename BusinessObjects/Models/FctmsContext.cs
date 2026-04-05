@@ -65,6 +65,7 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<SystemParameter> SystemParameters { get; set; }
     public virtual DbSet<SystemErrorLog> SystemErrorLogs { get; set; }
+    public virtual DbSet<ImportBatch> ImportBatches { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
