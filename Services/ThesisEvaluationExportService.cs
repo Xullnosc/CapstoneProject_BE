@@ -43,6 +43,7 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         var reviewers = await _lecturerRepository.GetReviewersAsync();
         var reviewerList = reviewers
             .Where(r => !string.IsNullOrWhiteSpace(r.Email))
+            .DistinctBy(r => GetEmailPrefix(r.Email))
             .ToList();
         var reviewerEmails = reviewerList.Select(r => r.Email).ToList();
         var allTheses = await _thesisRepository.GetThesesForEvaluationExportAsync();
@@ -501,6 +502,7 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
             return null;
         }
 
+        email = email.Trim();
         var atIndex = email.IndexOf('@');
         return atIndex > 0 ? email[..atIndex].ToLowerInvariant() : email.ToLowerInvariant();
     }
