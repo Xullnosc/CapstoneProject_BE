@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using BusinessObjects;
 using BusinessObjects.DTOs;
 using CapstoneProject_BE.Controllers;
@@ -42,7 +42,7 @@ public class CampusControllerTests
         // Arrange
         var campuses = new List<CampusDTO> 
         { 
-            new CampusDTO { CampusId = 1, CampusCode = "DN", CampusName = "Đà Nẵng" } 
+            new CampusDTO { CampusId = 1, CampusCode = "DN", CampusName = "ÄÃ  Náºµng" } 
         };
         _mockCampusService.Setup(s => s.GetAllCampusesAsync()).ReturnsAsync(campuses);
 
@@ -58,8 +58,8 @@ public class CampusControllerTests
     public async Task Create_ValidRequest_ReturnsCreated()
     {
         // Arrange
-        var dto = new CreateCampusDTO { CampusCode = "HN", CampusName = "Hà Nội" };
-        var created = new CampusDTO { CampusId = 2, CampusCode = "HN", CampusName = "FU-Hòa Lạc" };
+        var dto = new CreateCampusDTO { CampusCode = "HN", CampusName = "HÃ  Ná»™i" };
+        var created = new CampusDTO { CampusId = 2, CampusCode = "HN", CampusName = "FU-HÃ²a Láº¡c" };
         _mockCampusService.Setup(s => s.CreateCampusAsync(dto)).ReturnsAsync(created);
 
         // Act
@@ -97,5 +97,8 @@ public class CampusControllerTests
         // Assert
         var badRequest = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         badRequest.Value.Should().BeEquivalentTo(new { message = "Cannot delete this campus because it has active references" });
+
     }
 }
+
+

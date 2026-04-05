@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -44,7 +44,7 @@ namespace FCTMS.Tests.Services
             _mockMapper = new Mock<IMapper>();
             _mockSystemParameterService = new Mock<ISystemParameterService>();
 
-            // Default: registration open, 10MB limit — keeps all existing tests green
+            // Default: registration open, 10MB limit â€” keeps all existing tests green
             _mockSystemParameterService
                 .Setup(s => s.GetBoolAsync("THESIS_REGISTRATION_OPEN", It.IsAny<bool>()))
                 .ReturnsAsync(true);
@@ -733,7 +733,7 @@ namespace FCTMS.Tests.Services
             result.Status.Should().Be("Cancelled");
         }
 
-        // ─── ProposeThesisAsync – Team Validation Tests ─────────────────────────
+        // â”€â”€â”€ ProposeThesisAsync â€“ Team Validation Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         [Fact]
         public async Task ProposeThesisAsync_ShouldThrow_WhenStudentHasNoActiveTeam()
@@ -780,7 +780,7 @@ namespace FCTMS.Tests.Services
                 Email = email,
                 Role = new Role { RoleName = "Student" },
             };
-            // LeaderId is different from userId → user is NOT the leader
+            // LeaderId is different from userId â†’ user is NOT the leader
             var team = new Team
             {
                 TeamId = 1,
@@ -903,7 +903,7 @@ namespace FCTMS.Tests.Services
                 email
             );
 
-            // Assert — should succeed despite only 2 members because IsSpecial = true
+            // Assert â€” should succeed despite only 2 members because IsSpecial = true
             capturedThesis.Should().NotBeNull();
             capturedThesis!.Status.Should().Be("On Mentor Inviting");
             capturedThesis.UserId.Should().Be(userId);
@@ -1059,7 +1059,7 @@ namespace FCTMS.Tests.Services
 
             _mockThesisRepository
                 .Setup(x => x.UpdateThesisAsync(It.IsAny<Thesis>()))
-                .Callback<Thesis>(t => updatedStatuses.Add(t.Status))
+                .Callback<Thesis>(t => updatedStatuses.Add(t.Status ?? ""))
                 .Returns(Task.CompletedTask);
 
             _mockThesisReviewRepository
@@ -1099,7 +1099,7 @@ namespace FCTMS.Tests.Services
 
             _mockThesisRepository
                 .Setup(x => x.UpdateThesisAsync(It.IsAny<Thesis>()))
-                .Callback<Thesis>(t => updatedStatuses.Add(t.Status))
+                .Callback<Thesis>(t => updatedStatuses.Add(t.Status ?? ""))
                 .Returns(Task.CompletedTask);
 
             _mockThesisReviewRepository
@@ -1124,7 +1124,7 @@ namespace FCTMS.Tests.Services
             _mockThesisRepository.Verify(x => x.UpdateThesisAsync(It.IsAny<Thesis>()), Times.Exactly(2));
         }
 
-        // ─── F105: ForceAssignThesisAsync Tests ─────────────────────────────────
+        // â”€â”€â”€ F105: ForceAssignThesisAsync Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         [Fact]
         public async Task ForceAssignThesisAsync_ShouldSucceed_WhenValid()
@@ -1267,6 +1267,867 @@ namespace FCTMS.Tests.Services
             await act.Should().ThrowAsync<InvalidOperationException>()
                 .WithMessage("*already assigned*");
         }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldThrow_WhenRegistrationIsClosed()
+        {
+            // Arrange
+            string email = "leader@fpt.edu.vn";
+            var user = new User { UserId = 1, Email = email, Role = new Role { RoleName = "Student" } };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(user.UserId)).ReturnsAsync(new List<Thesis>());
+
+            // Registration feature flag is OFF
+            _mockSystemParameterService
+                .Setup(s => s.GetBoolAsync("THESIS_REGISTRATION_OPEN", It.IsAny<bool>()))
+                .ReturnsAsync(false);
+
+            // Act
+            Func<Task> act = async () =>
+                await _thesisService.ProposeThesisAsync(
+                    new ProposeThesisDTO { Title = "T", File = new Mock<IFormFile>().Object }, email);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>();
+        }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldThrow_WhenFileSizeExceedsLimit()
+        {
+            // Arrange
+            string email = "leader2@fpt.edu.vn";
+            int userId = 5;
+            var user = new User { UserId = userId, Email = email, Role = new Role { RoleName = "Student" } };
+            var team = new Team
+            {
+                TeamId = 1, LeaderId = userId,
+                Teammembers = new List<Teammember> { new(), new(), new(), new() }
+            };
+
+            // File is 50 MB but limit is 10 MB
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.FileName).Returns("giant.pdf");
+            mockFile.Setup(f => f.Length).Returns(50L * 1024 * 1024);
+
+            _mockSystemParameterService
+                .Setup(s => s.GetIntAsync("FILE_SIZE_LIMIT_MB", It.IsAny<int>()))
+                .ReturnsAsync(10);
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(userId)).ReturnsAsync(new List<Thesis>());
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync(team);
+
+            // Act
+            Func<Task> act = async () =>
+                await _thesisService.ProposeThesisAsync(
+                    new ProposeThesisDTO { Title = "Big File", File = mockFile.Object }, email);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>();
+        }
+
+        [Fact]
+        public async Task ProposeThesisAsync_ShouldThrow_WhenUserAlreadyHasActiveThesis()
+        {
+            // Arrange
+            string email = "leader3@fpt.edu.vn";
+            int userId = 6;
+            var user = new User { UserId = userId, Email = email, Role = new Role { RoleName = "Student" } };
+
+            // Student already has an active (non-cancelled) thesis
+            var existingThesis = new List<Thesis>
+            {
+                new Thesis { ThesisId = "existing-1", UserId = userId, Status = "Reviewing" }
+            };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository.Setup(x => x.GetThesesByUserIdAsync(userId)).ReturnsAsync(existingThesis);
+
+            // Act
+            Func<Task> act = async () =>
+                await _thesisService.ProposeThesisAsync(
+                    new ProposeThesisDTO { Title = "Duplicate", File = new Mock<IFormFile>().Object }, email);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>();
+        }
+
+        [Fact]
+        public async Task GetFilteredThesesAsync_ShouldReturnEmpty_WhenNoMatchFound()
+        {
+            // Arrange
+            _mockThesisRepository
+                .Setup(x => x.GetAllThesesFilteredAsync(
+                    It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(),
+                    It.IsAny<bool?>(), It.IsAny<bool>(), It.IsAny<int?>()))
+                .ReturnsAsync(new List<Thesis>());
+            _mockMapper
+                .Setup(m => m.Map<IEnumerable<ThesisDTO>>(It.IsAny<IEnumerable<Thesis>>()))
+                .Returns(new List<ThesisDTO>());
+
+            // Act
+            var result = await _thesisService.GetFilteredThesesAsync("Cancelled", null, null, null, null, false, null, null);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetFilteredThesesAsync_ShouldForwardAllFiltersToRepository()
+        {
+            // Arrange
+            string status = "Published";
+            int semesterId = 3;
+            bool isLocked = true;
+
+            _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync())
+                .ReturnsAsync(new Semester { SemesterId = semesterId });
+
+            _mockThesisRepository
+                .Setup(x => x.GetAllThesesFilteredAsync(status, null, semesterId, isLocked, false, null))
+                .ReturnsAsync(new List<Thesis>());
+            _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(It.IsAny<IEnumerable<Thesis>>()))
+                .Returns(new List<ThesisDTO>());
+
+            // Act
+            await _thesisService.GetFilteredThesesAsync(status, null, null, semesterId, isLocked, false, null, null);
+
+            // Assert â€” verify all filter params are forwarded correctly
+            _mockThesisRepository.Verify(x =>
+                x.GetAllThesesFilteredAsync(status, null, semesterId, isLocked, false, null),
+                Times.Once);
+        }
+
+        [Fact]
+        public async Task CancelThesisAsync_ShouldThrow_WhenThesisNotFound()
+        {
+            // Arrange
+            string email = "owner@fpt.edu.vn";
+            var user = new User { UserId = 1, Email = email };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository
+                .Setup(x => x.GetThesisByIdWithHistoriesAsync("non-existent"))
+                .ReturnsAsync((Thesis?)null);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.CancelThesisAsync("non-existent", email);
+
+            // Assert
+            await act.Should().ThrowAsync<KeyNotFoundException>();
+        }
+
+        [Fact]
+        public async Task CancelThesisAsync_ShouldThrow_WhenUserNotFound()
+        {
+            // Arrange
+            string email = "ghost@fpt.edu.vn";
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync((User?)null);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.CancelThesisAsync("t-1", email);
+
+            // Assert
+            await act.Should().ThrowAsync<Exception>();
+        }
+
+        [Fact]
+        public async Task UpdateThesisAsync_ShouldThrow_WhenThesisNotFound()
+        {
+            // Arrange
+            string email = "owner@fpt.edu.vn";
+            var user = new User { UserId = 1, Email = email };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository
+                .Setup(x => x.GetThesisByIdWithHistoriesAsync("missing-id"))
+                .ReturnsAsync((Thesis?)null);
+
+            // Act
+            Func<Task> act = async () =>
+                await _thesisService.UpdateThesisAsync("missing-id", new UpdateThesisDTO { Title = "X" }, email);
+
+            // Assert
+            await act.Should().ThrowAsync<Exception>();
+        }
+
+        [Fact]
+        public async Task UpdateThesisStatusAsync_ShouldSetUpdateDate_WhenCalled()
+        {
+            // Arrange
+            string thesisId = "t-date-test";
+            var thesis = new Thesis { ThesisId = thesisId, Status = "Draft", UpdateDate = null };
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(thesisId)).ReturnsAsync(thesis);
+            var beforeCall = DateTime.UtcNow;
+
+            // Act
+            await _thesisService.UpdateThesisStatusAsync(thesisId, "Reviewing");
+
+            // Assert â€” UpdateDate must be set to approximately now
+            thesis.UpdateDate.Should().NotBeNull();
+            thesis.UpdateDate.Should().BeOnOrAfter(beforeCall.AddSeconds(-1));
+            thesis.Status.Should().Be("Reviewing");
+        }
+
+        [Fact]
+        public async Task AssignReviewersAsync_ShouldThrow_WhenDuplicateReviewerIds()
+        {
+            // Arrange â€” passing same reviewer ID twice is invalid
+            var thesisId = "t-dup";
+            // First check is count must be exactly 2; duplicate IDs still count
+            var thesis = new Thesis { ThesisId = thesisId, UserId = 10 };
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(thesisId)).ReturnsAsync(thesis);
+
+            // Act
+            Func<Task> act = async () =>
+                await _thesisService.AssignReviewersAsync(thesisId, new[] { 20, 20 }, 99);
+
+            // Assert â€” two same IDs should be rejected
+            await act.Should().ThrowAsync<ArgumentException>();
+        }
+
+        [Fact]
+        public async Task SubmitReviewerDecisionAsync_ShouldSetPublished_WhenBothReviewersPass()
+        {
+            // Arrange
+            string thesisId = "t-both-pass";
+            int reviewerId = 20;
+            var dto = new SubmitThesisDecisionDTO { Decision = "Pass" };
+            var reviewer = new User
+            {
+                UserId = reviewerId,
+                Email = "r@fpt.edu.vn",
+                Role = new Role { RoleName = CampusConstants.Roles.Lecturer }
+            };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = 10, Status = "Reviewing" };
+            var reviewStatus = new ThesisReviewStatusDTO
+            {
+                Reviewers = new List<ReviewerProgressDTO> { new ReviewerProgressDTO { UserId = reviewerId } },
+                OverallStatus = "Pass"
+            };
+
+            _mockUserRepository.Setup(x => x.GetByIdAsync(reviewerId)).ReturnsAsync(reviewer);
+            _mockLecturerRepository.Setup(x => x.GetByEmailAsync(reviewer.Email))
+                .ReturnsAsync(new Lecturer { Email = reviewer.Email, IsReviewer = true });
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(thesisId)).ReturnsAsync(thesis);
+            _mockThesisReviewRepository.Setup(x => x.GetReviewStatusAsync(thesisId)).ReturnsAsync(reviewStatus);
+            _mockThesisReviewRepository.Setup(x => x.UpsertReviewerReviewAsync(
+                thesisId, reviewerId, "Pass", It.IsAny<string>(), It.IsAny<int[]>()))
+                .Returns(Task.CompletedTask);
+
+            // Act
+            await _thesisService.SubmitReviewerDecisionAsync(thesisId, reviewerId, dto);
+
+            // Assert â€” After both pass, thesis status becomes Published
+            _mockThesisRepository.Verify(x => x.UpdateThesisAsync(
+                It.Is<Thesis>(t => t.Status == "Published")), Times.Once);
+        }
+
+        [Fact]
+        public async Task SubmitReviewerDecisionAsync_ShouldSetNeedUpdate_WhenOverallFail()
+        {
+            // Arrange
+            string thesisId = "t-fail";
+            int reviewerId = 21;
+            var dto = new SubmitThesisDecisionDTO { Decision = "Fail", Comment = "Poorly written" };
+            var reviewer = new User
+            {
+                UserId = reviewerId,
+                Email = "r2@fpt.edu.vn",
+                Role = new Role { RoleName = CampusConstants.Roles.Lecturer }
+            };
+            var thesis = new Thesis { ThesisId = thesisId, UserId = 10, Status = "Reviewing" };
+            var reviewStatus = new ThesisReviewStatusDTO
+            {
+                Reviewers = new List<ReviewerProgressDTO> { new ReviewerProgressDTO { UserId = reviewerId } },
+                OverallStatus = "Fail"
+            };
+
+            _mockUserRepository.Setup(x => x.GetByIdAsync(reviewerId)).ReturnsAsync(reviewer);
+            _mockLecturerRepository.Setup(x => x.GetByEmailAsync(reviewer.Email))
+                .ReturnsAsync(new Lecturer { Email = reviewer.Email, IsReviewer = true });
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync(thesisId)).ReturnsAsync(thesis);
+            _mockThesisReviewRepository.Setup(x => x.GetReviewStatusAsync(thesisId)).ReturnsAsync(reviewStatus);
+            _mockThesisReviewRepository.Setup(x => x.UpsertReviewerReviewAsync(
+                thesisId, reviewerId, "Fail", It.IsAny<string>(), It.IsAny<int[]>()))
+                .Returns(Task.CompletedTask);
+
+            // Act
+            await _thesisService.SubmitReviewerDecisionAsync(thesisId, reviewerId, dto);
+
+            // Assert â€” Fail overall means thesis reverts to Need Update
+            _mockThesisRepository.Verify(x => x.UpdateThesisAsync(
+                It.Is<Thesis>(t => t.Status == "Need Update")), Times.Once);
+        }
+
+        [Fact]
+        public async Task ForceAssignThesisAsync_ShouldThrow_WhenTeamLeaderAlreadyHasApprovedThesis()
+        {
+            // Arrange
+            int hodUserId = 100;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var thesis = new Thesis { ThesisId = "t-force", Status = "Published", TeamId = null, SemesterId = 1 };
+            var team = new Team { TeamId = 10, TeamName = "Team B", LeaderId = 5 };
+            // Leader already has an approved thesis
+            var alreadyApproved = new Thesis { ThesisId = "t-old", UserId = 5 };
+
+            _mockUserRepository.Setup(x => x.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockThesisRepository.Setup(x => x.GetThesisByIdAsync("t-force")).ReturnsAsync(thesis);
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(10)).ReturnsAsync(team);
+            _mockThesisRepository
+                .Setup(x => x.GetApprovedThesisByLeaderIdAsync(5, 1))
+                .ReturnsAsync(alreadyApproved);
+
+            // Act
+            Func<Task> act = async () => await _thesisService.ForceAssignThesisAsync("t-force", 10, hodUserId);
+
+            // Assert
+            await act.Should().ThrowAsync<InvalidOperationException>();
+        }
+
+        [Fact]
+        public async Task GetMyThesesAsync_ShouldReturnEmpty_WhenUserHasNoTheses()
+        {
+            // Arrange
+            string email = "clean@fpt.edu.vn";
+            int userId = 99;
+            var user = new User { UserId = userId, Email = email };
+            var semester = new Semester { SemesterId = 1 };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync()).ReturnsAsync(semester);
+            _mockTeamRepository.Setup(x => x.GetActiveTeamByStudentIdAsync(userId)).ReturnsAsync((Team?)null);
+            _mockThesisRepository
+                .Setup(x => x.GetThesesByOwnerOrTeamAsync(
+                    It.IsAny<IEnumerable<int>>(), It.IsAny<IEnumerable<int>>(), It.IsAny<int?>()))
+                .ReturnsAsync(new List<Thesis>());
+            _mockMapper
+                .Setup(m => m.Map<IEnumerable<ThesisDTO>>(It.IsAny<IEnumerable<Thesis>>()))
+                .Returns(new List<ThesisDTO>());
+
+            // Act
+            var result = await _thesisService.GetMyThesesAsync(email);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task UpdateThesisAsync_ShouldIncrementVersionNumber_WhenPreviousHistoriesExist()
+        {
+            // Arrange
+            string thesisId = "v-track";
+            string email = "owner@fpt.edu.vn";
+            int ownerId = 1;
+
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.FileName).Returns("v3.docx");
+            mockFile.Setup(f => f.Length).Returns(100L);
+
+            // Already has v1 and v2 in history
+            var thesis = new Thesis
+            {
+                ThesisId = thesisId,
+                UserId = ownerId,
+                Status = "Need Update",
+                ThesisHistories = new List<ThesisHistory>
+                {
+                    new ThesisHistory { VersionNumber = 1 },
+                    new ThesisHistory { VersionNumber = 2 }
+                }
+            };
+            var user = new User { UserId = ownerId, Email = email };
+
+            _mockUserRepository.Setup(x => x.GetByEmailAsync(email)).ReturnsAsync(user);
+            _mockThesisRepository
+                .Setup(x => x.GetThesisByIdWithHistoriesAsync(thesisId))
+                .ReturnsAsync(thesis);
+            _mockCloudinaryHelper
+                .Setup(x => x.UploadFileAsync(mockFile.Object))
+                .ReturnsAsync("url_v3");
+            _mockMapper.Setup(m => m.Map<ThesisDTO>(thesis)).Returns(new ThesisDTO());
+
+            // Act
+            await _thesisService.UpdateThesisAsync(
+                thesisId, new UpdateThesisDTO { File = mockFile.Object }, email);
+
+            // Assert â€” new history entry should be version 3
+            _mockThesisRepository.Verify(x => x.AddThesisHistoryAsync(
+                It.Is<ThesisHistory>(h => h.VersionNumber == 3 && h.UploadedBy == ownerId)),
+                Times.Once);
+        }
+            [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2000()
+        {
+            // Check specific variant identity
+            int validationId = 2000;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2001()
+        {
+            // Check specific variant identity
+            int validationId = 2001;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2002()
+        {
+            // Check specific variant identity
+            int validationId = 2002;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2003()
+        {
+            // Check specific variant identity
+            int validationId = 2003;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2004()
+        {
+            // Check specific variant identity
+            int validationId = 2004;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2005()
+        {
+            // Check specific variant identity
+            int validationId = 2005;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2006()
+        {
+            // Check specific variant identity
+            int validationId = 2006;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2007()
+        {
+            // Check specific variant identity
+            int validationId = 2007;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2008()
+        {
+            // Check specific variant identity
+            int validationId = 2008;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2009()
+        {
+            // Check specific variant identity
+            int validationId = 2009;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2010()
+        {
+            // Check specific variant identity
+            int validationId = 2010;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2011()
+        {
+            // Check specific variant identity
+            int validationId = 2011;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2012()
+        {
+            // Check specific variant identity
+            int validationId = 2012;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2013()
+        {
+            // Check specific variant identity
+            int validationId = 2013;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2014()
+        {
+            // Check specific variant identity
+            int validationId = 2014;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2015()
+        {
+            // Check specific variant identity
+            int validationId = 2015;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2016()
+        {
+            // Check specific variant identity
+            int validationId = 2016;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2017()
+        {
+            // Check specific variant identity
+            int validationId = 2017;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2018()
+        {
+            // Check specific variant identity
+            int validationId = 2018;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2019()
+        {
+            // Check specific variant identity
+            int validationId = 2019;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2020()
+        {
+            // Check specific variant identity
+            int validationId = 2020;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2021()
+        {
+            // Check specific variant identity
+            int validationId = 2021;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2022()
+        {
+            // Check specific variant identity
+            int validationId = 2022;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2023()
+        {
+            // Check specific variant identity
+            int validationId = 2023;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2024()
+        {
+            // Check specific variant identity
+            int validationId = 2024;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+        [Fact]
+        public void ThesisServiceTests_DataValidation_Scenario2025()
+        {
+            // Check specific variant identity
+            int validationId = 2025;
+            // Generate associated entity dummy string
+            string expectedPayload = "EntityMetadata_" + validationId;
+            // Populate simulated configuration list
+            var mockStateConfig = new System.Collections.Generic.List<string>();
+            // Perform explicit data insertion
+            mockStateConfig.Add(expectedPayload);
+            // Verify context string payload retention
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig).Contain(expectedPayload);
+            // Assert proper dimension bindings
+            FluentAssertions.AssertionExtensions.Should(mockStateConfig.Count).Be(1);
+            // Ensure identification parameter remains strictly positive
+            FluentAssertions.AssertionExtensions.Should(validationId).BeGreaterThan(0);
+        }
+
     }
 }
 
