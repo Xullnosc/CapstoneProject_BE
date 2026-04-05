@@ -38,5 +38,10 @@ namespace Repositories
         {
             return await _dao.IsStudentInTeamAsync(studentId, semesterId);
         }
+
+        public async Task<bool> RemoveAllMembersFromTeamAsync(int teamId)
+        {
+            return await _dao.RemoveAllMembersFromTeamAsync(teamId);
+        }
     }
 }

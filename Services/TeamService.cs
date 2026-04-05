@@ -190,15 +190,40 @@ namespace Services
 
             if (team.LeaderId != leaderId)
             {
-                throw new Exception("Only the team leader can disband the team.");
+                throw new UnauthorizedAccessException("Only the team leader can disband the team.");
             }
 
-            // TODO: Check if team has matched topic (when Topic module implemented)
-            // if (team.TopicId != null && !semesterEnded) throw ...
+            // 1. Handle associated theses
+            var leaderTheses = await _thesisRepository.GetThesesByUserIdAsync(leaderId);
+            var teamTheses = leaderTheses.Where(t => t.TeamId == teamId).ToList();
 
+            foreach (var thesis in teamTheses)
+            {
+                if (string.Equals(thesis.Status, "Published", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("Cannot disband a team that has an approved (Published) thesis.");
+                }
+
+                var cancellable = new[] { "Reviewing", "Registered", "On Mentor Inviting", "Need Update" };
+                if (cancellable.Contains(thesis.Status, StringComparer.OrdinalIgnoreCase))
+                {
+                    thesis.Status = "Cancelled";
+                    thesis.UpdateDate = DateTime.UtcNow;
+                    await _thesisRepository.UpdateThesisAsync(thesis);
+                }
+            }
+
+            // 2. Remove all members
+            await _teamMemberRepository.RemoveAllMembersFromTeamAsync(teamId);
+
+            // 3. Mark team status
             team.Status = CampusConstants.TeamStatus.Disbanded;
             team.UpdatedAt = DateTime.UtcNow;
             await _teamRepository.UpdateAsync(team);
+            
+            // 4. Invalidate cache
+            await _semesterService.InvalidateSemesterCacheAsync(team.SemesterId);
+
             return true;
         }
 
@@ -271,11 +296,11 @@ namespace Services
             var team = await _teamRepository.GetByIdAsync(teamId);
             if (team == null) throw new KeyNotFoundException("Team not found");
 
-            // [LIFECYCLE GUARD] Chỉ cho phép cập nhật nhóm khi kỳ học ở trạng thái Open
+            // [LIFECYCLE GUARD] Chỉ cho phép cập nhật thông tin nhóm khi kỳ học ở trạng thái Open
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
             if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester?.Status))
             {
-                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester?.Status}'. Chỉ có thể cập nhật nhóm khi kỳ học đang mở (Open).");
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester?.Status}'. Chỉ có thể cập nhật thông tin nhóm khi kỳ học đang mở (Open).");
             }
 
             if (team.LeaderId != leaderId)
@@ -302,7 +327,7 @@ namespace Services
             var team = await _teamRepository.GetByIdAsync(teamId);
             if (team == null) return false;
 
-            // [LIFECYCLE GUARD] Chỉ cho phép đổi nhóm trưởng khi kỳ học ở trạng thái Open
+            // [LIFECYCLE GUARD] Chỉ cho phép thay đổi nhóm trưởng khi kỳ học ở trạng thái Open
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
             if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester?.Status))
             {
@@ -347,11 +372,11 @@ namespace Services
 
         public async Task<bool> RemoveMemberAsync(int teamId, int studentId)
         {
-            // [LIFECYCLE GUARD] Chỉ cho phép xóa thành viên khi kỳ học ở trạng thái Open
+            // [LIFECYCLE GUARD] Chỉ cho phép xóa thành viên khỏi nhóm khi kỳ học ở trạng thái Open
             var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
             if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester?.Status))
             {
-                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester?.Status}'. Chỉ có thể xóa thành viên khi kỳ học đang mở (Open).");
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester?.Status}'. Chỉ có thể xóa thành viên khỏi nhóm khi kỳ học đang mở (Open).");
             }
 
             var result = await _teamMemberRepository.RemoveMemberAsync(teamId, studentId);
