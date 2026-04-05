@@ -32,5 +32,15 @@ namespace Repositories
         {
             return _importDAO.ReconcileSemesterAsync(semesterId, importedItems, studentRoleId, now);
         }
+
+        public Task AddImportBatchAsync(ImportBatch batch)
+        {
+            return _importDAO.AddImportBatchAsync(batch);
+        }
+
+        public Task<List<ImportBatch>> GetImportBatchesBySemesterAsync(int semesterId)
+        {
+            return _importDAO.GetImportBatchesBySemesterAsync(semesterId);
+        }
     }
 }

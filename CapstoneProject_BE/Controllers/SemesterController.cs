@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Services;
+using Services.Helpers;
 
 namespace CapstoneProject_BE.Controllers
 {
@@ -20,11 +21,13 @@ namespace CapstoneProject_BE.Controllers
     {
         private readonly ISemesterService _semesterService;
         private readonly IImportService _importService;
+        private readonly ICloudinaryHelper _cloudinaryHelper;
 
-        public SemesterController(ISemesterService semesterService, IImportService importService)
+        public SemesterController(ISemesterService semesterService, IImportService importService, ICloudinaryHelper cloudinaryHelper)
         {
             _semesterService = semesterService;
             _importService = importService;
+            _cloudinaryHelper = cloudinaryHelper;
         }
 
         [HttpGet]
@@ -301,7 +304,17 @@ namespace CapstoneProject_BE.Controllers
 
                 if (commitFlag)
                 {
-                    await _importService.SaveWhitelistBatchAsync(importResult, id, file.FileName, uploaderEmail);
+                    string fileUrl = "";
+                    try
+                    {
+                        fileUrl = await _cloudinaryHelper.UploadFileAsync(file);
+                    }
+                    catch (Exception ex)
+                    {
+                        return StatusCode(500, new { message = "Failed to upload file to storage.", detail = ex.Message });
+                    }
+
+                    await _importService.SaveWhitelistBatchAsync(importResult, id, fileUrl, file.FileName, uploaderEmail);
                     return Ok(importResult);
                 }
 
@@ -372,6 +385,25 @@ namespace CapstoneProject_BE.Controllers
             catch (Exception)
             {
                 return StatusCode(500, new { message = "An error occurred while fetching orphaned students." });
+            }
+        }
+
+        [HttpGet("{id}/whitelist-batches")]
+        [Authorize(Roles = CampusConstants.Roles.HOD + "," + CampusConstants.Roles.Admin)]
+        public async Task<IActionResult> GetWhitelistBatches(int id)
+        {
+            if (id <= 0)
+            {
+                return BadRequest(new { message = "Invalid semester ID." });
+            }
+            try
+            {
+                var batches = await _importService.GetImportBatchesBySemesterAsync(id);
+                return Ok(batches);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while fetching whitelist batches.", detail = ex.Message });
             }
         }
     }
