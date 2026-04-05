@@ -263,6 +263,12 @@ namespace Services
                 throw new System.InvalidOperationException($"Semester code '{semesterCreateDTO.SemesterCode}' already exists.");
             }
 
+            // CRITICAL: Only allow creating new semester if the old one is CLOSED.
+            if (await _semesterRepository.HasActiveSemesterAsync())
+            {
+                throw new InvalidOperationException("Hệ thống hiện đang có một kỳ học đang hoạt động (Open/In Progress). Bạn vui lòng Đóng (Close) kỳ học hiện tại trước khi tạo kỳ học mới.");
+            }
+
             var campusId = _campusContextService.GetCurrentCampusId() 
                 ?? throw new System.InvalidOperationException("Hành động này yêu cầu Campus Context hợp lệ. Super Admin phải chọn Campus cụ thể.");
 
@@ -348,6 +354,12 @@ namespace Services
                 !string.Equals(semester.Status?.Trim(), CampusConstants.SemesterStatus.Upcoming, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException($"Không thể bắt đầu kỳ học. Trạng thái hiện tại: {semester.Status}");
+            }
+
+            // CRITICAL: Only allow starting if no other active semester exists
+            if (await _semesterRepository.HasActiveSemesterAsync())
+            {
+                throw new InvalidOperationException("Hệ thống hiện đang có một kỳ học khác đang hoạt động. Vui lòng đóng kỳ học đó trước.");
             }
 
             semester.Status = CampusConstants.SemesterStatus.Open;
