@@ -39,7 +39,11 @@ namespace Services
 
         // Review workflow (multi reviewer + optional HOD final decision)
         Task<ThesisReviewStatusDTO> GetReviewStatusAsync(string thesisId);
-        Task<List<ThesisReviewTimelineEventDTO>> GetReviewTimelineAsync(string thesisId);
+        Task<PagedResult<ThesisReviewTimelineEventDTO>> GetReviewTimelineAsync(
+            string thesisId,
+            int pageIndex = 1,
+            int pageSize = 10
+        );
         Task<ThesisReviewTimelineCommentDTO> AddReviewCommentAsync(
             string thesisId,
             int actorUserId,

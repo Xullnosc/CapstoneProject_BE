@@ -1,7 +1,7 @@
-using BusinessObjects.Models;
-using BusinessObjects.DTOs;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using BusinessObjects.DTOs;
+using BusinessObjects.Models;
 
 namespace DataAccess
 {
@@ -12,6 +12,7 @@ namespace DataAccess
         Task<Lecturer?> GetByEmailAsync(string email);
         Task<PagedResult<Lecturer>> GetByCampusAsync(string campus, int pageIndex, int pageSize);
         Task<IEnumerable<Lecturer>> GetActiveLecturersAsync();
+        Task<IEnumerable<Lecturer>> GetReviewersAsync();
         Task AddAsync(Lecturer lecturer);
         Task UpdateAsync(Lecturer lecturer);
         Task DeleteAsync(Lecturer lecturer);

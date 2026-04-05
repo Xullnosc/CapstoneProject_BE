@@ -12,6 +12,7 @@ namespace FCTMS.Tests.Controllers
     {
         private readonly Mock<ISemesterService> _mockSemesterService;
         private readonly Mock<IImportService> _mockImportService;
+        private readonly Mock<IThesisEvaluationExportService> _mockExportService;
         private readonly Mock<ICloudinaryHelper> _mockCloudinaryHelper;
         private readonly SemesterController _controller;
 
@@ -19,8 +20,9 @@ namespace FCTMS.Tests.Controllers
         {
             _mockSemesterService = new Mock<ISemesterService>();
             _mockImportService = new Mock<IImportService>();
+            _mockExportService = new Mock<IThesisEvaluationExportService>();
             _mockCloudinaryHelper = new Mock<ICloudinaryHelper>();
-            _controller = new SemesterController(_mockSemesterService.Object, _mockImportService.Object, _mockCloudinaryHelper.Object);
+            _controller = new SemesterController(_mockSemesterService.Object, _mockImportService.Object,_mockExportService.Object , _mockCloudinaryHelper.Object);
 
              // Mock User (ClaimsPrincipal) - Role HOD
             var user = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]

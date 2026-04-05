@@ -1,8 +1,7 @@
 using System.Text;
+using BusinessObjects.Interfaces;
 using BusinessObjects.Models;
 using CapstoneProject_BE.Extensions;
-using Services.Extensions;
-using BusinessObjects.Interfaces;
 using DataAccess;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -13,6 +12,7 @@ using Microsoft.OpenApi.Models;
 using OfficeOpenXml;
 using Repositories;
 using Services;
+using Services.Extensions;
 using Services.Helpers;
 using Services.Mappings;
 using StackExchange.Redis;
@@ -42,7 +42,11 @@ builder
     .Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.PropertyNamingPolicy = System
+            .Text
+            .Json
+            .JsonNamingPolicy
+            .CamelCase;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.ReferenceHandler = System
             .Text
@@ -126,6 +130,7 @@ builder.Services.AddScoped<ITeamInvitationService, TeamInvitationService>();
 builder.Services.AddScoped<IMentorInvitationService, MentorInvitationService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IImportService, ImportService>();
+builder.Services.AddScoped<IThesisEvaluationExportService, ThesisEvaluationExportService>();
 builder.Services.AddScoped<IWhitelistService, WhitelistService>();
 builder.Services.AddScoped<IRedisService, RedisService>();
 builder.Services.AddScoped<IThesisService, ThesisService>();

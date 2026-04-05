@@ -29,7 +29,11 @@ public interface IThesisReviewDAO
         int reviewer2Id,
         int assignedByUserId
     );
-    Task<List<ThesisReviewTimelineEventDTO>> GetTimelineAsync(string thesisId);
+    Task<PagedResult<ThesisReviewTimelineEventDTO>> GetTimelineAsync(
+        string thesisId,
+        int pageIndex,
+        int pageSize
+    );
     Task<ThesisReviewTimelineCommentDTO> AddCommentAsync(
         string thesisId,
         int authorUserId,

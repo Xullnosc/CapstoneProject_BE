@@ -316,7 +316,7 @@ public partial class FctmsContext : DbContext
             entity
                 .Property(e => e.EventType)
                 .HasColumnType(
-                    "enum('REVIEWER_ASSIGNED','REVIEWER_DECISION','HOD_FINAL_DECISION','COMMENT_ADDED','COMMENT_EDITED','STATUS_CHANGED','SYSTEM')"
+                    "enum('REVIEWER_ASSIGNED','REVIEWER_DECISION','FINAL_DECISION','COMMENT_ADDED','COMMENT_EDITED','STATUS_CHANGED','SYSTEM')"
                 );
             entity
                 .Property(e => e.ActorRole)
@@ -333,7 +333,7 @@ public partial class FctmsContext : DbContext
 
             entity
                 .HasOne(d => d.Thesis)
-                .WithMany()
+                .WithMany(p => p.ThesisReviewEvents)
                 .HasForeignKey(d => d.ThesisId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_ReviewEvents_Thesis");
@@ -941,7 +941,7 @@ public partial class FctmsContext : DbContext
 
             entity
                 .HasOne(d => d.Event)
-                .WithMany()
+                .WithMany(p => p.ChecklistResults)
                 .HasForeignKey(d => d.EventId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_ChecklistResults_Event");
