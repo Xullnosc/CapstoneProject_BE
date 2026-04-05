@@ -193,4 +193,163 @@ public class AdminControllerTests
         msgProp.Should().NotBeNull();
         msgProp!.GetValue(value).Should().Be("Unexpected failure");
     }
+
+    [Fact]
+    public async Task GetHodAccounts_EmptyList_ReturnsOkWithEmptyList()
+    {
+        // Arrange
+        _mockAdminService.Setup(x => x.GetHodAccountsAsync(null)).ReturnsAsync(new List<HodAccountDTO>());
+
+        // Act
+        var result = await _controller.GetHodAccounts(null);
+
+        // Assert
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().BeAssignableTo<IEnumerable<HodAccountDTO>>()
+            .Which.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetHodAccounts_WithSearchFilter_PassesFilterToService()
+    {
+        // Arrange
+        string filter = "hod@fpt";
+        var filtered = new List<HodAccountDTO>
+        {
+            new HodAccountDTO { UserId = 5, Email = "hod@fpt.edu.vn", FullName = "HOD FPT" }
+        };
+        _mockAdminService.Setup(x => x.GetHodAccountsAsync(filter)).ReturnsAsync(filtered);
+
+        // Act
+        var result = await _controller.GetHodAccounts(filter);
+
+        // Assert
+        _mockAdminService.Verify(x => x.GetHodAccountsAsync(filter), Times.Once);
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var items = ok.Value.Should().BeAssignableTo<IEnumerable<HodAccountDTO>>().Subject;
+        items.Should().HaveCount(1);
+        items.First().Email.Should().Be("hod@fpt.edu.vn");
+    }
+
+    [Fact]
+    public async Task CreateOrUpdateHod_Success_VerifiesServiceCalledOnce()
+    {
+        // Arrange
+        var dto = new CreateOrUpdateHodDTO { FullName = "New HOD", Email = "newHod@fpt.edu.vn", Username = "newhod", Password = "P@ss1234" };
+        _mockAdminService.Setup(x => x.CreateOrUpdateHodAsync(dto)).Returns(Task.CompletedTask);
+
+        // Act
+        await _controller.CreateOrUpdateHod(dto);
+
+        // Assert
+        _mockAdminService.Verify(x => x.CreateOrUpdateHodAsync(dto), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateOrUpdateHod_WithMinimalDto_ReturnsOk()
+    {
+        // Arrange — only required fields
+        var dto = new CreateOrUpdateHodDTO
+        {
+            Email = "minimal@fpt.edu.vn",
+            Username = "minimal",
+            Password = "pass",
+            FullName = "Minimal HOD"
+        };
+        _mockAdminService.Setup(x => x.CreateOrUpdateHodAsync(It.IsAny<CreateOrUpdateHodDTO>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _controller.CreateOrUpdateHod(dto);
+
+        // Assert
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetHodAccounts_MultipleResults_ReturnsAll()
+    {
+        // Arrange
+        var list = new List<HodAccountDTO>
+        {
+            new HodAccountDTO { UserId = 1, Email = "hod1@fpt.edu.vn", FullName = "HOD 1", HasCredential = true },
+            new HodAccountDTO { UserId = 2, Email = "hod2@fpt.edu.vn", FullName = "HOD 2", HasCredential = false },
+            new HodAccountDTO { UserId = 3, Email = "hod3@fpt.edu.vn", FullName = "HOD 3", HasCredential = true },
+        };
+        _mockAdminService.Setup(x => x.GetHodAccountsAsync(null)).ReturnsAsync(list);
+
+        // Act
+        var result = await _controller.GetHodAccounts(null);
+
+        // Assert
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var items = ok.Value.Should().BeAssignableTo<IEnumerable<HodAccountDTO>>().Subject;
+        items.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task CreateOrUpdateHod_NetworkError_Returns500()
+    {
+        // Arrange — simulate transient network/DB error
+        var dto = new CreateOrUpdateHodDTO { FullName = "HOD", Email = "e@e.com", Username = "u", Password = "p" };
+        _mockAdminService.Setup(x => x.CreateOrUpdateHodAsync(dto))
+            .ThrowsAsync(new System.Net.Http.HttpRequestException("Network timeout"));
+
+        // Act
+        var result = await _controller.CreateOrUpdateHod(dto);
+
+        // Assert — generic exceptions become 500
+        var status = result.Should().BeOfType<ObjectResult>().Subject;
+        status.StatusCode.Should().Be(500);
+    }
+
+    [Fact]
+    public async Task CreateOrUpdateHod_EmailAlreadyExists_ReturnsBadRequest()
+    {
+        // Arrange
+        var dto = new CreateOrUpdateHodDTO { FullName = "HOD", Email = "dup@fpt.edu.vn", Username = "dup", Password = "pass" };
+        _mockAdminService.Setup(x => x.CreateOrUpdateHodAsync(dto))
+            .ThrowsAsync(new InvalidOperationException("Email already registered"));
+
+        // Act
+        var result = await _controller.CreateOrUpdateHod(dto);
+
+        // Assert
+        var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        bad.Value!.GetType().GetProperty("message")!.GetValue(bad.Value).Should().Be("Email already registered");
+    }
+
+    [Fact]
+    public async Task GetHodAccounts_ServiceThrows_ReturnsCorrectErrorMessage()
+    {
+        // Arrange
+        _mockAdminService.Setup(x => x.GetHodAccountsAsync(It.IsAny<string?>()))
+            .ThrowsAsync(new Exception("Connection string error"));
+
+        // Act
+        var result = await _controller.GetHodAccounts("test");
+
+        // Assert
+        var status = result.Should().BeOfType<ObjectResult>().Subject;
+        status.StatusCode.Should().Be(500);
+        status.Value!.GetType().GetProperty("message")!
+            .GetValue(status.Value).Should().Be("Connection string error");
+    }
+
+    [Fact]
+    public async Task CreateOrUpdateHod_UsernameAlreadyExists_ReturnsBadRequest()
+    {
+        // Arrange
+        var dto = new CreateOrUpdateHodDTO { FullName = "H", Email = "h@h.com", Username = "taken", Password = "p" };
+        _mockAdminService.Setup(x => x.CreateOrUpdateHodAsync(dto))
+            .ThrowsAsync(new InvalidOperationException("Username already exists"));
+
+        // Act
+        var result = await _controller.CreateOrUpdateHod(dto);
+
+        // Assert
+        var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        bad.Value!.GetType().GetProperty("message")!
+            .GetValue(bad.Value).Should().Be("Username already exists");
+    }
 }

@@ -278,5 +278,170 @@ namespace FCTMS.Tests.Controllers
             var serverError = result.Should().BeOfType<ObjectResult>().Subject;
             serverError.StatusCode.Should().Be(500);
         }
+
+        [Fact]
+        public async Task CreateSemester_ReturnsCreated_WhenSuccessful()
+        {
+            // Arrange
+            var dto = new SemesterCreateDTO { SemesterCode = "SP27", SemesterName = "Spring 2027" };
+            var created = new SemesterDTO { SemesterId = 10, SemesterCode = "SP27", SemesterName = "Spring 2027" };
+            _mockSemesterService.Setup(x => x.CreateSemesterAsync(dto)).ReturnsAsync(created);
+
+            // Act
+            var result = await _controller.CreateSemester(dto);
+
+            // Assert — controller returns CreatedAtAction (201)
+            result.Result.Should().BeOfType<CreatedAtActionResult>()
+                .Which.Value.Should().BeEquivalentTo(created);
+        }
+
+        [Fact]
+        public async Task CreateSemester_ReturnsBadRequest_WhenCodeAlreadyExists()
+        {
+            // Arrange
+            var dto = new SemesterCreateDTO { SemesterCode = "SP26" };
+            _mockSemesterService.Setup(x => x.CreateSemesterAsync(dto))
+                .ThrowsAsync(new InvalidOperationException("Semester code 'SP26' already exists."));
+
+            // Act
+            var result = await _controller.CreateSemester(dto);
+
+            // Assert
+            var bad = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            bad.Value!.ToString().Should().Contain("SP26");
+        }
+
+        [Fact]
+        public async Task CreateSemester_ReturnsBadRequest_WhenDatesOverlap()
+        {
+            // Arrange
+            var dto = new SemesterCreateDTO { SemesterCode = "XX01" };
+            _mockSemesterService.Setup(x => x.CreateSemesterAsync(dto))
+                .ThrowsAsync(new InvalidOperationException("Semester dates overlap"));
+
+            // Act
+            var result = await _controller.CreateSemester(dto);
+
+            // Assert
+            result.Result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task UpdateSemester_ReturnsNoContent_WhenSuccessful()
+        {
+            // Arrange
+            var dto = new SemesterCreateDTO { SemesterId = 1, SemesterCode = "SU27" };
+            _mockSemesterService.Setup(x => x.UpdateSemesterAsync(dto)).Returns(Task.CompletedTask);
+
+            // Act — controller signature: UpdateSemester(int id, SemesterCreateDTO dto)
+            var result = await _controller.UpdateSemester(1, dto);
+
+            // Assert — returns 204 NoContent on success
+            result.Should().BeOfType<NoContentResult>();
+            _mockSemesterService.Verify(x => x.UpdateSemesterAsync(dto), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateSemester_ReturnsBadRequest_WhenIdMismatch()
+        {
+            // Arrange — id in route != id in body
+            var dto = new SemesterCreateDTO { SemesterId = 5 };
+
+            // Act
+            var result = await _controller.UpdateSemester(999, dto);
+
+            // Assert — controller returns 400 when ids don't match
+            result.Should().BeOfType<BadRequestResult>();
+        }
+
+        [Fact]
+        public async Task UpdateSemester_ReturnsBadRequest_WhenDatesOverlap()
+        {
+            // Arrange
+            var dto = new SemesterCreateDTO { SemesterId = 2, SemesterCode = "XX" };
+            _mockSemesterService.Setup(x => x.UpdateSemesterAsync(dto))
+                .ThrowsAsync(new InvalidOperationException("Semester dates overlap"));
+
+            // Act
+            var result = await _controller.UpdateSemester(2, dto);
+
+            // Assert
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task EndSemester_ReturnsOk_WhenSuccessful()
+        {
+            // Arrange
+            int id = 1;
+            _mockSemesterService.Setup(x => x.EndSemesterAsync(id)).Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _controller.EndSemester(id);
+
+            // Assert
+            result.Should().BeOfType<OkObjectResult>();
+            _mockSemesterService.Verify(x => x.EndSemesterAsync(id), Times.Once);
+        }
+
+        [Fact]
+        public async Task EndSemester_ReturnsNotFound_WhenIdDoesNotExist()
+        {
+            // Arrange
+            int id = 999;
+            _mockSemesterService.Setup(x => x.EndSemesterAsync(id))
+                .ThrowsAsync(new KeyNotFoundException($"Semester with ID {id} not found."));
+
+            // Act
+            var result = await _controller.EndSemester(id);
+
+            // Assert
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
+
+        [Fact]
+        public async Task GetSemester_ReturnsOk_WhenFound()
+        {
+            // Arrange
+            int id = 1;
+            var semester = new SemesterDTO { SemesterId = id, SemesterCode = "SP26" };
+            _mockSemesterService.Setup(x => x.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
+
+            // Act — action is named GetSemester(int id)
+            var result = await _controller.GetSemester(id);
+
+            // Assert — returns 200 with the semester DTO implicitly wrapped
+            result.Value.Should().BeEquivalentTo(semester);
+        }
+
+        [Fact]
+        public async Task GetSemester_ReturnsNotFound_WhenNull()
+        {
+            // Arrange
+            _mockSemesterService.Setup(x => x.GetSemesterByIdAsync(404)).ReturnsAsync((SemesterDTO?)null);
+
+            // Act
+            var result = await _controller.GetSemester(404);
+
+            // Assert — controller returns NotFound when service returns null
+            result.Result.Should().BeOfType<NotFoundResult>();
+        }
+
+        [Fact]
+        public async Task GetOrphanedStudents_ReturnsOk_WithEmptyList_WhenNoOrphans()
+        {
+            // Arrange
+            int id = 1;
+            var empty = new PagedResult<WhitelistDTO>(new List<WhitelistDTO>(), 0, 1, 10);
+            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>()))
+                .ReturnsAsync(empty);
+
+            // Act
+            var result = await _controller.GetOrphanedStudents(id);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.Should().NotBeNull();
+        }
     }
 }

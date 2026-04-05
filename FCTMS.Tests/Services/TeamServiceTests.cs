@@ -241,7 +241,7 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { UserId = userId, Email = "test@edu.vn" });
             _mockWhitelistRepository.Setup(r => r.IsWhitelistedInSemesterAsync("test@edu.vn", 1)).ReturnsAsync(true);
-            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team)null);
+            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team?)null);
             _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1)).ReturnsAsync(new List<string>());
             _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => { t.TeamId = 1; return t; });
 
@@ -263,7 +263,7 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
             _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { UserId = userId, Email = "test@edu.vn" });
             _mockWhitelistRepository.Setup(r => r.IsWhitelistedInSemesterAsync("test@edu.vn", 1)).ReturnsAsync(true);
-            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team)null);
+            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1)).ReturnsAsync((Team?)null);
             _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1))
                 .ReturnsAsync(new List<string> { "SP25_SE_01", "SP25_SE_02", "SP25_SE_15" });
             _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) => { t.TeamId = 1; return t; });
@@ -481,6 +481,410 @@ namespace FCTMS.Tests.Services
             // Act & Assert
             Func<Task> act = () => _teamService.ForceCreateTeamAsync(hodUserId, dto);
             await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*already in team*");
+        }
+
+        #endregion
+
+        #region CreateTeamAsync Additional Edge Cases
+
+        [Fact]
+        public async Task CreateTeamAsync_ShouldThrow_WhenUserNotFound()
+        {
+            // Arrange
+            // We mock the semester to exist so the flow reaches the user check.
+            int userId = 999;
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25" };
+
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
+            // Return null to simulate that the user doesn't exist in the system.
+            _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync((User?)null);
+
+            // Act
+            Func<Task> act = () => _teamService.CreateTeamAsync(userId, new CreateTeamDTO { TeamName = "Ghost Team" });
+
+            // Assert
+            // The service should detect a missing user and throw a descriptive exception.
+            await act.Should().ThrowAsync<KeyNotFoundException>();
+        }
+
+        [Fact]
+        public async Task CreateTeamAsync_ShouldThrow_WhenUserAlreadyInTeam()
+        {
+            // Arrange
+            int userId = 5;
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25" };
+            var existingTeam = new Team { TeamId = 10, TeamName = "Old Team" };
+
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
+            _mockUserRepository.Setup(r => r.GetByIdAsync(userId))
+                .ReturnsAsync(new User { UserId = userId, Email = "student@edu.vn" });
+            _mockWhitelistRepository.Setup(r => r.IsWhitelistedInSemesterAsync("student@edu.vn", 1))
+                .ReturnsAsync(true);
+            // The student is already in a team for this semester.
+            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(userId, 1))
+                .ReturnsAsync(existingTeam);
+
+            // Act
+            Func<Task> act = () => _teamService.CreateTeamAsync(userId, new CreateTeamDTO { TeamName = "New Team" });
+
+            // Assert
+            // System should detect the conflict with existing team membership and raise error.
+            await act.Should().ThrowAsync<InvalidOperationException>();
+        }
+
+        [Fact]
+        public async Task CreateTeamAsync_ShouldThrow_WhenUserNotWhitelisted()
+        {
+            // Arrange
+            int userId = 6;
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP25" };
+
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(semester);
+            _mockUserRepository.Setup(r => r.GetByIdAsync(userId))
+                .ReturnsAsync(new User { UserId = userId, Email = "notwhitelisted@edu.vn" });
+            // Whitelist check returns false, meaning the student is not eligible.
+            _mockWhitelistRepository.Setup(r => r.IsWhitelistedInSemesterAsync("notwhitelisted@edu.vn", 1))
+                .ReturnsAsync(false);
+
+            // Act
+            Func<Task> act = () => _teamService.CreateTeamAsync(userId, new CreateTeamDTO { TeamName = "Rejected Team" });
+
+            // Assert
+            // Not whitelisted students should not be able to create teams.
+            await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        }
+
+        [Fact]
+        public async Task CreateTeamAsync_ShouldThrow_WhenNoActiveSemester()
+        {
+            // Arrange
+            // The semester repository returns null, simulating no active semester.
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync((Semester?)null);
+
+            // Act
+            Func<Task> act = () => _teamService.CreateTeamAsync(1, new CreateTeamDTO { TeamName = "Semester Missing" });
+
+            // Assert
+            // Without a semester context, team creation must be blocked.
+            await act.Should().ThrowAsync<InvalidOperationException>();
+        }
+
+        #endregion
+
+        #region DisbandTeamAsync Additional Edge Cases
+
+        [Fact]
+        public async Task DisbandTeamAsync_ShouldSucceed_WhenThesisIsDraft()
+        {
+            // Arrange
+            int teamId = 2;
+            int leaderId = 200;
+            var team = new Team { TeamId = teamId, LeaderId = leaderId, Status = "Insufficient", SemesterId = 2 };
+
+            // The team has a thesis but it's only in Draft status (not blocking disbanding).
+            var draftThesis = new Thesis { TeamId = teamId, Status = "Draft" };
+
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
+            _mockTeamRepository.Setup(r => r.UpdateAsync(team)).ReturnsAsync(true);
+            _mockThesisRepository.Setup(r => r.GetThesesByUserIdAsync(leaderId))
+                .ReturnsAsync(new List<Thesis> { draftThesis });
+            _mockTeamMemberRepository.Setup(r => r.RemoveAllMembersFromTeamAsync(teamId)).ReturnsAsync(true);
+
+            // Act
+            var result = await _teamService.DisbandTeamAsync(teamId, leaderId);
+
+            // Assert
+            // Draft thesis should not block disbanding.
+            result.Should().BeTrue();
+            team.Status.Should().Be("Disbanded");
+        }
+
+        [Fact]
+        public async Task DisbandTeamAsync_ShouldCancelThesis_WhenThesisIsReviewing()
+        {
+            // Arrange
+            int teamId = 3;
+            int leaderId = 300;
+            var team = new Team { TeamId = teamId, LeaderId = leaderId, Status = "Active" };
+            // Thesis under review disbanding should cancel it.
+            var reviewThesis = new Thesis { TeamId = teamId, Status = "Reviewing" };
+
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
+            _mockTeamRepository.Setup(r => r.UpdateAsync(team)).ReturnsAsync(true);
+            _mockThesisRepository.Setup(r => r.GetThesesByUserIdAsync(leaderId))
+                .ReturnsAsync(new List<Thesis> { reviewThesis });
+            _mockTeamMemberRepository.Setup(r => r.RemoveAllMembersFromTeamAsync(teamId)).ReturnsAsync(true);
+
+            // Act
+            var result = await _teamService.DisbandTeamAsync(teamId, leaderId);
+
+            // Assert
+            result.Should().BeTrue();
+            reviewThesis.Status.Should().Be("Cancelled");
+            _mockThesisRepository.Verify(r => r.UpdateThesisAsync(reviewThesis), Times.Once);
+            team.Status.Should().Be("Disbanded");
+            _mockTeamRepository.Verify(r => r.UpdateAsync(team), Times.Once);
+        }
+
+        [Fact]
+        public async Task DisbandTeamAsync_ShouldInvalidateCache_AfterDisband()
+        {
+            // Arrange
+            int teamId = 4;
+            int leaderId = 400;
+            int semesterId = 5;
+            var team = new Team { TeamId = teamId, LeaderId = leaderId, Status = "Insufficient", SemesterId = semesterId };
+
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
+            _mockTeamRepository.Setup(r => r.UpdateAsync(team)).ReturnsAsync(true);
+            _mockThesisRepository.Setup(r => r.GetThesesByUserIdAsync(leaderId))
+                .ReturnsAsync(new List<Thesis>());
+            _mockTeamMemberRepository.Setup(r => r.RemoveAllMembersFromTeamAsync(teamId)).ReturnsAsync(true);
+
+            // Act
+            await _teamService.DisbandTeamAsync(teamId, leaderId);
+
+            // Assert
+            // Cache invalidation ensures other users see up-to-date team lists.
+            _mockSemesterService.Verify(s => s.InvalidateSemesterCacheAsync(semesterId), Times.Once);
+        }
+
+        #endregion
+
+        #region UpdateTeamAsync Additional Edge Cases
+
+        [Fact]
+        public async Task UpdateTeamAsync_ShouldPreserveAvatar_WhenNoFileProvided()
+        {
+            // Arrange
+            int teamId = 1;
+            int leaderId = 1;
+            string originalAvatar = "https://res.cloudinary.com/old_avatar.jpg";
+
+            var updateDto = new UpdateTeamDTO
+            {
+                TeamName = "New Name Only",
+                Description = "Same description",
+                AvatarFile = null // No new file â€” avatar should remain unchanged.
+            };
+
+            var existingTeam = new Team
+            {
+                TeamId = teamId,
+                LeaderId = leaderId,
+                TeamName = "Old Name",
+                TeamAvatar = originalAvatar,
+                Teammembers = new List<Teammember>()
+            };
+
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
+
+            // Act
+            var result = await _teamService.UpdateTeamAsync(teamId, leaderId, updateDto);
+
+            // Assert
+            // Avatar should not be changed since no file was provided.
+            result.TeamAvatar.Should().Be(originalAvatar);
+            // Cloud upload should NOT have been called.
+            _mockCloudinaryHelper.Verify(x => x.UploadImageAsync(It.IsAny<IFormFile>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task UpdateTeamAsync_ShouldUpdateDescription_WhenNameNotChanged()
+        {
+            // Arrange
+            int teamId = 1;
+            int leaderId = 1;
+            string originalName = "Unchanged Team Name";
+
+            var updateDto = new UpdateTeamDTO
+            {
+                TeamName = originalName, // Same name.
+                Description = "Brand new detailed description of the project scope."
+            };
+
+            var existingTeam = new Team
+            {
+                TeamId = teamId,
+                LeaderId = leaderId,
+                TeamName = originalName,
+                Description = "Old description.",
+                Teammembers = new List<Teammember>()
+            };
+
+            _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
+
+            // Act
+            var result = await _teamService.UpdateTeamAsync(teamId, leaderId, updateDto);
+
+            // Assert
+            result.TeamName.Should().Be(originalName);
+            result.Description.Should().Be("Brand new detailed description of the project scope.");
+            // Repository update should still be called.
+            _mockTeamRepository.Verify(x => x.UpdateAsync(existingTeam), Times.Once);
+        }
+
+        #endregion
+
+        #region ToggleSpecialFlagAsync Additional Edge Cases
+
+        [Fact]
+        public async Task ToggleSpecialFlagAsync_ShouldInvalidateCache_WhenToggledToSpecial()
+        {
+            // Arrange
+            int teamId = 10;
+            int hodUserId = 5;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var team = new Team { TeamId = teamId, IsSpecial = false };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
+            _mockTeamRepository.Setup(r => r.UpdateAsync(team)).ReturnsAsync(true);
+
+            // Act
+            await _teamService.ToggleSpecialFlagAsync(teamId, hodUserId);
+
+            // Assert
+            // Global cache invalidation ensures all semesters reflect the change.
+            _mockSemesterService.Verify(s => s.InvalidateSemesterCacheAsync(null), Times.Once);
+        }
+
+        [Fact]
+        public async Task ToggleSpecialFlagAsync_ShouldThrow_WhenUserIsStudent()
+        {
+            // Arrange
+            int userId = 7;
+            // Student role â€” should be blocked from this administrative action.
+            var student = new User { UserId = userId, Role = new Role { RoleName = "Student" } };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(student);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(
+                () => _teamService.ToggleSpecialFlagAsync(1, userId));
+
+            // Make sure we never even looked up the team.
+            _mockTeamRepository.Verify(r => r.GetByIdAsync(It.IsAny<int>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task ToggleSpecialFlagAsync_ShouldThrow_WhenUserIsLecturer()
+        {
+            // Arrange
+            int userId = 8;
+            var lecturer = new User { UserId = userId, Role = new Role { RoleName = "Lecturer" } };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(lecturer);
+
+            // Act & Assert
+            // Only HOD should have the privilege to toggle this flag.
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(
+                () => _teamService.ToggleSpecialFlagAsync(1, userId));
+        }
+
+        #endregion
+
+        #region ForceCreateTeamAsync Additional Edge Cases
+
+        [Fact]
+        public async Task ForceCreateTeamAsync_ShouldThrow_WhenUserIsNotHod()
+        {
+            // Arrange
+            int studentUserId = 5;
+            var student = new User { UserId = studentUserId, Role = new Role { RoleName = "Student" } };
+            var dto = new ForceCreateTeamDTO
+            {
+                TeamName = "Unauthorized Attempt",
+                SemesterId = 1,
+                LeaderEmail = "s1@fpt.edu.vn",
+                MemberEmails = new List<string> { "s1@fpt.edu.vn" }
+            };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(studentUserId)).ReturnsAsync(student);
+
+            // Act & Assert
+            // Students should not be able to force-create teams under any circumstances.
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(
+                () => _teamService.ForceCreateTeamAsync(studentUserId, dto));
+        }
+
+        [Fact]
+        public async Task ForceCreateTeamAsync_ShouldThrow_WhenMemberEmailsIsEmpty()
+        {
+            // Arrange
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP26" };
+            var dto = new ForceCreateTeamDTO
+            {
+                TeamName = "Empty Members",
+                SemesterId = 1,
+                LeaderEmail = "leader@fpt.edu.vn",
+                // MemberEmails is empty â€” this is an invalid request.
+                MemberEmails = new List<string>()
+            };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(1)).ReturnsAsync(semester);
+
+            // Act & Assert
+            // A team with no members is semantically invalid.
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => _teamService.ForceCreateTeamAsync(hodUserId, dto));
+        }
+
+        [Fact]
+        public async Task ForceCreateTeamAsync_ShouldCreateWithQualifiedStatus_WhenFourMembersAdded()
+        {
+            // Arrange
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP26" };
+
+            // Create 4 students â€” this should produce a "Qualified" or "Active" team.
+            var students = Enumerable.Range(1, 4).Select(i => new User
+            {
+                UserId = 100 + i,
+                Email = $"s{i}@fpt.edu.vn",
+                FullName = $"Student {i}",
+                Role = new Role { RoleName = "Student" }
+            }).ToList();
+
+            var emails = students.Select(s => s.Email).ToList();
+
+            var dto = new ForceCreateTeamDTO
+            {
+                TeamName = "Full Team",
+                SemesterId = 1,
+                LeaderEmail = "s1@fpt.edu.vn",
+                MemberEmails = emails
+            };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(1)).ReturnsAsync(semester);
+            _mockUserRepository.Setup(r => r.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
+                .ReturnsAsync(students);
+            _mockWhitelistRepository.Setup(r => r.GetBySemesterIdAsync(1))
+                .ReturnsAsync(emails.Select(e => new Whitelist
+                {
+                    Email = e,
+                    Role = new Role { RoleName = "Student" }
+                }).ToList());
+            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(It.IsAny<int>(), 1))
+                .ReturnsAsync((Team?)null);
+            _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1))
+                .ReturnsAsync(new List<string>());
+            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>()))
+                .ReturnsAsync((Team t) => { t.TeamId = 99; return t; });
+
+            // Act
+            var result = await _teamService.ForceCreateTeamAsync(hodUserId, dto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.MemberCount.Should().Be(4);
+            // 4 members meets minimum so team should NOT be "Insufficient".
+            result.Status.Should().NotBe("Insufficient");
         }
 
         #endregion

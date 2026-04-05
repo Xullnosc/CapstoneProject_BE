@@ -149,5 +149,337 @@ namespace FCTMS.Tests.Services
             await act.Should().ThrowAsync<KeyNotFoundException>().WithMessage("Checklist with id 999 not found.");
             _mockRepository.Verify(x => x.DeleteAsync(It.IsAny<int>()), Times.Never);
         }
+
+        [Fact]
+        public async Task GetAllAsync_ShouldReturnEmptyList_WhenNoChecklistsExist()
+        {
+            // Arrange
+            // Repository returns empty list Ã¢â‚¬â€ no checklists in the system yet.
+            var emptyEntities = new List<Checklist>();
+            var emptyDtos = new List<ChecklistDTO>();
+
+            _mockRepository.Setup(x => x.GetAllAsync()).ReturnsAsync(emptyEntities);
+            _mockMapper.Setup(m => m.Map<List<ChecklistDTO>>(emptyEntities)).Returns(emptyDtos);
+
+            // Act
+            var result = await _service.GetAllAsync();
+
+            // Assert
+            // Must not be null Ã¢â‚¬â€ must be an empty list.
+            result.Should().NotBeNull();
+            result.Should().BeEmpty();
+            // Verify the repository was still called even when result is empty.
+            _mockRepository.Verify(x => x.GetAllAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetAllAsync_ShouldReturnAllChecklists_WhenMultipleExist()
+        {
+            // Arrange
+            // Three checklist entities simulate a real semester checklist.
+            var entities = new List<Checklist>
+            {
+                new Checklist { ChecklistId = 1, Content = "Submit Proposal Document" },
+                new Checklist { ChecklistId = 2, Content = "Complete 1st Mentor Meeting" },
+                new Checklist { ChecklistId = 3, Content = "Finalize Topic With Supervisor" }
+            };
+
+            var dtos = new List<ChecklistDTO>
+            {
+                new ChecklistDTO { ChecklistId = 1, Content = "Submit Proposal Document" },
+                new ChecklistDTO { ChecklistId = 2, Content = "Complete 1st Mentor Meeting" },
+                new ChecklistDTO { ChecklistId = 3, Content = "Finalize Topic With Supervisor" }
+            };
+
+            _mockRepository.Setup(x => x.GetAllAsync()).ReturnsAsync(entities);
+            _mockMapper.Setup(m => m.Map<List<ChecklistDTO>>(entities)).Returns(dtos);
+
+            // Act
+            var result = await _service.GetAllAsync();
+
+            // Assert
+            // All 3 items should be in the response.
+            result.Should().HaveCount(3);
+            // Verify each expected content is present.
+            result.Should().ContainSingle(d => d.Content == "Submit Proposal Document");
+            result.Should().ContainSingle(d => d.Content == "Complete 1st Mentor Meeting");
+            result.Should().ContainSingle(d => d.Content == "Finalize Topic With Supervisor");
+        }
+
+        [Fact]
+        public async Task CreateAsync_ShouldCallMapper_BeforeSavingToRepository()
+        {
+            // Arrange
+            var createDto = new ChecklistCreateDTO { Content = "Attend Final Presentation" };
+            // Mapper would produce this entity from the DTO.
+            var mappedEntity = new Checklist { Content = "Attend Final Presentation" };
+            // Repository returns this after saving.
+            var savedEntity = new Checklist { ChecklistId = 5, Content = "Attend Final Presentation" };
+            var resultDto = new ChecklistDTO { ChecklistId = 5, Content = "Attend Final Presentation" };
+
+            // Configure all steps of the pipeline.
+            _mockMapper.Setup(m => m.Map<Checklist>(createDto)).Returns(mappedEntity);
+            _mockRepository.Setup(x => x.AddAsync(mappedEntity)).ReturnsAsync(savedEntity);
+            _mockMapper.Setup(m => m.Map<ChecklistDTO>(savedEntity)).Returns(resultDto);
+
+            // Act
+            var result = await _service.CreateAsync(createDto);
+
+            // Assert
+            result.ChecklistId.Should().Be(5);
+            result.Content.Should().Be("Attend Final Presentation");
+            // The mapper must be called to convert DTO Ã¢â€ â€™ Entity.
+            _mockMapper.Verify(m => m.Map<Checklist>(createDto), Times.Once);
+            // The repository must then save the mapped entity.
+            _mockRepository.Verify(x => x.AddAsync(mappedEntity), Times.Once);
+            // The mapper must also convert SavedEntity Ã¢â€ â€™ ResponseDTO.
+            _mockMapper.Verify(m => m.Map<ChecklistDTO>(savedEntity), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_ShouldReplaceContent_WhenValidIdAndDtoProvided()
+        {
+            // Arrange
+            int checklistId = 3;
+            var existingEntity = new Checklist
+            {
+                ChecklistId = checklistId,
+                Content = "Old content with a typo"
+            };
+            var updateDto = new ChecklistUpdateDTO
+            {
+                Content = "Corrected content without typos"
+            };
+
+            _mockRepository.Setup(x => x.GetByIdAsync(checklistId)).ReturnsAsync(existingEntity);
+
+            // Act
+            await _service.UpdateAsync(checklistId, updateDto);
+
+            // Assert
+            // Content must be updated to the new value.
+            existingEntity.Content.Should().Be("Corrected content without typos");
+            // Original ID must remain intact.
+            existingEntity.ChecklistId.Should().Be(checklistId);
+            // Persistence must be triggered.
+            _mockRepository.Verify(x => x.UpdateAsync(existingEntity), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_ShouldNotCallUpdate_WhenChecklistDoesNotExist()
+        {
+            // Arrange
+            int nonExistentId = 404;
+            _mockRepository.Setup(x => x.GetByIdAsync(nonExistentId)).ReturnsAsync((Checklist?)null);
+            var dto = new ChecklistUpdateDTO { Content = "Should not be saved" };
+
+            // Act
+            Func<Task> act = async () => await _service.UpdateAsync(nonExistentId, dto);
+
+            // Assert
+            // A clear exception is thrown before any DB write happens.
+            await act.Should().ThrowAsync<KeyNotFoundException>();
+            // Absolutely no update must occur for a non-existent record.
+            _mockRepository.Verify(x => x.UpdateAsync(It.IsAny<Checklist>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task DeleteAsync_ShouldPassCorrectId_ToRepositoryDelete()
+        {
+            // Arrange
+            int targetId = 7;
+            var entity = new Checklist { ChecklistId = targetId, Content = "To be deleted" };
+
+            _mockRepository.Setup(x => x.GetByIdAsync(targetId)).ReturnsAsync(entity);
+
+            // Act
+            await _service.DeleteAsync(targetId);
+
+            // Assert
+            // The repository must be called with the very same ID Ã¢â‚¬â€ not any other value.
+            _mockRepository.Verify(x => x.DeleteAsync(targetId), Times.Once);
+            // Verify no extra delete calls occurred for other IDs.
+            _mockRepository.Verify(x => x.DeleteAsync(It.Is<int>(id => id != targetId)), Times.Never);
+        }
+
+        [Fact]
+        public async Task GetByIdAsync_ShouldMapAllFieldsCorrectly_WhenEntityHasFullData()
+        {
+            // Arrange
+            int id = 42;
+            var entity = new Checklist
+            {
+                ChecklistId = id,
+                Content = "This is a very detailed checklist item for the third sprint review meeting."
+            };
+            var dto = new ChecklistDTO
+            {
+                ChecklistId = id,
+                Content = "This is a very detailed checklist item for the third sprint review meeting."
+            };
+
+            _mockRepository.Setup(x => x.GetByIdAsync(id)).ReturnsAsync(entity);
+            _mockMapper.Setup(m => m.Map<ChecklistDTO>(entity)).Returns(dto);
+
+            // Act
+            var result = await _service.GetByIdAsync(id);
+
+            // Assert
+            result.Should().NotBeNull();
+            result!.ChecklistId.Should().Be(id);
+            // Full content must be preserved without truncation.
+            result.Content.Should().Be("This is a very detailed checklist item for the third sprint review meeting.");
+        }
+
+        [Fact]
+        public async Task GetAllAsync_ShouldReturnEmpty_WhenNoChecklistsExist()
+        {
+            // Arrange
+            _mockRepository.Setup(x => x.GetAllAsync()).ReturnsAsync(new List<Checklist>());
+            _mockMapper.Setup(m => m.Map<List<ChecklistDTO>>(It.IsAny<List<Checklist>>()))
+                .Returns(new List<ChecklistDTO>());
+
+            // Act
+            var result = await _service.GetAllAsync();
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetByIdAsync_ShouldReturnNull_WhenChecklistDoesNotExist()
+        {
+            // Arrange
+            _mockRepository.Setup(x => x.GetByIdAsync(9999)).ReturnsAsync((Checklist?)null);
+
+            // Act
+            var result = await _service.GetByIdAsync(9999);
+
+            // Assert
+            result.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task CreateAsync_ShouldReturnDto_WhenValidDtoProvided()
+        {
+            // Arrange  CreateAsync takes ChecklistCreateDTO (Content only)
+            var createDto = new ChecklistCreateDTO { Content = "New task" };
+            var entity = new Checklist { ChecklistId = 10, Content = "New task" };
+            var resultDto = new ChecklistDTO { ChecklistId = 10, Content = "New task" };
+
+            _mockMapper.Setup(m => m.Map<Checklist>(It.IsAny<object>())).Returns(entity);
+            _mockRepository.Setup(x => x.AddAsync(entity)).ReturnsAsync(entity);
+            _mockMapper.Setup(m => m.Map<ChecklistDTO>(entity)).Returns(resultDto);
+
+            // Act
+            var result = await _service.CreateAsync(createDto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.ChecklistId.Should().Be(10);
+            _mockRepository.Verify(x => x.AddAsync(It.IsAny<Checklist>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetByIdAsync_ShouldCallRepositoryOnce()
+        {
+            // Arrange
+            int id = 5;
+            var entity = new Checklist { ChecklistId = id, Content = "Test" };
+            var dto = new ChecklistDTO { ChecklistId = id, Content = "Test" };
+            _mockRepository.Setup(x => x.GetByIdAsync(id)).ReturnsAsync(entity);
+            _mockMapper.Setup(m => m.Map<ChecklistDTO>(entity)).Returns(dto);
+
+            // Act
+            await _service.GetByIdAsync(id);
+
+            // Assert
+            _mockRepository.Verify(x => x.GetByIdAsync(id), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_ShouldThrow_WhenNotFound()
+        {
+            // Arrange  UpdateAsync(int id, ChecklistUpdateDTO dto)
+            var dto = new ChecklistUpdateDTO { Content = "Updated" };
+            _mockRepository.Setup(x => x.GetByIdAsync(888)).ReturnsAsync((Checklist?)null);
+
+            // Act
+            Func<Task> act = async () => await _service.UpdateAsync(888, dto);
+
+            // Assert
+            await act.Should().ThrowAsync<KeyNotFoundException>();
+        }
+
+        [Fact]
+        public async Task UpdateAsync_ShouldReplaceContent_WhenExists()
+        {
+            // Arrange
+            int id = 3;
+            var existing = new Checklist { ChecklistId = id, Content = "Old" };
+            var dto = new ChecklistUpdateDTO { Content = "New" };
+
+            _mockRepository.Setup(x => x.GetByIdAsync(id)).ReturnsAsync(existing);
+            _mockMapper.Setup(m => m.Map(dto, existing));
+            _mockRepository.Setup(x => x.UpdateAsync(existing)).Returns(Task.CompletedTask);
+
+            // Act — UpdateAsync returns Task (void), call without assigning
+            await _service.UpdateAsync(id, dto);
+
+            // Assert
+            _mockRepository.Verify(x => x.UpdateAsync(existing), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeleteAsync_ShouldCallRepository_WithCorrectId()
+        {
+            // Arrange
+            int id = 4;
+            _mockRepository.Setup(x => x.GetByIdAsync(id)).ReturnsAsync(new Checklist { ChecklistId = id });
+            _mockRepository.Setup(x => x.DeleteAsync(id)).Returns(Task.CompletedTask);
+
+            // Act
+            await _service.DeleteAsync(id);
+
+            // Assert
+            _mockRepository.Verify(x => x.DeleteAsync(id), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeleteAsync_ShouldThrow_WhenNotFound()
+        {
+            // Arrange
+            _mockRepository.Setup(x => x.DeleteAsync(404))
+                .ThrowsAsync(new KeyNotFoundException("Checklist 404 not found"));
+
+            // Act
+            Func<Task> act = async () => await _service.DeleteAsync(404);
+
+            // Assert
+            await act.Should().ThrowAsync<KeyNotFoundException>();
+        }
+
+        [Fact]
+        public async Task GetAllAsync_ShouldReturnAll_WhenManyExist()
+        {
+            // Arrange
+            var entities = new List<Checklist>
+            {
+                new Checklist { ChecklistId = 1, Content = "Item 1" },
+                new Checklist { ChecklistId = 2, Content = "Item 2" },
+                new Checklist { ChecklistId = 3, Content = "Item 3" },
+            };
+            var dtos = entities.Select(e => new ChecklistDTO { ChecklistId = e.ChecklistId, Content = e.Content }).ToList();
+
+            _mockRepository.Setup(x => x.GetAllAsync()).ReturnsAsync(entities);
+            _mockMapper.Setup(m => m.Map<List<ChecklistDTO>>(entities)).Returns(dtos);
+
+            // Act
+            var result = await _service.GetAllAsync();
+
+            // Assert
+            result.Should().HaveCount(3);
+        }
     }
 }
