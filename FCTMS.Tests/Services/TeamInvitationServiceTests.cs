@@ -1,4 +1,4 @@
-﻿using BusinessObjects.DTOs;
+using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using BusinessObjects;
 using Moq;
@@ -655,6 +655,8 @@ namespace FCTMS.Tests.Services
             };
 
             _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync())
+                .ReturnsAsync(new Semester { SemesterId = 1, Status = "Open" });
             // Email not found in the user database.
             _mockUserRepository.Setup(r => r.SearchUsersAsync(unknownEmail))
                 .ReturnsAsync(new List<User>());

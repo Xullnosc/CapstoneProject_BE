@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using FluentAssertions;
@@ -549,7 +549,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             var dto = new SemesterCreateDTO { SemesterCode = "FA27", SemesterName = "Fall 2027" };
             var mappedSemester = new Semester { SemesterCode = "FA27" };
-            var savedSemester = new Semester { SemesterId = 5, SemesterCode = "FA27", Status = "Upcoming" };
+            var savedSemester = new Semester { SemesterId = 5, SemesterCode = "FA27", Status = CampusConstants.SemesterStatus.Open };
 
             _mockSemesterRepository.Setup(r => r.GetSemesterByCodeAsync("FA27")).ReturnsAsync((Semester?)null);
             _mockMapper.Setup(m => m.Map<Semester>(dto)).Returns(mappedSemester);
@@ -562,7 +562,7 @@ namespace FCTMS.Tests.Services
 
             // Assert â€” Status must be Upcoming before calling CreateSemesterAsync
             _mockSemesterRepository.Verify(r =>
-                r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == "Upcoming")), Times.Once);
+                r.CreateSemesterAsync(It.Is<Semester>(s => s.Status == CampusConstants.SemesterStatus.Open)), Times.Once);
         }
 
         [Fact]
