@@ -1728,6 +1728,22 @@ Thesis content:
             // 7. Assign
             thesis.TeamId = teamId;
             thesis.Status = "Registered";
+            
+            // Sync mentors from Team to Thesis record
+            var mentor1User = team.MentorId.HasValue ? await _userRepository.GetByIdAsync(team.MentorId.Value) : null;
+            var mentor2User = team.MentorId2.HasValue ? await _userRepository.GetByIdAsync(team.MentorId2.Value) : null;
+
+            if (mentor1User != null)
+            {
+                var lect1 = await _lecturerRepository.GetByEmailAsync(mentor1User.Email);
+                thesis.MentorId1 = lect1?.LecturerId;
+            }
+            if (mentor2User != null)
+            {
+                var lect2 = await _lecturerRepository.GetByEmailAsync(mentor2User.Email);
+                thesis.MentorId2 = lect2?.LecturerId;
+            }
+
             thesis.UpdateDate = DateTime.UtcNow;
             await _thesisRepository.UpdateThesisAsync(thesis);
 
