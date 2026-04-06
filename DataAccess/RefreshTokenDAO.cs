@@ -35,4 +35,21 @@ public class RefreshTokenDAO : IRefreshTokenDAO
             await _context.SaveChangesAsync();
         }
     }
+
+    public async Task RevokeAllByUserIdAsync(int userId)
+    {
+        var now = DateTime.UtcNow;
+        var activeTokens = await _context.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
+            .ToListAsync();
+
+        if (activeTokens.Count == 0) return;
+
+        foreach (var token in activeTokens)
+        {
+            token.RevokedAt = now;
+        }
+
+        await _context.SaveChangesAsync();
+    }
 }

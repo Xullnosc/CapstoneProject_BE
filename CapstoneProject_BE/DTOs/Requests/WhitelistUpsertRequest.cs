@@ -12,6 +12,8 @@ namespace CapstoneProject_BE.DTOs.Requests
 
         public string? FullName { get; set; }
 
+        public string? Status { get; set; }
+
         [Range(1, int.MaxValue)]
         public int RoleId { get; set; }
 

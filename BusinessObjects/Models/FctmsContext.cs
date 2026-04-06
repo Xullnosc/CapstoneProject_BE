@@ -316,7 +316,7 @@ public partial class FctmsContext : DbContext
             entity
                 .Property(e => e.EventType)
                 .HasColumnType(
-                    "enum('REVIEWER_ASSIGNED','REVIEWER_DECISION','FINAL_DECISION','COMMENT_ADDED','COMMENT_EDITED','STATUS_CHANGED','SYSTEM')"
+                    "enum('REVIEWER_ASSIGNED','REVIEWER_DECISION','FINAL_DECISION','COMMENT_ADDED','COMMENT_EDITED','STATUS_CHANGED','SYSTEM','REVISION_UPDATED')"
                 );
             entity
                 .Property(e => e.ActorRole)
@@ -480,7 +480,7 @@ public partial class FctmsContext : DbContext
 
             entity.HasIndex(e => e.Status, "idx_status");
 
-            entity.HasIndex(e => e.StudentId, "idx_student");
+            entity.HasIndex(e => e.ReceiverId, "idx_receiver");
 
             entity.HasIndex(e => e.TeamId, "idx_team");
 
@@ -506,9 +506,9 @@ public partial class FctmsContext : DbContext
                 .HasConstraintName("teaminvitations_ibfk_3");
 
             entity
-                .HasOne(d => d.Student)
-                .WithMany(p => p.TeaminvitationStudents)
-                .HasForeignKey(d => d.StudentId)
+                .HasOne(d => d.Receiver)
+                .WithMany(p => p.TeaminvitationReceivers)
+                .HasForeignKey(d => d.ReceiverId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("teaminvitations_ibfk_2");
 
@@ -639,6 +639,7 @@ public partial class FctmsContext : DbContext
                 .HasColumnType("datetime");
             entity.Property(e => e.Email).HasMaxLength(100);
             entity.Property(e => e.FullName).HasMaxLength(250);
+            entity.Property(e => e.Status).HasMaxLength(50);
             entity.Property(e => e.RoleId).HasColumnName("RoleID");
             entity.Property(e => e.StudentCode).HasMaxLength(20);
 
@@ -693,36 +694,6 @@ public partial class FctmsContext : DbContext
                 .Property(e => e.UpDate)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
-            entity
-                .Property(e => e.UpdateDate)
-                .ValueGeneratedOnAddOrUpdate()
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("datetime");
-
-            entity
-                .HasOne(d => d.User)
-                .WithMany(p => p.Theses)
-                .HasForeignKey(d => d.UserId)
-                .HasConstraintName("fk_thesis_userid");
-
-            entity
-                .HasOne(d => d.OriginalAuthor)
-                .WithMany()
-                .HasForeignKey(d => d.OriginalAuthorId)
-                .OnDelete(DeleteBehavior.SetNull)
-                .HasConstraintName("fk_thesis_original_author");
-
-            entity
-                .HasOne(d => d.Semester)
-                .WithMany()
-                .HasForeignKey(d => d.SemesterId)
-                .HasConstraintName("fk_thesis_semester");
-
-            entity
-                .HasOne(d => d.Team)
-                .WithMany()
-                .HasForeignKey(d => d.TeamId)
-                .HasConstraintName("FK_Thesis_Teams_TeamId");
 
             entity
                 .HasOne(d => d.Mentor1)
@@ -742,6 +713,20 @@ public partial class FctmsContext : DbContext
                 .HasForeignKey(d => d.CampusId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("FK_Thesis_Campus");
+
+            entity
+                .HasOne(d => d.User)
+                .WithMany(p => p.Theses)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_thesis_userid");
+
+            entity
+                .HasOne(d => d.OriginalAuthor)
+                .WithMany()
+                .HasForeignKey(d => d.OriginalAuthorId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_Thesis_OriginalAuthor");
 
             entity.HasQueryFilter(e => CurrentCampusId == null || e.CampusId == CurrentCampusId);
         });

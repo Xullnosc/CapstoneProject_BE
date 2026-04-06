@@ -42,7 +42,7 @@ namespace CapstoneProject_BE.Controllers
         [HttpPost]
         public async Task<ActionResult<Whitelist>> Add([FromBody] WhitelistUpsertRequest request)
         {
-            var whitelist = new Whitelist
+            var result = await _whitelistService.AddStudentToWhitelistAsync(new Whitelist
             {
                 Email = request.Email,
                 StudentCode = request.StudentCode,
@@ -50,17 +50,16 @@ namespace CapstoneProject_BE.Controllers
                 RoleId = request.RoleId,
                 Avatar = request.Avatar,
                 CampusId = request.CampusId ?? 0,
-                SemesterId = request.SemesterId
-            };
-
-            var result = await _whitelistService.AddStudentToWhitelistAsync(whitelist);
+                SemesterId = request.SemesterId,
+                Status = request.Status
+            });
             return Ok(result);
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] WhitelistUpsertRequest request)
         {
-            var whitelist = new Whitelist
+            await _whitelistService.UpdateWhitelistAsync(new Whitelist
             {
                 WhitelistId = id,
                 Email = request.Email,
@@ -69,10 +68,9 @@ namespace CapstoneProject_BE.Controllers
                 RoleId = request.RoleId,
                 Avatar = request.Avatar,
                 CampusId = request.CampusId ?? 0,
-                SemesterId = request.SemesterId
-            };
-
-            await _whitelistService.UpdateWhitelistAsync(whitelist);
+                SemesterId = request.SemesterId,
+                Status = request.Status
+            });
             return NoContent();
         }
 

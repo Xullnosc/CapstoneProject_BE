@@ -286,11 +286,13 @@ namespace Services
                 globalWhitelists = await _whitelistRepository.GetByRoleAsync(lecturerRole.RoleId);
             }
 
-            // Look for an existing global entry for the CURRENT email (where SemesterId is null)
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            
+            // Look for an existing global or current semester entry for the CURRENT email
             var existingEntry = globalWhitelists.FirstOrDefault(w => 
                 !string.IsNullOrEmpty(w.Email) && 
                 w.Email.Trim().Equals(lecturer.Email.Trim(), StringComparison.OrdinalIgnoreCase) && 
-                w.SemesterId == null);
+                (w.SemesterId == null || w.SemesterId == currentSemester?.SemesterId));
 
             if (shouldBePresent)
             {
@@ -303,7 +305,7 @@ namespace Services
                         Avatar = lecturer.Avatar,
                         CampusId = lecturer.CampusId,
                         RoleId = lecturerRole.RoleId,
-                        SemesterId = null, // Global lecturer whitelist
+                        SemesterId = currentSemester?.SemesterId, // Assigned current semester ID
                         AddedDate = DateTime.UtcNow
                     });
                     changed = true;

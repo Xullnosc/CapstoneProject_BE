@@ -7,7 +7,7 @@ namespace BusinessObjects.DTOs
         public int InvitationId { get; set; }
         public int TeamId { get; set; }
         public TeamInfoDTO? Team { get; set; } // Nested Team Object
-        public int StudentId { get; set; }
+        public int ReceiverId { get; set; }
         public InvitedByDTO? InvitedBy { get; set; } // Nested Inviter Object
         public string? Status { get; set; }
         public DateTime CreatedAt { get; set; }

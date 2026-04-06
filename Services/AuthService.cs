@@ -129,6 +129,11 @@ public class AuthService : IAuthService
                     // Cho phép đăng nhập ở cả Open và In Progress (review giữa kỳ)
                     if (whitelistEntry.Role?.RoleName == CampusConstants.Roles.Student)
                     {
+                        if (whitelistEntry.Status == CampusConstants.WhitelistStatus.Unqualified)
+                        {
+                            throw new UnauthorizedAccessException("Bạn không có trong danh sách được phép tham gia kỳ này hoặc trạng thái tài khoản không hợp lệ.");
+                        }
+
                         if (whitelistEntry.Semester == null || CampusConstants.SemesterStatus.IsClosedStage(whitelistEntry.Semester.Status))
                         {
                             throw new UnauthorizedAccessException("Học kỳ bạn tham gia đã kết thúc. Bạn không thể đăng nhập vào hệ thống lúc này.");
@@ -185,14 +190,20 @@ public class AuthService : IAuthService
                 // 4. Check authorization
                 if (user.IsAuthorized == false)
                 {
-                    var supportEmail = await _systemSettingService.GetSettingValueAsync("SupportEmail", _configuration["Support:Email"] ?? "N/A");
-                    var supportPhone = await _systemSettingService.GetSettingValueAsync("SupportPhone", _configuration["Support:Phone"] ?? "N/A");
-                    throw new UnauthorizedAccessException(
-                        $"Bạn chưa được phân quyền vào hệ thống. Vui lòng liên hệ {supportEmail} / {supportPhone}"
-                    );
+                    throw new UnauthorizedAccessException(await GetSupportContactMessageAsync("Bạn chưa được phân quyền vào hệ thống."));
                 }
 
                 // 5. Generate JWT Token
+                // IMPORTANT: use the DB-persisted LastLogin value for session_stamp alignment.
+                var persistedLastLogin = await _userRepository.GetLastLoginUtcAsync(user.UserId);
+                if (persistedLastLogin.HasValue)
+                {
+                    var dbRaw = persistedLastLogin.Value;
+                    user.LastLogin = dbRaw.Kind == DateTimeKind.Unspecified
+                        ? DateTime.SpecifyKind(dbRaw, DateTimeKind.Utc)
+                        : dbRaw.ToUniversalTime();
+                }
+
                 var jwtSettings = GetJwtSettings();
 
                 // Fetch IsReviewer + LecturerId from Lecturers table if applicable
@@ -205,6 +216,7 @@ public class AuthService : IAuthService
                 }
 
                 var accessToken = JwtTokenGenerator.GenerateToken(user, isReviewer, jwtSettings);
+                await _refreshTokenRepository.RevokeAllByUserIdAsync(user.UserId);
                 var (refreshToken, refreshExpiresAt) = await CreateRefreshTokenAndSaveAsync(user.UserId);
 
                 var userInfo = _mapper.Map<UserInfoDTO>(user);
@@ -243,7 +255,7 @@ public class AuthService : IAuthService
 
         var credential = await _credentialRepository.GetByIdentifierAsync(request.Username.Trim());
         if (credential == null || credential.User?.Role == null)
-            throw new UnauthorizedAccessException("Invalid username or password.");
+            throw new UnauthorizedAccessException(await GetSupportContactMessageAsync("Thông tin đăng nhập không hợp lệ."));
 
         var roleName = credential.User.Role.RoleName;
         // pass rule student login
@@ -275,11 +287,25 @@ public class AuthService : IAuthService
         }
 
         if (!isValid)
-            throw new UnauthorizedAccessException("Invalid username or password.");
+            throw new UnauthorizedAccessException(await GetSupportContactMessageAsync("Thông tin đăng nhập không hợp lệ."));
 
         var user = credential.User;
+
+        // Check if user is authorized
+        if (user.IsAuthorized == false)
+            throw new UnauthorizedAccessException(await GetSupportContactMessageAsync("Tài khoản của bạn đã bị vô hiệu hóa hoặc chưa được cấp quyền."));
         user.LastLogin = DateTime.UtcNow;
         await _userRepository.UpdateAsync(user);
+
+        // IMPORTANT: use the DB-persisted LastLogin value for session_stamp alignment.
+        var persistedLastLogin = await _userRepository.GetLastLoginUtcAsync(user.UserId);
+        if (persistedLastLogin.HasValue)
+        {
+            var dbRaw = persistedLastLogin.Value;
+            user.LastLogin = dbRaw.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(dbRaw, DateTimeKind.Utc)
+                : dbRaw.ToUniversalTime();
+        }
 
         var jwtSettings = GetJwtSettings();
         
@@ -292,6 +318,7 @@ public class AuthService : IAuthService
         }
 
         var accessToken = JwtTokenGenerator.GenerateToken(user, isReviewer, jwtSettings);
+        await _refreshTokenRepository.RevokeAllByUserIdAsync(user.UserId);
         var (refreshToken, refreshExpiresAt) = await CreateRefreshTokenAndSaveAsync(user.UserId);
 
         var userInfo = _mapper.Map<UserInfoDTO>(user);
@@ -441,5 +468,11 @@ public class AuthService : IAuthService
             Audience = _configuration["Jwt:Audience"] ?? "FCTMS",
             ExpireMinutes = expireMinutes
         };
+    }
+    private async Task<string> GetSupportContactMessageAsync(string baseMessage)
+    {
+        var supportEmail = await _systemSettingService.GetSettingValueAsync("SupportEmail", _configuration["Support:Email"] ?? "N/A");
+        var supportPhone = await _systemSettingService.GetSettingValueAsync("SupportPhone", _configuration["Support:Phone"] ?? "N/A");
+        return $"{baseMessage} Vui lòng liên hệ {supportEmail} / {supportPhone}";
     }
 }

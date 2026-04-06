@@ -161,7 +161,8 @@ public class AdminService : IAdminService
             {
                 UserId = user.UserId,
                 Username = dto.Username.Trim(),
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, BCrypt.Net.BCrypt.GenerateSalt(12))
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, BCrypt.Net.BCrypt.GenerateSalt(12)),
+                CreatedAt = DateTime.UtcNow
             });
         }
 

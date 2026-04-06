@@ -196,9 +196,9 @@ namespace Services
             else
             {
                 var semester = await _semesterRepo.GetCurrentSemesterAsync();
-                if (semester != null)
+                if (semester != null && thesis.UserId.HasValue)
                 {
-                    var ownerTeam = await _teamRepo.GetTeamByStudentIdAsync(thesis.UserId, semester.SemesterId);
+                    var ownerTeam = await _teamRepo.GetTeamByStudentIdAsync(thesis.UserId.Value, semester.SemesterId);
                     if (ownerTeam != null && (ownerTeam.MentorId == userId || ownerTeam.MentorId2 == userId))
                     {
                         isAuthorized = true;
@@ -257,9 +257,9 @@ namespace Services
             else
             {
                 var authSemester = await _semesterRepo.GetCurrentSemesterAsync();
-                if (authSemester != null)
+                if (authSemester != null && app.Thesis.UserId.HasValue)
                 {
-                    var ownerTeam = await _teamRepo.GetTeamByStudentIdAsync(app.Thesis.UserId, authSemester.SemesterId);
+                    var ownerTeam = await _teamRepo.GetTeamByStudentIdAsync(app.Thesis.UserId.Value, authSemester.SemesterId);
                     if (ownerTeam != null && (ownerTeam.MentorId == userId || ownerTeam.MentorId2 == userId))
                     {
                         isAuthorized = true;
@@ -337,9 +337,9 @@ namespace Services
             else
             {
                 var semester = await _semesterRepo.GetCurrentSemesterAsync();
-                if (semester != null)
+                if (semester != null && thesis.UserId.HasValue)
                 {
-                    var ownerTeam = await _teamRepo.GetTeamByStudentIdAsync(thesis.UserId, semester.SemesterId);
+                    var ownerTeam = await _teamRepo.GetTeamByStudentIdAsync(thesis.UserId.Value, semester.SemesterId);
                     if (ownerTeam != null && (ownerTeam.MentorId == userId || ownerTeam.MentorId2 == userId))
                     {
                         isAuthorized = true;

@@ -82,10 +82,82 @@ namespace BusinessObjects
 
         public static class Roles
         {
-            public const string HOD = "HOD";
-            public const string Student = "Student";
-            public const string Lecturer = "Lecturer";
             public const string Admin = "Admin";
+            public const string Lecturer = "Lecturer";
+            public const string Student = "Student";
+            public const string HOD = "HOD";
+        }
+
+        public static class SemesterStatus
+        {
+            public const string Open = "Open";
+            public const string InProgress = "In Progress";
+            public const string Closed = "Closed";
+
+            // Backward compatibility
+            [Obsolete("Use Open instead")]
+            public const string Active = "Active";
+            [Obsolete("Use Open instead")]
+            public const string Upcoming = "Upcoming";
+            [Obsolete("Use InProgress instead")]
+            public const string ReviewThesis = "Review Thesis";
+            [Obsolete("Use InProgress instead")]
+            public const string ReviewMiddle = "Review Middle Semester";
+
+            public static bool IsOpenStage(string? status) =>
+                status == Open || status == Active || status == Upcoming;
+
+            public static bool IsLockedStage(string? status) =>
+                status == InProgress || status == ReviewThesis || status == ReviewMiddle;
+
+            public static bool IsClosedStage(string? status) =>
+                status == Closed;
+        }
+
+        public static class ThesisStatus
+        {
+            public const string Draft = "Draft";
+            public const string OnMentorInviting = "On Mentor Inviting";
+            public const string Reviewing = "Reviewing";
+            public const string Registered = "Registered";
+            public const string NeedUpdate = "Need Update";
+            public const string Published = "Published";
+            public const string Rejected = "Rejected";
+        }
+
+        public static class EvaluationChecklistStatus
+        {
+            public const string Draft = "Draft";
+            public const string Submitted = "Submitted";
+        }
+
+        public static class TeamStatus
+        {
+            public const string Pending = "Pending";
+            public const string PendingApproval = "Pending"; // Map both to DB "Pending"
+            public const string Insufficient = "Insufficient";
+            public const string Disbanded = "Disbanded";
+            public const string Active = "Qualified"; // Match DB enum
+        }
+
+        public static class TeamRole
+        {
+            public const string Leader = "Leader";
+            public const string Member = "Member";
+        }
+
+        public static class WhitelistStatus
+        {
+            public const string Qualified = "Qualified";
+            public const string Unqualified = "Unqualified";
+        }
+
+        public static class MajorGroupCode
+        {
+            public const string IT = "IT";
+            public const string Biz = "Biz";
+            public const string Art = "Art";
+            public const string Lan = "Lan";
         }
 
         public static class InvitationStatus
@@ -102,53 +174,11 @@ namespace BusinessObjects
             public const string Mentor = "Mentor";
         }
 
-        public static class SemesterStatus
+        public static class MentorRecommendationStatus
         {
-            /// <summary>Mở — Thực hiện được tất cả hoạt động nhóm và đề tài.</summary>
-            public const string Open = "Open";
-
-            /// <summary>Đang giữa kỳ — Chỉ phục vụ review giữa kỳ. Không tạo nhóm/đề tài.</summary>
-            public const string InProgress = "In Progress";
-
-            /// <summary>Đóng — Chỉ xem, không thao tác gì.</summary>
-            public const string Closed = "Closed";
-
-            // ── Legacy / Backward compatibility aliases (Giữ để không gãy logic cũ) ──
-            [Obsolete("Sử dụng Open thay thế")]
-            public const string Active = "Active";
-            [Obsolete("Sử dụng Open thay thế")]
-            public const string Upcoming = "Upcoming";
-            [Obsolete("Sử dụng InProgress thay thế")]
-            public const string ReviewThesis = "Review Thesis";
-            [Obsolete("Sử dụng InProgress thay thế")]
-            public const string ReviewMiddle = "Review Middle Semester";
-
-            /// <summary>Kiểm tra semester có đang ở giai đoạn Mở không (cho phép mọi hoạt động).</summary>
-            public static bool IsOpenStage(string? status) =>
-                status == Open || status == Active || status == Upcoming;
-
-            /// <summary>Kiểm tra semester đang bị khóa (chỉ review giữa kỳ).</summary>
-            public static bool IsLockedStage(string? status) =>
-                status == InProgress || status == ReviewThesis || status == ReviewMiddle;
-
-            /// <summary>Kiểm tra semester đã đóng (chỉ xem).</summary>
-            public static bool IsClosedStage(string? status) =>
-                status == Closed;
-        }
-
-        public static class TeamStatus
-        {
-            public const string Pending = "Pending"; // Matches DB enum
-            public const string PendingApproval = "Pending"; // Map both to DB "Pending"
-            public const string Insufficient = "Insufficient";
-            public const string Disbanded = "Disbanded";
-            public const string Active = "Qualified"; // Match DB enum "Qualified"
-        }
-
-        public static class TeamRole
-        {
-            public const string Leader = "Leader";
-            public const string Member = "Member";
+            public const string Pending = "Pending";
+            public const string Recommended = "Recommended";
+            public const string Rejected = "Rejected";
         }
 
         public static class WhitelistImportColumns
