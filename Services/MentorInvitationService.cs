@@ -300,24 +300,45 @@ namespace Services
             await _teamRepo.UpdateAsync(team);
             await _invitationRepo.UpdateStatusAsync(invitationId, CampusConstants.InvitationStatus.Accepted);
 
-            // AUTO-TRANSITION Thesis Status
-            // If student proposed a thesis and it's waiting for a mentor, transition to Reviewing
+            // AUTO-TRANSITION Thesis Status & Mentor sync
+            // Sync team mentors to thesis record and handle status migration
             try
             {
-                var thesis = await _thesisRepo.GetThesisForInvitationAsync(team.LeaderId, team.SemesterId);
-                if (thesis != null && thesis.Status == "On Mentor Inviting")
+                // Use the expanded signature to find the correct thesis for this team
+                var thesis = await _thesisRepo.GetThesisForInvitationAsync(team.LeaderId, team.TeamId, team.SemesterId);
+                if (thesis != null)
                 {
-                    thesis.Status = "Reviewing";
+                    // Sync mentors from Team to Thesis record
+                    var mentor1User = team.MentorId.HasValue ? await _userRepo.GetByIdAsync(team.MentorId.Value) : null;
+                    var mentor2User = team.MentorId2.HasValue ? await _userRepo.GetByIdAsync(team.MentorId2.Value) : null;
+
+                    if (mentor1User != null)
+                    {
+                        var lect1 = await _lecturerRepo.GetByEmailAsync(mentor1User.Email);
+                        thesis.MentorId1 = lect1?.LecturerId;
+                    }
+                    if (mentor2User != null)
+                    {
+                        var lect2 = await _lecturerRepo.GetByEmailAsync(mentor2User.Email);
+                        thesis.MentorId2 = lect2?.LecturerId;
+                    }
+
+                    // Handle status transition: Only move to "Reviewing" if currently in the invitation stage.
+                    // If it's already "Registered", "Need Update", or "Reviewing", keep it as is.
+                    if (thesis.Status == "On Mentor Inviting")
+                    {
+                        thesis.Status = "Reviewing";
+                    }
+
                     thesis.UpdateDate = DateTime.UtcNow;
                     await _thesisRepo.UpdateThesisAsync(thesis);
-                    _logger.LogInformation("Thesis {ThesisId} transitioned to 'Reviewing' after mentor {MentorId} accepted invitation for team {TeamId}.", 
-                        thesis.ThesisId, mentorId, team.TeamId);
+                    _logger.LogInformation("Thesis {ThesisId} synced and status handled after mentor {MentorId} accepted invitation.", 
+                        thesis.ThesisId, mentorId);
                 }
             }
             catch (Exception ex)
             {
-                // Non-blocking error
-                _logger.LogError(ex, "Failed to auto-transition thesis status for team {TeamId} after mentor acceptance.", team.TeamId);
+                _logger.LogError(ex, "Failed to sync mentors or transition thesis status for team {TeamId}.", team.TeamId);
             }
 
             // Invalidate cache after accepting
