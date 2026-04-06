@@ -1,0 +1,1 @@
+UPDATE semesters SET Status = 'Closed' WHERE Status = 'Ended';

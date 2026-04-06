@@ -617,7 +617,7 @@ namespace FCTMS.Tests.Services
                 Email = email,
                 Role = new Role { RoleName = "Student" },
             };
-            var currentSemester = new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Active };
+            var currentSemester = new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Open };
             var team = new Team
             {
                 TeamId = 1,
@@ -669,7 +669,7 @@ namespace FCTMS.Tests.Services
                 Email = email,
                 Role = new Role { RoleName = "Lecturer" },
             };
-            var currentSemester = new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Active };
+            var currentSemester = new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Open };
 
             var mockFile = new Mock<IFormFile>();
             mockFile.Setup(f => f.FileName).Returns("thesis.docx");
@@ -874,7 +874,7 @@ namespace FCTMS.Tests.Services
                 IsSpecial = true,
                 Teammembers = new List<Teammember> { new(), new() }, // 2 members
             };
-            var currentSemester = new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Active };
+            var currentSemester = new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Open };
 
             var mockFile = new Mock<IFormFile>();
             mockFile.Setup(f => f.FileName).Returns("thesis.docx");
@@ -930,7 +930,7 @@ namespace FCTMS.Tests.Services
                 LeaderId = userId,
                 Teammembers = new List<Teammember> { new(), new(), new(), new() }, // exactly 4
             };
-            var currentSemester = new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Active };
+            var currentSemester = new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Open };
 
             var mockFile = new Mock<IFormFile>();
             mockFile.Setup(f => f.FileName).Returns("thesis.docx");

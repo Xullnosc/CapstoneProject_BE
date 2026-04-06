@@ -1,4 +1,5 @@
 using System.Linq;
+using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
@@ -17,10 +18,11 @@ namespace DataAccess
         public async Task<Whitelist?> GetByEmailAsync(string email)
         {
             return await _context.Whitelists
+                .AsNoTracking()
                 .Include(w => w.Role)
                 .Include(w => w.Semester)
                 .Where(w => w.Email == email)
-                .OrderByDescending(w => w.Semester != null && w.Semester.Status == "Active")
+                .OrderByDescending(w => w.Semester != null && w.Semester.Status == CampusConstants.SemesterStatus.Open)
                 .ThenByDescending(w => w.SemesterId)
                 .FirstOrDefaultAsync();
         }

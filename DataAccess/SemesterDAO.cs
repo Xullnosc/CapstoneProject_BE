@@ -104,9 +104,10 @@ namespace DataAccess
                 .FirstOrDefaultAsync(s => 
                     s.Status == CampusConstants.SemesterStatus.Open || 
                     s.Status == CampusConstants.SemesterStatus.InProgress ||
-                    s.Status == CampusConstants.SemesterStatus.Active || // Legacy
-                    s.Status == CampusConstants.SemesterStatus.ReviewThesis || // Legacy
-                    s.Status == CampusConstants.SemesterStatus.ReviewMiddle); // Legacy
+                    s.Status == CampusConstants.SemesterStatus.Active || // Legacy Support
+                    s.Status == CampusConstants.SemesterStatus.Upcoming || // Legacy Support
+                    s.Status == CampusConstants.SemesterStatus.ReviewThesis || // Legacy Support
+                    s.Status == CampusConstants.SemesterStatus.ReviewMiddle); // Legacy Support
 
             if (activeSemester != null)
             {
