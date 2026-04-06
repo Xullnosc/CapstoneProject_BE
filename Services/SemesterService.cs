@@ -49,7 +49,7 @@ namespace Services
         public async Task<List<SemesterDTO>> GetAllSemestersAsync()
         {
             var campusId = _campusContextService.GetCurrentCampusId()?.ToString() ?? "global";
-            string cacheKey = $"fctms:semester_v2:all:{campusId}";
+            string cacheKey = $"fctms:semester:all:{campusId}";
             var cached = await _redisService.GetObjectAsync<List<SemesterDTO>>(cacheKey);
             if (cached != null) return cached;
 
@@ -109,7 +109,7 @@ namespace Services
         public async Task<PagedResult<SemesterDTO>> GetAllSemestersPaginatedAsync(int page, int pageSize)
         {
             var campusId = _campusContextService.GetCurrentCampusId()?.ToString() ?? "global";
-            string cacheKey = $"fctms:semester_v2:paged:{campusId}:{page}:{pageSize}";
+            string cacheKey = $"fctms:semester:paged:{campusId}:{page}:{pageSize}";
             var cached = await _redisService.GetObjectAsync<PagedResult<SemesterDTO>>(cacheKey);
             if (cached != null) return cached;
 
@@ -167,7 +167,7 @@ namespace Services
         public async Task<SemesterDTO?> GetSemesterByIdAsync(int id)
         {
             var campusId = _campusContextService.GetCurrentCampusId()?.ToString() ?? "global";
-            string cacheKey = $"fctms:semester_v2:id:{id}:{campusId}";
+            string cacheKey = $"fctms:semester:id:{id}:{campusId}";
             var cached = await _redisService.GetObjectAsync<SemesterDTO>(cacheKey);
             if (cached != null) return cached;
 
@@ -525,7 +525,7 @@ namespace Services
         {
             // Clear all semester-related caches (all campuses)
             // This is safer and ensures no stale data remains after a structural change.
-            await _redisService.RemoveByPrefixAsync("fctms:semester_v2:");
+            await _redisService.RemoveByPrefixAsync("fctms:semester:");
         }
 
         private async Task PopulateWhitelistsAvatarsAndReviewersAsync(List<WhitelistDTO> whitelists)
