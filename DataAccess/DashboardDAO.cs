@@ -401,7 +401,7 @@ namespace DataAccess
         {
             var activeSemester = await _context
                 .Semesters.AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Status == "Active");
+                .FirstOrDefaultAsync(s => s.Status == CampusConstants.SemesterStatus.Open);
 
             if (activeSemester != null)
             {
