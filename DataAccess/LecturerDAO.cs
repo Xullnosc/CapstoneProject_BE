@@ -1,10 +1,10 @@
-using BusinessObjects.Models;
-using BusinessObjects;
-using BusinessObjects.DTOs;
-using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BusinessObjects;
+using BusinessObjects.DTOs;
+using BusinessObjects.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace DataAccess
 {
@@ -48,7 +48,11 @@ namespace DataAccess
             return l;
         }
 
-        public async Task<PagedResult<Lecturer>> GetByCampusAsync(string campus, int pageIndex, int pageSize)
+        public async Task<PagedResult<Lecturer>> GetByCampusAsync(
+            string campus,
+            int pageIndex,
+            int pageSize
+        )
         {
             string? mappedCampus = CampusConstants.MapCodeToFullName(campus)?.Trim();
             if (pageIndex <= 0)
@@ -77,10 +81,7 @@ namespace DataAccess
                 .OrderBy(l => l.FullName);
 
             var totalCountTask = baseQuery.CountAsync();
-            var itemsTask = baseQuery
-                .Skip((pageIndex - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+            var itemsTask = baseQuery.Skip((pageIndex - 1) * pageSize).Take(pageSize).ToListAsync();
 
             await Task.WhenAll(totalCountTask, itemsTask);
 
@@ -92,10 +93,20 @@ namespace DataAccess
 
         public async Task<IEnumerable<Lecturer>> GetActiveLecturersAsync()
         {
-            return await _context.Lecturers
-                .AsNoTracking()
+            return await _context
+                .Lecturers.AsNoTracking()
                 .Where(l => l.IsActive)
                 .OrderBy(l => l.FullName)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Lecturer>> GetReviewersAsync()
+        {
+            return await _context
+                .Lecturers.AsNoTracking()
+                .Where(l => l.IsReviewer && !string.IsNullOrWhiteSpace(l.Email))
+                .OrderBy(l => l.FullName)
+                .ThenBy(l => l.Email)
                 .ToListAsync();
         }
 
@@ -117,15 +128,14 @@ namespace DataAccess
             await _context.SaveChangesAsync();
         }
 
-
         public async Task<IEnumerable<Lecturer>> SearchAsync(string term)
         {
             string normalizedTerm = term?.Trim() ?? string.Empty;
 
             if (string.IsNullOrWhiteSpace(term))
             {
-                return await _context.Lecturers
-                    .AsNoTracking()
+                return await _context
+                    .Lecturers.AsNoTracking()
                     .Where(l => l.IsActive)
                     .OrderBy(l => l.FullName)
                     .Take(20)
@@ -144,10 +154,11 @@ namespace DataAccess
 
         public async Task<IEnumerable<Lecturer>> GetByEmailsAsync(List<string> emails)
         {
-            if (emails == null || !emails.Any()) return new List<Lecturer>();
+            if (emails == null || !emails.Any())
+                return new List<Lecturer>();
             var lowerEmails = emails.Select(e => e.ToLower().Trim()).ToList();
-            return await _context.Lecturers
-                .Where(l => l.Email != null && lowerEmails.Contains(l.Email.ToLower()))
+            return await _context
+                .Lecturers.Where(l => l.Email != null && lowerEmails.Contains(l.Email.ToLower()))
                 .AsNoTracking()
                 .ToListAsync();
         }

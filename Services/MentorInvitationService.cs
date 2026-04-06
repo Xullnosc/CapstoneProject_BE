@@ -124,6 +124,12 @@ namespace Services
             var currentSemester = await _semesterRepo.GetCurrentSemesterAsync();
             if (currentSemester == null) throw new Exception("Current semester not found.");
 
+            // [LIFECYCLE GUARD] Chỉ cho phép mời Mentor khi kỳ học ở trạng thái Open
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Chỉ có thể mời Mentor khi kỳ học đang mở (Open).");
+            }
+
             // Check if thesis is in "On Mentor Inviting" status for the current semester
             var thesis = await _thesisRepo.GetThesisForInvitationAsync(leaderId, currentSemester.SemesterId);
             if (thesis == null)

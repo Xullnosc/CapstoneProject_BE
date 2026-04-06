@@ -348,6 +348,224 @@ namespace FCTMS.Tests.Controllers
             // Assert
             result.Should().BeOfType<BadRequestObjectResult>();
         }
+
+        [Fact]
+        public async Task ProposeThesis_ShouldReturnOk_WhenSuccessful()
+        {
+            // Arrange
+            var dto = new ProposeThesisDTO { Title = "New Thesis" };
+            // ProposeThesisAsync returns Task<Thesis>, not Task<ThesisDTO>
+            var returnedThesis = new Thesis { ThesisId = "t-new", Status = "On Mentor Inviting" };
+            _mockThesisService
+                .Setup(x => x.ProposeThesisAsync(It.IsAny<ProposeThesisDTO>(), "student@fpt.edu.vn"))
+                .ReturnsAsync(returnedThesis);
+
+            // Act
+            var result = await _controller.ProposeThesis(dto);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.Should().NotBeNull();
+        }
+
+        [Fact]
+        public async Task ProposeThesis_ShouldReturnBadRequest_WhenRegistrationClosed()
+        {
+            // Arrange
+            var dto = new ProposeThesisDTO { Title = "Thesis" };
+            _mockThesisService
+                .Setup(x => x.ProposeThesisAsync(It.IsAny<ProposeThesisDTO>(), "student@fpt.edu.vn"))
+                .ThrowsAsync(new InvalidOperationException("Thesis registration is closed."));
+
+            // Act
+            var result = await _controller.ProposeThesis(dto);
+
+            // Assert
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task ProposeThesis_ShouldReturnForbidden_WhenNotTeamLeader()
+        {
+            // Arrange
+            var dto = new ProposeThesisDTO { Title = "Thesis" };
+            _mockThesisService
+                .Setup(x => x.ProposeThesisAsync(It.IsAny<ProposeThesisDTO>(), "student@fpt.edu.vn"))
+                .ThrowsAsync(new UnauthorizedAccessException("Only the team leader can propose."));
+
+            // Act
+            var result = await _controller.ProposeThesis(dto);
+
+            // Assert
+            var statusResult = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            statusResult.Value!.ToString().Should().Contain("Only the team leader can propose");
+        }
+
+        [Fact]
+        public async Task CancelThesis_ShouldReturnOk_WhenSuccessful()
+        {
+            // Arrange
+            string thesisId = "t-cancel";
+            var returnedDto = new ThesisDTO { ThesisId = thesisId, Status = "Cancelled" };
+            _mockThesisService
+                .Setup(x => x.CancelThesisAsync(thesisId, "student@fpt.edu.vn"))
+                .ReturnsAsync(returnedDto);
+
+            // Act
+            var result = await _controller.CancelThesis(thesisId);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.Should().NotBeNull();
+        }
+
+        [Fact]
+        public async Task CancelThesis_ShouldReturnNotFound_WhenThesisMissing()
+        {
+            // Arrange
+            _mockThesisService
+                .Setup(x => x.CancelThesisAsync("missing", "student@fpt.edu.vn"))
+                .ThrowsAsync(new KeyNotFoundException("Thesis not found."));
+
+            // Act
+            var result = await _controller.CancelThesis("missing");
+
+            // Assert
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
+
+        [Fact]
+        public async Task CancelThesis_ShouldReturnForbidden_WhenNotOwner()
+        {
+            // Arrange
+            _mockThesisService
+                .Setup(x => x.CancelThesisAsync("t-1", "student@fpt.edu.vn"))
+                .ThrowsAsync(new UnauthorizedAccessException("You are not authorized."));
+
+            // Act
+            var result = await _controller.CancelThesis("t-1");
+
+            // Assert
+            var objResult = result.Should().BeOfType<ObjectResult>().Subject;
+            objResult.StatusCode.Should().Be(403);
+        }
+
+        [Fact]
+        public async Task CancelThesis_ShouldReturnBadRequest_WhenInvalidOperation()
+        {
+            // Arrange
+            _mockThesisService
+                .Setup(x => x.CancelThesisAsync("t-pub", "student@fpt.edu.vn"))
+                .ThrowsAsync(new InvalidOperationException("Cannot cancel a Published thesis."));
+
+            // Act
+            var result = await _controller.CancelThesis("t-pub");
+
+            // Assert
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task GetAllTheses_ShouldReturnOk_WithEmptyList()
+        {
+            // Arrange
+            _mockThesisService
+                .Setup(x => x.GetFilteredThesesAsync(
+                    null, null, null, null, null, false, It.IsAny<int?>(), It.IsAny<string?>()))
+                .ReturnsAsync(new List<ThesisDTO>());
+
+            // Act
+            var result = await _controller.GetAllTheses(null, null, null, null, null, false);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            var data = okResult.Value.Should().BeAssignableTo<IEnumerable<ThesisDTO>>().Subject;
+            data.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetMyTheses_ShouldReturnOk_WithEmptyList_WhenNoTheses()
+        {
+            // Arrange
+            _mockThesisService
+                .Setup(x => x.GetMyThesesAsync("student@fpt.edu.vn", null, null))
+                .ReturnsAsync(new List<ThesisDTO>());
+
+            // Act
+            var result = await _controller.GetMyTheses(null, null);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            var data = okResult.Value.Should().BeAssignableTo<IEnumerable<ThesisDTO>>().Subject;
+            data.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task UpdateThesis_ShouldReturnBadRequest_WhenInvalidOperation()
+        {
+            // Arrange
+            var req = new UpdateThesisDTO { Title = "Updated" };
+            _mockThesisService
+                .Setup(x => x.UpdateThesisAsync("t-x", req, "student@fpt.edu.vn"))
+                .ThrowsAsync(new InvalidOperationException("Thesis cannot be updated in current state."));
+
+            // Act
+            var result = await _controller.UpdateThesis("t-x", req);
+
+            // Assert
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task UpdateThesis_ShouldReturnNotFound_WhenThesisMissing()
+        {
+            // Arrange
+            var req = new UpdateThesisDTO { Title = "X" };
+            _mockThesisService
+                .Setup(x => x.UpdateThesisAsync("missing-t", req, "student@fpt.edu.vn"))
+                .ThrowsAsync(new KeyNotFoundException("Thesis not found."));
+
+            // Act
+            var result = await _controller.UpdateThesis("missing-t", req);
+
+            // Assert
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
+
+        [Fact]
+        public async Task GetReviewStatus_ShouldReturnOk_WhenThesisExists()
+        {
+            // Arrange
+            string thesisId = "t-review";
+            var status = new ThesisReviewStatusDTO
+            {
+                OverallStatus = "Pass",
+                Reviewers = new List<ReviewerProgressDTO>()
+            };
+            _mockThesisService.Setup(x => x.GetReviewStatusAsync(thesisId)).ReturnsAsync(status);
+
+            // Act
+            var result = await _controller.GetReviewStatus(thesisId);
+
+            // Assert
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.Should().Be(status);
+        }
+
+        [Fact]
+        public async Task GetReviewStatus_ShouldReturnNotFound_WhenThesisMissing()
+        {
+            // Arrange
+            _mockThesisService
+                .Setup(x => x.GetReviewStatusAsync("no-t"))
+                .ThrowsAsync(new KeyNotFoundException("Thesis not found."));
+
+            // Act
+            var result = await _controller.GetReviewStatus("no-t");
+
+            // Assert
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
     }
 }
 

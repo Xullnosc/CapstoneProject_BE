@@ -11,6 +11,8 @@ namespace Services
             string uploaderEmail,
             List<WhitelistRowOverrideDTO>? rowOverrides = null);
 
-        Task SaveWhitelistBatchAsync(ImportResult<WhitelistImportDTO> importResult, int semesterId, string fileUrl, string uploaderEmail);
+        Task SaveWhitelistBatchAsync(ImportResult<WhitelistImportDTO> importResult, int semesterId, string fileUrl, string originalFileName, string uploaderEmail);
+
+        Task<List<ImportBatchDTO>> GetImportBatchesBySemesterAsync(int semesterId);
     }
 }

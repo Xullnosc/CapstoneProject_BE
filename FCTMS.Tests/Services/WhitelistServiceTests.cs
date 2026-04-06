@@ -32,80 +32,174 @@ namespace FCTMS.Tests.Services
             _mockRedisService.Setup(x => x.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
             _mockRedisService.Setup(x => x.RemoveByPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
             _whitelistService = new WhitelistService(
-                _mockWhitelistRepository.Object, 
+                _mockWhitelistRepository.Object,
                 _mockSemesterRepository.Object,
-                _mockRedisService.Object, 
+                _mockRedisService.Object,
                 _mockLecturerRepository.Object,
                 _mockUserRepository.Object,
                 _mockCredentialRepository.Object);
         }
-
-/*
         [Fact]
-        public async Task UpdateReviewerStatusAsync_ShouldAssignReviewer_WhenValid()
+        public async Task GetWhitelistByRoleAsync_ShouldReturnEntries_WhenRoleHasStudents()
         {
-            // Arrange
-            int whitelistId = 1;
-            var whitelistEntry = new Whitelist
+            // Arrange â€” role 2 = Student
+            int roleId = 2;
+            var entries = new List<Whitelist>
             {
-                WhitelistId = whitelistId,
-                Email = "test@example.com",
-                // IsReviewer = false // Property removed
+                new Whitelist { WhitelistId = 1, Email = "s1@fpt.edu.vn", RoleId = roleId },
+                new Whitelist { WhitelistId = 2, Email = "s2@fpt.edu.vn", RoleId = roleId }
             };
-
-            _mockWhitelistRepository.Setup(x => x.GetByIdAsync(whitelistId))
-                .ReturnsAsync(whitelistEntry);
+            _mockWhitelistRepository.Setup(x => x.GetByRoleAsync(roleId)).ReturnsAsync(entries);
 
             // Act
-            await _whitelistService.UpdateReviewerStatusAsync(whitelistId, true);
+            var result = await _whitelistService.GetWhitelistByRoleAsync(roleId);
 
             // Assert
-            // whitelistEntry.IsReviewer.Should().BeTrue(); // Property removed
-            _mockWhitelistRepository.Verify(x => x.UpdateAsync(whitelistEntry), Times.Once);
+            result.Should().HaveCount(2);
+            result.Should().OnlyContain(e => e.RoleId == roleId);
         }
 
         [Fact]
-        public async Task UpdateReviewerStatusAsync_ShouldUnassignReviewer_WhenValid()
+        public async Task GetWhitelistByRoleAsync_ShouldReturnEmpty_WhenNoStudentsForRole()
         {
-            // Arrange
-            int whitelistId = 1;
-            var whitelistEntry = new Whitelist
-            {
-                WhitelistId = whitelistId,
-                Email = "test@example.com",
-                // IsReviewer = true // Property removed
-            };
-
-            _mockWhitelistRepository.Setup(x => x.GetByIdAsync(whitelistId))
-                .ReturnsAsync(whitelistEntry);
+            // Arrange â€” role 99 has no students
+            _mockWhitelistRepository.Setup(x => x.GetByRoleAsync(99))
+                .ReturnsAsync(new List<Whitelist>());
 
             // Act
-            await _whitelistService.UpdateReviewerStatusAsync(whitelistId, false);
+            var result = await _whitelistService.GetWhitelistByRoleAsync(99);
 
             // Assert
-            // whitelistEntry.IsReviewer.Should().BeFalse(); // Property removed
-            _mockWhitelistRepository.Verify(x => x.UpdateAsync(whitelistEntry), Times.Once);
+            result.Should().BeEmpty();
         }
-*/
 
-/*
         [Fact]
-        public async Task UpdateReviewerStatusAsync_ShouldThrow_WhenWhitelistNotFound()
+        public async Task AddStudentToWhitelistAsync_ShouldReturnCreated_WhenValidEntry()
         {
             // Arrange
-            int whitelistId = 99;
-            _mockWhitelistRepository.Setup(x => x.GetByIdAsync(whitelistId))
-                .ReturnsAsync((Whitelist?)null);
+            var entry = new Whitelist { WhitelistId = 0, Email = "newstudent@fpt.edu.vn", RoleId = 2, SemesterId = 1 };
+            _mockSemesterRepository.Setup(x => x.GetSemesterByIdAsync(1)).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockWhitelistRepository.Setup(x => x.GetByEmailAsync(entry.Email)).ReturnsAsync((Whitelist?)null);
+            _mockWhitelistRepository.Setup(x => x.AddAsync(entry)).Returns(Task.CompletedTask);
 
             // Act
-            Func<Task> act = async () => await _whitelistService.UpdateReviewerStatusAsync(whitelistId, true);
+            var result = await _whitelistService.AddStudentToWhitelistAsync(entry);
 
             // Assert
-            await act.Should().ThrowAsync<KeyNotFoundException>()
-                .WithMessage($"Whitelist entry with ID {whitelistId} not found.");
-            
-            _mockWhitelistRepository.Verify(x => x.UpdateAsync(It.IsAny<Whitelist>()), Times.Never);
+            result.Should().NotBeNull();
+            _mockWhitelistRepository.Verify(x => x.AddAsync(entry), Times.Once);
         }
-*/
+
+        [Fact]
+        public async Task AddStudentToWhitelistAsync_EmailShouldBePreserved()
+        {
+            // Arrange
+            var entry = new Whitelist { Email = "lecturer@fpt.edu.vn", RoleId = 3, SemesterId = 1 };
+            _mockSemesterRepository.Setup(x => x.GetSemesterByIdAsync(1)).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockWhitelistRepository.Setup(x => x.GetByEmailAsync(entry.Email)).ReturnsAsync((Whitelist?)null);
+            _mockWhitelistRepository.Setup(x => x.AddAsync(It.IsAny<Whitelist>())).Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _whitelistService.AddStudentToWhitelistAsync(entry);
+
+            // Assert
+            result.Email.Should().Be("lecturer@fpt.edu.vn");
+        }
+
+        [Fact]
+        public async Task UpdateWhitelistAsync_ShouldCallRepository_WhenValidEntry()
+        {
+            // Arrange
+            var entry = new Whitelist { WhitelistId = 3, Email = "updated@fpt.edu.vn", RoleId = 2, SemesterId = 1 };
+            _mockWhitelistRepository.Setup(x => x.GetByIdAsync(3)).ReturnsAsync(entry);
+            _mockSemesterRepository.Setup(x => x.GetSemesterByIdAsync(1)).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockWhitelistRepository.Setup(x => x.UpdateAsync(entry)).Returns(Task.CompletedTask);
+
+            // Act
+            await _whitelistService.UpdateWhitelistAsync(entry);
+
+            // Assert
+            _mockWhitelistRepository.Verify(x => x.UpdateAsync(entry), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateWhitelistAsync_ShouldThrow_WhenRepositoryThrows()
+        {
+            // Arrange
+            var entry = new Whitelist { WhitelistId = 999, SemesterId = 1 };
+            _mockWhitelistRepository.Setup(x => x.GetByIdAsync(999)).ReturnsAsync(entry);
+            _mockSemesterRepository.Setup(x => x.GetSemesterByIdAsync(1)).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockWhitelistRepository.Setup(x => x.UpdateAsync(entry))
+                .ThrowsAsync(new KeyNotFoundException("Whitelist not found"));
+
+            // Act
+            Func<Task> act = async () => await _whitelistService.UpdateWhitelistAsync(entry);
+
+            // Assert
+            await act.Should().ThrowAsync<KeyNotFoundException>();
+        }
+
+        [Fact]
+        public async Task DeleteWhitelistAsync_ShouldCallRepository_WhenValidId()
+        {
+            // Arrange
+            int id = 7;
+            var entity = new Whitelist { WhitelistId = id };
+            _mockWhitelistRepository.Setup(x => x.GetByIdAsync(id)).ReturnsAsync(entity);
+            _mockWhitelistRepository.Setup(x => x.DeleteAsync(entity)).Returns(Task.CompletedTask);
+
+            // Act
+            await _whitelistService.DeleteWhitelistAsync(id);
+
+            // Assert
+            _mockWhitelistRepository.Verify(x => x.DeleteAsync(entity), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeleteWhitelistAsync_ShouldNotThrow_WhenEntryNotFound()
+        {
+            // Arrange
+            _mockWhitelistRepository.Setup(x => x.GetByIdAsync(404)).ReturnsAsync((Whitelist?)null);
+
+            // Act
+            Func<Task> act = async () => await _whitelistService.DeleteWhitelistAsync(404);
+
+            // Assert
+            await act.Should().NotThrowAsync();
+        }
+
+        [Fact]
+        public async Task DeleteWhitelistAsync_ShouldNotThrow_WhenSuccessful()
+        {
+            // Arrange
+            int id = 1;
+            var entity = new Whitelist { WhitelistId = id };
+            _mockWhitelistRepository.Setup(x => x.GetByIdAsync(id)).ReturnsAsync(entity);
+            _mockWhitelistRepository.Setup(x => x.DeleteAsync(entity)).Returns(Task.CompletedTask);
+
+            // Act
+            Func<Task> act = async () => await _whitelistService.DeleteWhitelistAsync(id);
+
+            // Assert
+            await act.Should().NotThrowAsync();
+        }
+
+        [Theory]
+        [InlineData(1)]
+        [InlineData(2)]
+        [InlineData(3)]
+        public async Task GetWhitelistByRoleAsync_DifferentRoles_CallsRepositoryOnce(int roleId)
+        {
+            // Arrange
+            _mockWhitelistRepository.Setup(x => x.GetByRoleAsync(roleId))
+                .ReturnsAsync(new List<Whitelist>());
+
+            // Act
+            await _whitelistService.GetWhitelistByRoleAsync(roleId);
+
+            // Assert
+            _mockWhitelistRepository.Verify(x => x.GetByRoleAsync(roleId), Times.Once);
+        }
     }
 }
+

@@ -121,7 +121,11 @@ namespace Services.Mappings
                 .ForMember(
                     dest => dest.MemberCount,
                     opt => opt.MapFrom(src => src.Teammembers != null ? src.Teammembers.Count : 0)
-                );
+                )
+                .ForMember(dest => dest.TeamAvatar, opt => opt.MapFrom(src => src.TeamAvatar))
+                .ForMember(dest => dest.LeaderAvatar, opt => opt.MapFrom(src => src.Leader != null ? src.Leader.Avatar : null))
+                .ForMember(dest => dest.LeaderEmail, opt => opt.MapFrom(src => src.Leader != null ? src.Leader.Email : null))
+                .ForMember(dest => dest.LeaderName, opt => opt.MapFrom(src => src.Leader != null ? src.Leader.FullName : null));
 
             // Semester -> SemesterDTO
             CreateMap<Semester, SemesterDTO>()

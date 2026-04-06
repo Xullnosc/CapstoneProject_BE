@@ -147,6 +147,32 @@ namespace DataAccess
             return await query.OrderByDescending(t => t.UpdateDate).ToListAsync();
         }
 
+        public async Task<IEnumerable<Thesis>> GetThesesForEvaluationExportAsync()
+        {
+            // Semester filtering is done in-memory by the service using the loaded Team navigation.
+            return await _context.Theses
+                .AsNoTracking()
+                .IgnoreQueryFilters()
+                .Include(t => t.Team)
+                    .ThenInclude(team => team.Teammembers)
+                        .ThenInclude(teamMember => teamMember.Student)
+                            .ThenInclude(student => student.AccountDetail)
+                .Include(t => t.Mentor1)
+                .Include(t => t.Mentor2)
+                .Include(t => t.ThesisReviewEvents.Where(e => !e.IsDeleted))
+                    .ThenInclude(e => e.ActorUser)
+                .Include(t => t.ThesisReviewEvents.Where(e => !e.IsDeleted))
+                    .ThenInclude(e => e.Comments.Where(c => !c.IsDeleted))
+                        .ThenInclude(c => c.AuthorUser)
+                .Include(t => t.ThesisReviewEvents.Where(e => !e.IsDeleted))
+                    .ThenInclude(e => e.ChecklistResults)
+                        .ThenInclude(cr => cr.Checklist)
+                .OrderBy(t => t.Team == null ? 1 : 0)
+                .ThenBy(t => t.Team!.TeamCode)
+                .ThenBy(t => t.ThesisId)
+                .ToListAsync();
+        }
+
         public async Task<Thesis?> GetThesisByIdWithHistoriesAsync(string id)
         {
             if (string.IsNullOrEmpty(id))

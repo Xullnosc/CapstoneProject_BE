@@ -426,5 +426,20 @@ namespace DataAccess
         {
             return value?.Trim().ToLowerInvariant() ?? string.Empty;
         }
+
+        public async Task AddImportBatchAsync(ImportBatch batch)
+        {
+            _context.ImportBatches.Add(batch);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<List<ImportBatch>> GetImportBatchesBySemesterAsync(int semesterId)
+        {
+            return await _context.ImportBatches
+                .AsNoTracking()
+                .Where(b => b.AffectedSemesterId == semesterId)
+                .OrderByDescending(b => b.UploadedAt)
+                .ToListAsync();
+        }
     }
 }

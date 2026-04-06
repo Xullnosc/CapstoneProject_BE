@@ -110,7 +110,7 @@ namespace FCTMS.Tests.Services
                 Errors = new List<ImportError>()
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
             context.Whitelists.Should().ContainSingle();
             context.Users.Should().ContainSingle(user => user.Email == "student@example.com" && user.RoleId == 3 && user.CampusId == 1);
@@ -132,7 +132,7 @@ namespace FCTMS.Tests.Services
                 Errors = new List<ImportError>()
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
             _mockRedisService.Verify(x => x.RemoveByPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         }
@@ -174,7 +174,7 @@ namespace FCTMS.Tests.Services
                 Errors = new List<ImportError>()
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
             context.Whitelists.Should().BeEmpty();
             context.Users.Count(user => user.Email == "lecturer@example.com").Should().Be(1);
@@ -225,7 +225,7 @@ namespace FCTMS.Tests.Services
                 }
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
             context.Users.Should().ContainSingle(user => user.Email == "student@example.com" && user.StudentCode == "NEW001" && user.FullName == "Updated Name");
             context.Whitelists.Should().ContainSingle(whitelist => whitelist.Email == "student@example.com" && whitelist.StudentCode == "NEW001");
@@ -299,7 +299,7 @@ namespace FCTMS.Tests.Services
                 }
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
             context.Users.Should().ContainSingle(user => user.Email == "keep@example.com");
             context.Whitelists.Should().ContainSingle(whitelist => whitelist.Email == "keep@example.com");
@@ -337,7 +337,7 @@ namespace FCTMS.Tests.Services
                 Errors = new List<ImportError>()
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
             context.Whitelists.Should().ContainSingle(w => w.Email == "duplicate@example.com");
             context.Users.Should().ContainSingle(u => u.Email == "duplicate@example.com");
@@ -394,7 +394,7 @@ namespace FCTMS.Tests.Services
                 Errors = new List<ImportError>()
             };
 
-            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
             context.Whitelists.Count(w => w.Email == "student@example.com").Should().Be(1);
             context.Whitelists.Single(w => w.Email == "student@example.com").SemesterId.Should().Be(1);
@@ -430,7 +430,7 @@ namespace FCTMS.Tests.Services
             };
 
             // Act
-            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "hod@example.com");
+            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
             // Assert - verify logging occurred at start and end
             _mockLogger.Verify(
@@ -613,6 +613,147 @@ namespace FCTMS.Tests.Services
             result.Items.Single().FullName.Should().Be("Student One");
             result.Errors.Should().NotContain(e => e.Message.Contains("Missing required column", StringComparison.OrdinalIgnoreCase));
         }
+
+        #endregion
+
+        #region GetImportBatchesBySemesterAsync
+
+        [Fact]
+        public async Task GetImportBatchesBySemesterAsync_ReturnsBatches()
+        {
+            using var context = CreateContext();
+            var service = CreateService(context);
+
+            context.ImportBatches.AddRange(
+                new ImportBatch { ImportBatchId = 1, FileUrl = "url1", AffectedSemesterId = 1, UploadedAt = DateTime.UtcNow, Version = 1 },
+                new ImportBatch { ImportBatchId = 2, FileUrl = "url2", AffectedSemesterId = 1, UploadedAt = DateTime.UtcNow.AddMinutes(5), Version = 1 },
+                new ImportBatch { ImportBatchId = 3, FileUrl = "url3", AffectedSemesterId = 2, UploadedAt = DateTime.UtcNow, Version = 1 }
+            );
+            context.SaveChanges();
+
+            var result = await service.GetImportBatchesBySemesterAsync(1);
+
+            result.Should().HaveCount(2);
+            result.Select(r => r.FileUrl).Should().Contain(new[] { "url1", "url2" });
+            result.Should().NotContain(r => r.FileUrl == "url3");
+        }
+
+        [Fact]
+        public async Task GetImportBatchesBySemesterAsync_NoBatches_ReturnsEmpty()
+        {
+            using var context = CreateContext();
+            var service = CreateService(context);
+
+            var result = await service.GetImportBatchesBySemesterAsync(999);
+
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetImportBatchesBySemesterAsync_Ordering_ReturnsDescendingByUploadedAt()
+        {
+            using var context = CreateContext();
+            var service = CreateService(context);
+
+            context.ImportBatches.AddRange(
+                new ImportBatch { ImportBatchId = 1, FileUrl = "url1", AffectedSemesterId = 1, UploadedAt = DateTime.UtcNow, Version = 1 },
+                new ImportBatch { ImportBatchId = 2, FileUrl = "url2", AffectedSemesterId = 1, UploadedAt = DateTime.UtcNow.AddMinutes(5), Version = 2 },
+                new ImportBatch { ImportBatchId = 3, FileUrl = "url3", AffectedSemesterId = 1, UploadedAt = DateTime.UtcNow.AddMinutes(10), Version = 3 }
+            );
+            context.SaveChanges();
+
+            var result = await service.GetImportBatchesBySemesterAsync(1);
+
+            result.Should().HaveCount(3);
+            result.First().FileUrl.Should().Be("url3"); // Newest
+            result.Last().FileUrl.Should().Be("url1"); // Oldest
+        }
+
+        [Fact]
+        public async Task SaveWhitelistBatchAsync_NullImportResult_ThrowsArgumentNullException()
+        {
+            using var context = CreateContext();
+            var service = CreateService(context);
+
+            await Assert.ThrowsAsync<ArgumentNullException>(() => 
+                service.SaveWhitelistBatchAsync(null!, 1, "urllink", "test.xlsx", "user@example.com"));
+        }
+
+        [Fact]
+        public async Task SaveWhitelistBatchAsync_EmptyFileUrl_ThrowsArgumentException()
+        {
+            using var context = CreateContext();
+            var service = CreateService(context);
+            var importResult = new ImportResult<WhitelistImportDTO> { Items = new List<WhitelistImportDTO>(), Errors = new List<ImportError>() };
+
+            await Assert.ThrowsAsync<ArgumentException>(() => 
+                service.SaveWhitelistBatchAsync(importResult, 1, "", "test.xlsx", "user@example.com"));
+        }
+
+        [Fact]
+        public async Task SaveWhitelistBatchAsync_NullOriginalFileName_ThrowsArgumentException()
+        {
+            using var context = CreateContext();
+            var service = CreateService(context);
+            var importResult = new ImportResult<WhitelistImportDTO> { Items = new List<WhitelistImportDTO>(), Errors = new List<ImportError>() };
+
+            await Assert.ThrowsAsync<ArgumentException>(() => 
+                service.SaveWhitelistBatchAsync(importResult, 1, "url", null!, "user@example.com"));
+        }
+
+        [Fact]
+        public async Task SaveWhitelistBatchAsync_MissingUploaderEmail_ThrowsArgumentException()
+        {
+            using var context = CreateContext();
+            var service = CreateService(context);
+            var importResult = new ImportResult<WhitelistImportDTO> { Items = new List<WhitelistImportDTO>(), Errors = new List<ImportError>() };
+
+            await Assert.ThrowsAsync<ArgumentException>(() => 
+                service.SaveWhitelistBatchAsync(importResult, 1, "url", "file.xlsx", " "));
+        }
+
+
+
+        [Fact]
+        public async Task SaveWhitelistBatchAsync_NoItems_DoesNotCreateBatch()
+        {
+            using var context = CreateContext();
+            var service = CreateService(context);
+            var importResult = new ImportResult<WhitelistImportDTO> { Items = new List<WhitelistImportDTO>(), Errors = new List<ImportError>() };
+
+            await service.SaveWhitelistBatchAsync(importResult, 1, "url", "file.xlsx", "user@example.com");
+
+            context.ImportBatches.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task GetImportBatchesBySemesterAsync_Mapping_AllPropertiesMapped()
+        {
+            using var context = CreateContext();
+            var service = CreateService(context);
+            var now = DateTime.UtcNow;
+
+            context.ImportBatches.Add(new ImportBatch 
+            { 
+                ImportBatchId = 10, 
+                FileUrl = "url", 
+                OriginalFileName = "name.xlsx", 
+                AffectedSemesterId = 1, 
+                UploadedAt = now, 
+                Version = 2 
+            });
+            context.SaveChanges();
+
+            var results = await service.GetImportBatchesBySemesterAsync(1);
+            var res = results.First();
+
+            res.ImportBatchId.Should().Be(10);
+            res.FileUrl.Should().Be("url");
+            res.OriginalFileName.Should().Be("name.xlsx");
+            res.UploadedAt.Should().BeCloseTo(now, TimeSpan.FromSeconds(1));
+        }
+
+
 
         #endregion
     }
