@@ -109,7 +109,7 @@ namespace Services.Mappings
                 .ForMember(dest => dest.Avatar, opt => opt.MapFrom(src => src.Avatar))
                 .ForMember(
                     dest => dest.Campus,
-                    opt => opt.MapFrom(src => CampusConstants.MapCodeToFullName(src.Campus))
+                    opt => opt.MapFrom(src => src.CampusNavigation != null ? src.CampusNavigation.CampusName : null)
                 )
                 .ForMember(dest => dest.StudentCode, opt => opt.MapFrom(src => src.StudentCode))
                 .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
@@ -169,6 +169,10 @@ namespace Services.Mappings
                     dest => dest.MentorEmail2,
                     opt => opt.MapFrom(src => src.Mentor2 != null ? src.Mentor2.Email : null)
                 )
+                .ForMember(dest => dest.MentorId1, opt => opt.MapFrom(src => src.MentorId1))
+                .ForMember(dest => dest.MentorId2, opt => opt.MapFrom(src => src.MentorId2))
+                .ForMember(dest => dest.TeamMentorId1, opt => opt.MapFrom(src => src.Team != null ? src.Team.MentorId : null))
+                .ForMember(dest => dest.TeamMentorId2, opt => opt.MapFrom(src => src.Team != null ? src.Team.MentorId2 : null))
                 .ForMember(dest => dest.Histories, opt => opt.MapFrom(src => src.ThesisHistories));
 
             // ThesisHistory → ThesisHistoryDTO

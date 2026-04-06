@@ -20,7 +20,7 @@ namespace Repositories
         Task<Semester?> IsOverlapAsync(DateTime start, DateTime end, int? excludeId);
         Task<bool> HasActiveSemesterAsync();
         Task<bool> SemesterExistsAsync(int semesterId);
-        Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize);
+        Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize, string? search = null);
     }
 }
 

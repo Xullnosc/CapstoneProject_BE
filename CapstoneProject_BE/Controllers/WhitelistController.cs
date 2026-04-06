@@ -49,7 +49,6 @@ namespace CapstoneProject_BE.Controllers
                 FullName = request.FullName,
                 RoleId = request.RoleId,
                 Avatar = request.Avatar,
-                Campus = request.Campus,
                 CampusId = request.CampusId ?? 0,
                 SemesterId = request.SemesterId
             };
@@ -69,7 +68,6 @@ namespace CapstoneProject_BE.Controllers
                 FullName = request.FullName,
                 RoleId = request.RoleId,
                 Avatar = request.Avatar,
-                Campus = request.Campus,
                 CampusId = request.CampusId ?? 0,
                 SemesterId = request.SemesterId
             };

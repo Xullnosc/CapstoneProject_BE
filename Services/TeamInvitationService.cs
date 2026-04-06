@@ -166,7 +166,7 @@ namespace Services
                     Avatar = whitelistEntry.Avatar ?? "",
                     RoleId = whitelistEntry.RoleId,
                     StudentCode = whitelistEntry.StudentCode,
-                    Campus = whitelistEntry.Campus,
+                    CampusId = whitelistEntry.CampusId,
                     IsAuthorized = true, // Ensure they can login later
                     CreatedAt = DateTime.UtcNow
                 };

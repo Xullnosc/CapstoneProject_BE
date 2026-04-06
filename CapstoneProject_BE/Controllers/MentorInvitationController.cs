@@ -73,7 +73,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet("my-invitations")]
-        [Authorize(Roles = "Lecturer")]
+        [Authorize(Roles = "Lecturer,HOD")]
         public async Task<IActionResult> GetMyInvitations([FromQuery] int pageIndex = 1, [FromQuery] int pageSize = 10)
         {
             try
@@ -110,7 +110,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpPost("{id}/accept")]
-        [Authorize(Roles = "Lecturer")]
+        [Authorize(Roles = "Lecturer,HOD")]
         public async Task<IActionResult> AcceptInvitation(int id)
         {
             try
@@ -131,7 +131,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpPost("{id}/decline")]
-        [Authorize(Roles = "Lecturer")]
+        [Authorize(Roles = "Lecturer,HOD")]
         public async Task<IActionResult> DeclineInvitation(int id)
         {
             try
@@ -152,7 +152,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet("active-team-count")]
-        [Authorize(Roles = "Lecturer")]
+        [Authorize(Roles = "Lecturer,HOD")]
         public async Task<IActionResult> GetActiveTeamCount()
         {
             try

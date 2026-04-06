@@ -17,7 +17,7 @@ namespace Services
         Task LockAllUpdatesAsync(int id);
         Task CloseSemesterAsync(int id);
         Task<PagedResult<WhitelistDTO>> GetWhitelistsPaginatedAsync(int semesterId, int page, int pageSize, string? role = null, string? search = null);
-        Task<PagedResult<WhitelistDTO>> GetOrphanedStudentsAsync(int semesterId, int page, int pageSize);
+        Task<PagedResult<WhitelistDTO>> GetOrphanedStudentsAsync(int semesterId, int page, int pageSize, string? search = null);
         Task InvalidateSemesterCacheAsync(int? id = null);
     }
 }

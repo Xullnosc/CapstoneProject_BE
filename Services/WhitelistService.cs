@@ -58,7 +58,6 @@ namespace Services
                 {
                     Email = whitelist.Email,
                     FullName = whitelist.FullName ?? "New Lecturer",
-                    Campus = whitelist.Campus ?? "N/A",
                     CampusId = whitelist.CampusId,
                     IsReviewer = true,
                     IsActive = true
@@ -84,7 +83,6 @@ namespace Services
                 existing.RoleId = whitelist.RoleId;
                 existing.Avatar = whitelist.Avatar;
                 existing.CampusId = semester.CampusId;
-                existing.Campus = semester.Campus?.CampusName;
                 existing.SemesterId = semester.SemesterId;
 
                 await _whitelistRepository.UpdateAsync(existing);
@@ -100,7 +98,6 @@ namespace Services
 
             whitelist.Email = whitelist.Email.Trim();
             whitelist.CampusId = semester.CampusId;
-            whitelist.Campus = semester.Campus?.CampusName;
 
             await _whitelistRepository.AddAsync(whitelist);
             await InvalidateCache(whitelist.SemesterId);
@@ -118,7 +115,6 @@ namespace Services
             // Update properties
             existing.Email = whitelist.Email;
             existing.FullName = whitelist.FullName;
-            existing.Campus = semester.Campus?.CampusName;
             existing.CampusId = semester.CampusId;
             existing.StudentCode = whitelist.StudentCode;
             existing.RoleId = whitelist.RoleId;

@@ -481,12 +481,12 @@ namespace Services
             return new PagedResult<WhitelistDTO>(items, total, page, pageSize);
         }
 
-        public async Task<PagedResult<WhitelistDTO>> GetOrphanedStudentsAsync(int semesterId, int page, int pageSize)
+        public async Task<PagedResult<WhitelistDTO>> GetOrphanedStudentsAsync(int semesterId, int page, int pageSize, string? search = null)
         {
             var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
             if (semester == null) throw new KeyNotFoundException($"Semester {semesterId} not found");
 
-            var pagedOrphaned = await _semesterRepository.GetOrphanedStudentsAsync(semesterId, page, pageSize);
+            var pagedOrphaned = await _semesterRepository.GetOrphanedStudentsAsync(semesterId, page, pageSize, search);
             var dtos = _mapper.Map<List<WhitelistDTO>>(pagedOrphaned.Items);
 
             // Populate avatars (same pattern as GetWhitelistsPaginatedAsync)

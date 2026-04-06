@@ -111,7 +111,7 @@ namespace Services
 
             var createdTeam = await _teamRepository.CreateAsync(team);
             await _semesterService.InvalidateSemesterCacheAsync(currentSemester.SemesterId);
-            return MapToDTO(createdTeam);
+            return await MapToDTOAsync(createdTeam);
         }
 
         private async Task<string> GenerateTeamCodeAsync(int semesterId, string semesterCode)
@@ -160,19 +160,28 @@ namespace Services
                 throw new UnauthorizedAccessException("You are not authorized to view this team details.");
             }
 
-            return MapToDTO(team);
+            return await MapToDTOAsync(team);
         }
 
         public async Task<List<TeamDTO>> GetTeamsBySemesterAsync(int semesterId)
         {
             var teams = await _teamRepository.GetBySemesterAsync(semesterId);
-            return teams.Select(MapToDTO).ToList();
+            var dtos = new List<TeamDTO>();
+            foreach (var t in teams)
+            {
+                dtos.Add(await MapToDTOAsync(t));
+            }
+            return dtos;
         }
 
         public async Task<PagedResult<TeamDTO>> GetTeamsBySemesterPagedAsync(int semesterId, int page, int limit)
         {
             var (items, totalCount) = await _teamRepository.GetBySemesterPagedAsync(semesterId, page, limit);
-            var dtos = items.Select(MapToDTO).ToList();
+            var dtos = new List<TeamDTO>();
+            foreach (var t in items)
+            {
+                dtos.Add(await MapToDTOAsync(t));
+            }
             return new PagedResult<TeamDTO>(dtos, totalCount, page, limit);
         }
 
@@ -239,7 +248,7 @@ namespace Services
                  var mentoredTeams = await _teamRepository.GetBySemesterAsync(currentSemester.SemesterId);
                  team = mentoredTeams.FirstOrDefault(t => t.MentorId == studentId || t.MentorId2 == studentId);
              }
-             return team == null ? null : MapToDTO(team);
+             return team == null ? null : await MapToDTOAsync(team);
         }
 
         public async Task<List<TeamDTO>> GetMentorTeamsAsync(int mentorId)
@@ -248,15 +257,21 @@ namespace Services
             if (currentSemester == null) return new List<TeamDTO>();
 
             var allTeams = await _teamRepository.GetBySemesterAsync(currentSemester.SemesterId);
-            return allTeams
-                .Where(t => (t.MentorId == mentorId || t.MentorId2 == mentorId) && t.Status != "Disbanded")
-                .Select(MapToDTO)
+            var mentorTeams = allTeams
+                .Where(t => (t.MentorId == mentorId || t.MentorId2 == mentorId) && t.Status != CampusConstants.TeamStatus.Disbanded)
                 .ToList();
+
+            var dtos = new List<TeamDTO>();
+            foreach (var t in mentorTeams)
+            {
+                dtos.Add(await MapToDTOAsync(t));
+            }
+            return dtos;
         }
 
-        private TeamDTO MapToDTO(Team team)
+        private async Task<TeamDTO> MapToDTOAsync(Team team)
         {
-            return new TeamDTO
+            var dto = new TeamDTO
             {
                 TeamId = team.TeamId,
                 TeamCode = DisplayHelper.FormatTeamCode(team.TeamCode),
@@ -276,8 +291,8 @@ namespace Services
                     StudentCode = tm.Student?.StudentCode ?? "N/A", 
                     FullName = tm.Student?.FullName ?? "Unknown",
                     Email = tm.Student?.Email ?? "N/A",
-                    Avatar = tm.Student?.Avatar,
-                    Role = tm.Role,
+                    Avatar = tm.Student?.Avatar ?? string.Empty,
+                    Role = tm.Role ?? "Member",
                     JoinedAt = tm.JoinedAt ?? DateTime.UtcNow
                 }).ToList() ?? new List<TeamMemberDTO>(),
                 MentorId = team.MentorId,
@@ -289,6 +304,20 @@ namespace Services
                 Mentor2Email = team.Mentor2?.Email ?? string.Empty,
                 Mentor2Avatar = team.Mentor2?.Avatar ?? string.Empty
             };
+
+            // Enrichment from Thesis
+            var theses = await _thesisRepository.GetThesesByTeamIdAsync(team.TeamId);
+            var activeThesis = theses.FirstOrDefault(t => t.Status != "Cancelled" && t.Status != "Rejected");
+            if (activeThesis != null)
+            {
+                dto.TopicId = activeThesis.ThesisId;
+                dto.TopicName = activeThesis.Title;
+                dto.TopicDescription = activeThesis.ShortDescription;
+                dto.TopicStatus = activeThesis.Status;
+                dto.TopicFileUrl = activeThesis.FileUrl;
+            }
+
+            return dto;
         }
 
         public async Task<TeamDTO> UpdateTeamAsync(int teamId, int leaderId, UpdateTeamDTO updateTeamDto)
@@ -319,7 +348,7 @@ namespace Services
             }
 
             await _teamRepository.UpdateAsync(team);
-            return MapToDTO(team);
+            return await MapToDTOAsync(team);
         }
 
         public async Task<bool> ChangeLeaderAsync(int teamId, int currentLeaderId, int newLeaderId)
@@ -517,7 +546,7 @@ namespace Services
 
             var createdTeam = await _teamRepository.CreateAsync(team);
             await _semesterService.InvalidateSemesterCacheAsync(dto.SemesterId);
-            return MapToDTO(createdTeam);
+            return await MapToDTOAsync(createdTeam);
         }
     }
 }

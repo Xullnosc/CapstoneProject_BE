@@ -96,7 +96,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet("my-mentor-teams")]
-        [Authorize(Roles = "Lecturer")]
+        [Authorize(Roles = "Lecturer,HOD")]
         public async Task<IActionResult> GetMyMentorTeams()
         {
             try

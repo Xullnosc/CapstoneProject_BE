@@ -19,21 +19,33 @@ namespace DataAccess
 
         public async Task<IEnumerable<Lecturer>> GetAllAsync()
         {
-            return await _context.Lecturers.AsNoTracking().OrderBy(l => l.FullName).ToListAsync();
+            var list = await _context.Lecturers
+                .Include(l => l.CampusNavigation)
+                .AsNoTracking()
+                .OrderBy(l => l.FullName)
+                .ToListAsync();
+            list.ForEach(l => l.Campus = CampusConstants.MapIdToCode(l.CampusId));
+            return list;
         }
 
         public async Task<Lecturer?> GetByIdAsync(int id)
         {
-            return await _context
-                .Lecturers.AsNoTracking()
+            var l = await _context.Lecturers
+                .Include(l => l.CampusNavigation)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(l => l.LecturerId == id);
+            if (l != null) l.Campus = CampusConstants.MapIdToCode(l.CampusId);
+            return l;
         }
 
         public async Task<Lecturer?> GetByEmailAsync(string email)
         {
-            return await _context
-                .Lecturers.AsNoTracking()
+            var l = await _context.Lecturers
+                .Include(l => l.CampusNavigation)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(l => l.Email == email);
+            if (l != null) l.Campus = CampusConstants.MapIdToCode(l.CampusId);
+            return l;
         }
 
         public async Task<PagedResult<Lecturer>> GetByCampusAsync(
@@ -56,14 +68,16 @@ namespace DataAccess
                 pageSize = 100;
             }
 
-            if (string.IsNullOrWhiteSpace(mappedCampus))
+            int? campusId = CampusConstants.MapToId(campus);
+            if (!campusId.HasValue)
             {
                 return new PagedResult<Lecturer>(new List<Lecturer>(), 0, pageIndex, pageSize);
             }
 
-            var baseQuery = _context
-                .Lecturers.AsNoTracking()
-                .Where(l => l.IsActive && l.Campus == mappedCampus)
+            var baseQuery = _context.Lecturers
+                .Include(l => l.CampusNavigation)
+                .AsNoTracking()
+                .Where(l => l.IsActive && l.CampusId == campusId.Value)
                 .OrderBy(l => l.FullName);
 
             var totalCountTask = baseQuery.CountAsync();
@@ -71,12 +85,10 @@ namespace DataAccess
 
             await Task.WhenAll(totalCountTask, itemsTask);
 
-            return new PagedResult<Lecturer>(
-                itemsTask.Result,
-                totalCountTask.Result,
-                pageIndex,
-                pageSize
-            );
+            var result = itemsTask.Result;
+            result.ForEach(l => l.Campus = CampusConstants.MapIdToCode(l.CampusId));
+
+            return new PagedResult<Lecturer>(result, totalCountTask.Result, pageIndex, pageSize);
         }
 
         public async Task<IEnumerable<Lecturer>> GetActiveLecturersAsync()
@@ -130,17 +142,14 @@ namespace DataAccess
                     .ToListAsync();
             }
 
-            return await _context
-                .Lecturers.AsNoTracking()
-                .Where(l =>
-                    l.IsActive
-                    && (
-                        (l.FullName ?? string.Empty).Contains(normalizedTerm)
-                        || l.Email.Contains(normalizedTerm)
-                    )
-                )
+            var list = await _context.Lecturers
+                .Include(l => l.CampusNavigation)
+                .AsNoTracking()
+                .Where(l => l.IsActive && ((l.FullName ?? string.Empty).Contains(normalizedTerm) || l.Email.Contains(normalizedTerm)))
                 .OrderBy(l => l.FullName)
                 .ToListAsync();
+            list.ForEach(l => l.Campus = CampusConstants.MapIdToCode(l.CampusId));
+            return list;
         }
 
         public async Task<IEnumerable<Lecturer>> GetByEmailsAsync(List<string> emails)

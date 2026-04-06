@@ -83,6 +83,13 @@ namespace CapstoneProject_BE.Controllers
             return NoContent();
         }
 
+        [HttpPut("toggle-reviewer/{id}")]
+        public async Task<IActionResult> ToggleReviewer(int id, [FromBody] bool isReviewer)
+        {
+            await _lecturerService.ToggleReviewerAsync(id, isReviewer);
+            return NoContent();
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

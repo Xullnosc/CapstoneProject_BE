@@ -116,5 +116,19 @@ namespace DataAccess
 
             await _context.SaveChangesAsync();
         }
+
+        public async Task CancelAllPendingByTeamIdExceptAsync(int teamId, int exceptId)
+        {
+            var pendingApps = await _context.ThesisApplications
+                .Where(a => a.TeamId == teamId && a.Status == "Pending" && a.Id != exceptId)
+                .ToListAsync();
+
+            foreach (var app in pendingApps)
+            {
+                app.Status = "Cancelled";
+            }
+
+            await _context.SaveChangesAsync();
+        }
     }
 }

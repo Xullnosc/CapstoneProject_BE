@@ -64,14 +64,13 @@ namespace FCTMS.Tests.Services
             }
         }
 
-        private static void SeedUploader(FctmsContext context, string email = "hod@example.com", string campus = CampusConstants.HoaLac)
+        private static void SeedUploader(FctmsContext context, string email = "hod@example.com", int campusId = 1)
         {
             SeedCampuses(context);
             context.Users.Add(new User
             {
                 Email = email,
-                Campus = campus,
-                CampusId = 1,
+                CampusId = campusId,
                 RoleId = 1,
                 IsAuthorized = true,
                 CreatedAt = DateTime.UtcNow,
@@ -114,10 +113,9 @@ namespace FCTMS.Tests.Services
             await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
             context.Whitelists.Should().ContainSingle();
-            context.Users.Should().ContainSingle(user => user.Email == "student@example.com" && user.RoleId == 3 && user.CampusId == 1 && user.Campus == CampusConstants.HoaLac);
+            context.Users.Should().ContainSingle(user => user.Email == "student@example.com" && user.RoleId == 3 && user.CampusId == 1);
             context.Whitelists.Single().SemesterId.Should().Be(1);
             context.Whitelists.Single().CampusId.Should().Be(1);
-            context.Whitelists.Single().Campus.Should().Be(CampusConstants.HoaLac);
             _mockRedisService.Verify(x => x.RemoveByPrefixAsync("fctms:semester:", It.IsAny<CancellationToken>()), Times.Once);
         }
 
@@ -150,7 +148,7 @@ namespace FCTMS.Tests.Services
                 Email = "lecturer@example.com",
                 FullName = "Existing Lecturer",
                 RoleId = 2,
-                Campus = CampusConstants.HoaLac,
+                CampusId = 1,
                 IsAuthorized = true,
                 CreatedAt = DateTime.UtcNow,
             });
@@ -247,7 +245,7 @@ namespace FCTMS.Tests.Services
                     FullName = "Keep User",
                     StudentCode = "ST001",
                     RoleId = 3,
-                    Campus = CampusConstants.HoaLac,
+                    CampusId = 1,
                     IsAuthorized = true,
                     CreatedAt = DateTime.UtcNow,
                 },
@@ -257,7 +255,7 @@ namespace FCTMS.Tests.Services
                     FullName = "Remove User",
                     StudentCode = "ST002",
                     RoleId = 3,
-                    Campus = CampusConstants.HoaLac,
+                    CampusId = 1,
                     IsAuthorized = true,
                     CreatedAt = DateTime.UtcNow,
                 });
@@ -269,7 +267,7 @@ namespace FCTMS.Tests.Services
                     FullName = "Keep User",
                     StudentCode = "ST001",
                     RoleId = 3,
-                    Campus = CampusConstants.HoaLac,
+                    CampusId = 1,
                     SemesterId = 1,
                     AddedDate = DateTime.UtcNow,
                 },
@@ -279,7 +277,7 @@ namespace FCTMS.Tests.Services
                     FullName = "Remove User",
                     StudentCode = "ST002",
                     RoleId = 3,
-                    Campus = CampusConstants.HoaLac,
+                    CampusId = 1,
                     SemesterId = 1,
                     AddedDate = DateTime.UtcNow,
                 });
@@ -362,7 +360,7 @@ namespace FCTMS.Tests.Services
                 FullName = "Existing Student",
                 StudentCode = "ST001",
                 RoleId = 3,
-                Campus = CampusConstants.HoaLac,
+                CampusId = 1,
                 IsAuthorized = true,
                 CreatedAt = DateTime.UtcNow,
             });
@@ -373,7 +371,7 @@ namespace FCTMS.Tests.Services
                 FullName = "Existing Student",
                 StudentCode = "ST001",
                 RoleId = 3,
-                Campus = CampusConstants.HoaLac,
+                CampusId = 1,
                 SemesterId = 2,
                 AddedDate = DateTime.UtcNow,
             });
@@ -480,7 +478,7 @@ namespace FCTMS.Tests.Services
                 Email = "lecturer@example.com",
                 FullName = "Lecturer Name",
                 RoleId = 2,
-                Campus = CampusConstants.HoaLac,
+                CampusId = 1,
                 IsAuthorized = true,
                 CreatedAt = DateTime.UtcNow,
             });
@@ -514,7 +512,7 @@ namespace FCTMS.Tests.Services
                 Email = "lecturer@example.com",
                 FullName = "Lecturer Name",
                 RoleId = 2,
-                Campus = CampusConstants.HoaLac,
+                CampusId = 1,
                 IsAuthorized = true,
                 CreatedAt = DateTime.UtcNow,
             });
@@ -558,8 +556,8 @@ namespace FCTMS.Tests.Services
 
             // Two existing non-student users.
             context.Users.AddRange(
-                new User { Email = "lecturer1@example.com", FullName = "Lecturer 1", RoleId = 2, Campus = CampusConstants.HoaLac, IsAuthorized = true, CreatedAt = DateTime.UtcNow },
-                new User { Email = "lecturer2@example.com", FullName = "Lecturer 2", RoleId = 2, Campus = CampusConstants.HoaLac, IsAuthorized = true, CreatedAt = DateTime.UtcNow }
+                new User { Email = "lecturer1@example.com", FullName = "Lecturer 1", RoleId = 2, CampusId = 1, IsAuthorized = true, CreatedAt = DateTime.UtcNow },
+                new User { Email = "lecturer2@example.com", FullName = "Lecturer 2", RoleId = 2, CampusId = 1, IsAuthorized = true, CreatedAt = DateTime.UtcNow }
             );
             context.SaveChanges();
 

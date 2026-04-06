@@ -35,7 +35,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet("lecturer-stats")]
-        [Authorize(Roles = "Lecturer")]
+        [Authorize(Roles = "Lecturer,HOD")]
         public async Task<ActionResult<LecturerDashboardStatsDTO>> GetLecturerDashboardStats()
         {
             try

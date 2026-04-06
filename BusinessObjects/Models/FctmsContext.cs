@@ -565,7 +565,6 @@ public partial class FctmsContext : DbContext
             entity.HasIndex(e => e.Email, "UQ__Users__A9D105343BD5A87E").IsUnique();
 
             entity.Property(e => e.UserId).HasColumnName("UserID");
-            entity.Property(e => e.Campus).HasMaxLength(50);
             entity
                 .Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
@@ -638,7 +637,6 @@ public partial class FctmsContext : DbContext
                 .Property(e => e.AddedDate)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
-            entity.Property(e => e.Campus).HasMaxLength(50);
             entity.Property(e => e.Email).HasMaxLength(100);
             entity.Property(e => e.FullName).HasMaxLength(250);
             entity.Property(e => e.RoleId).HasColumnName("RoleID");
@@ -690,6 +688,7 @@ public partial class FctmsContext : DbContext
                 );
             entity.Property(e => e.IsLocked).HasDefaultValue(false).HasColumnName("IsLocked");
             entity.Property(e => e.Title).HasMaxLength(255);
+            entity.Property(e => e.OriginalAuthorId).HasColumnName("OriginalAuthorId");
             entity
                 .Property(e => e.UpDate)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
@@ -705,6 +704,13 @@ public partial class FctmsContext : DbContext
                 .WithMany(p => p.Theses)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("fk_thesis_userid");
+
+            entity
+                .HasOne(d => d.OriginalAuthor)
+                .WithMany()
+                .HasForeignKey(d => d.OriginalAuthorId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_thesis_original_author");
 
             entity
                 .HasOne(d => d.Semester)
@@ -802,7 +808,7 @@ public partial class FctmsContext : DbContext
 
             entity.Property(e => e.Email).HasMaxLength(255);
             entity.Property(e => e.FullName).HasMaxLength(255);
-            entity.Property(e => e.Campus).HasMaxLength(100);
+            entity.Property(e => e.IsHod).HasDefaultValueSql("0").HasColumnType("tinyint(1)");
             entity.Property(e => e.IsActive).HasColumnName("IsActive");
             entity.Property(e => e.IsReviewer).HasColumnName("IsReviewer");
             entity

@@ -48,7 +48,7 @@ namespace Repositories
             return semester != null;
         }
 
-        public async Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize)
-            => await _semesterDAO.GetOrphanedStudentsAsync(semesterId, pageIndex, pageSize);
+        public async Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize, string? search = null)
+            => await _semesterDAO.GetOrphanedStudentsAsync(semesterId, pageIndex, pageSize, search);
     }
 }

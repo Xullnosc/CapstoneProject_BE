@@ -19,9 +19,10 @@ namespace DataAccess
         {
             var user = await _context.Users
                 .AsNoTracking()
+                .Include(u => u.CampusNavigation)
                 .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
 
-            return user?.Campus;
+            return user?.CampusNavigation?.CampusName;
         }
 
         public async Task<List<User>> GetUsersForConflictCheckAsync(List<string> normalizedEmails, List<string> normalizedStudentCodes)
@@ -141,7 +142,6 @@ namespace DataAccess
                     string campusName = campusRef?.CampusName ?? "";
 
                     whitelistMatch.CampusId = importedItem.CampusId.Value;
-                    whitelistMatch.Campus = campusName;
                     whitelistMatch.SemesterId = semesterId;
                     whitelistMatch.AddedDate = whitelistMatch.AddedDate ?? now;
 
@@ -164,7 +164,6 @@ namespace DataAccess
                     userMatch.StudentCode = importedItem.StudentCode;
                     userMatch.FullName = importedItem.FullName;
                     userMatch.CampusId = importedItem.CampusId.Value;
-                    userMatch.Campus = campusName;
                     userMatch.RoleId = studentRoleId;
                     userMatch.IsAuthorized = true;
 

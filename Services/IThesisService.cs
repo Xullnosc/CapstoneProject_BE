@@ -28,6 +28,7 @@ namespace Services
         Task<IEnumerable<ThesisDTO>> GetFilteredThesesAsync(
             string? status,
             int? userId,
+            int? teamId = null,
             string? searchTitle = null,
             int? semesterId = null,
             bool? isLocked = null,

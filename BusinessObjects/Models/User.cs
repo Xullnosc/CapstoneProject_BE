@@ -19,8 +19,6 @@ public partial class User
 
     public bool? IsAuthorized { get; set; }
 
-    public string? Campus { get; set; }
-
     public int? CampusId { get; set; }
 
     public virtual Campus CampusNavigation { get; set; } = null!;

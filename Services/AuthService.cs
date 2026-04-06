@@ -101,11 +101,9 @@ public class AuthService : IAuthService
                     );
                 }
 
-                // 0. Validate if Campus is valid
-                if (
-                    string.IsNullOrEmpty(request.Campus)
-                    || !CampusConstants.All.Contains(request.Campus)
-                )
+                // 0. Map Campus string to Id
+                var targetCampusId = CampusConstants.MapToId(request.Campus);
+                if (!targetCampusId.HasValue)
                 {
                     throw new UnauthorizedAccessException("Cơ sở không hợp lệ. Vui lòng chọn lại.");
                 }
@@ -118,16 +116,11 @@ public class AuthService : IAuthService
                 {
                     isAuthorized = false;
                 }
-                else if (
-                    !string.Equals(
-                        whitelistEntry.Campus,
-                        request.Campus,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
+                else if (whitelistEntry.CampusId != targetCampusId.Value)
                 {
+                    var registeredCampusName = CampusConstants.MapIdToFullName(whitelistEntry.CampusId);
                     throw new UnauthorizedAccessException(
-                        $"Tài khoản của bạn thuộc cơ sở {whitelistEntry.Campus}. Vui lòng chọn đúng cơ sở khi đăng nhập."
+                        $"Tài khoản của bạn thuộc cơ sở {registeredCampusName}. Vui lòng chọn đúng cơ sở khi đăng nhập."
                     );
                 }
                 else
@@ -146,7 +139,6 @@ public class AuthService : IAuthService
 
                 int? roleId = whitelistEntry?.RoleId;
                 string? studentCode = whitelistEntry?.StudentCode;
-                string? campus = whitelistEntry?.Campus;
 
                 if (whitelistEntry != null && !string.IsNullOrEmpty(whitelistEntry.FullName))
                 {
@@ -165,7 +157,6 @@ public class AuthService : IAuthService
                         Avatar = avatar,
                         RoleId = roleId,
                         StudentCode = studentCode,
-                        Campus = campus,
                         CampusId = whitelistEntry?.CampusId,
                         IsAuthorized = isAuthorized,
                         LastLogin = DateTime.UtcNow,
@@ -180,7 +171,6 @@ public class AuthService : IAuthService
                     user.Avatar = avatar;
                     user.RoleId = roleId;
                     user.StudentCode = studentCode;
-                    user.Campus = campus;
                     // Update CampusId if not already set (supports migration of existing users)
                     if (user.CampusId == null && whitelistEntry?.CampusId != null)
                     {

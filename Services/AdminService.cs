@@ -30,6 +30,7 @@ public class AdminService : IAdminService
         var query = _context.Users
             .AsNoTracking()
             .Include(u => u.Role)
+            .Include(u => u.CampusNavigation)
             .Where(u => u.Role != null && u.Role.RoleName == CampusConstants.Roles.HOD);
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -66,7 +67,7 @@ public class AdminService : IAdminService
                 LastLogin = u.LastLogin,
                 CreatedAt = u.CreatedAt,
                 UpdatedAt = cred?.UpdatedAt,
-                Campus = u.Campus
+                Campus = u.CampusNavigation?.CampusName
             };
         }).ToList();
     }
@@ -84,11 +85,8 @@ public class AdminService : IAdminService
         if (hodRole == null)
             throw new InvalidOperationException("HOD role not found in database.");
 
+        // Campus check
         var campusRef = await _context.Campuses.FirstOrDefaultAsync(c => c.CampusId == dto.CampusId);
-        if (campusRef == null)
-            throw new InvalidOperationException($"Campus with ID {dto.CampusId} does not exist.");
-
-        string campusNameString = dto.Campus ?? campusRef.CampusName;
 
         User? user = null;
         if (dto.UserId.HasValue)
@@ -111,7 +109,6 @@ public class AdminService : IAdminService
             user.Email = dto.Email.Trim();
             user.FullName = dto.FullName?.Trim() ?? user.FullName;
             user.CampusId = dto.CampusId;
-            user.Campus = campusNameString;
             await _userRepository.UpdateAsync(user);
         }
         else
@@ -125,7 +122,6 @@ public class AdminService : IAdminService
                 user = existingWithEmail;
                 user.FullName = dto.FullName?.Trim() ?? user.FullName;
                 user.CampusId = dto.CampusId;
-                user.Campus = campusNameString;
                 await _userRepository.UpdateAsync(user);
             }
             else
@@ -137,8 +133,7 @@ public class AdminService : IAdminService
                     RoleId = hodRole.RoleId,
                     IsAuthorized = true,
                     CreatedAt = DateTime.UtcNow,
-                    CampusId = dto.CampusId,
-                    Campus = campusNameString
+                    CampusId = dto.CampusId
                 };
                 user = await _userRepository.AddAsync(user);
             }
@@ -169,6 +164,36 @@ public class AdminService : IAdminService
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, BCrypt.Net.BCrypt.GenerateSalt(12))
             });
         }
+
+        // --- HOD to Lecturer Synchronization ---
+        var lecturer = await _context.Lecturers.FirstOrDefaultAsync(l => l.Email == user.Email);
+        if (lecturer == null)
+        {
+            lecturer = new Lecturer
+            {
+                Email = user.Email,
+                FullName = user.FullName,
+                Avatar = user.Avatar,
+                CampusId = user.CampusId ?? 0,
+                IsActive = true,
+                IsHod = true,
+                IsReviewer = false, // HODs are mentors, but not reviewer by default
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await _context.Lecturers.AddAsync(lecturer);
+        }
+        else
+        {
+            lecturer.FullName = user.FullName;
+            lecturer.Avatar = user.Avatar;
+            lecturer.CampusId = user.CampusId ?? 0;
+            lecturer.IsActive = true;
+            lecturer.IsHod = true;
+            lecturer.UpdatedAt = DateTime.UtcNow;
+            _context.Lecturers.Update(lecturer);
+        }
+        await _context.SaveChangesAsync();
     }
 
     public async Task DeleteHodAsync(int userId)
@@ -186,7 +211,15 @@ public class AdminService : IAdminService
             await _credentialRepository.DeleteAsync(cred);
         }
 
+        // Remove from Lecturers table as well
+        var lecturer = await _context.Lecturers.FirstOrDefaultAsync(l => l.Email == user.Email);
+        if (lecturer != null)
+        {
+            _context.Lecturers.Remove(lecturer);
+        }
+
         await _userRepository.DeleteAsync(user);
+        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateHodEmailAsync(int userId, string newEmail)

@@ -176,7 +176,7 @@ namespace DataAccess
                 start.Date <= s.EndDate.Date && end.Date >= s.StartDate.Date);
         }
 
-        public async Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize)
+        public async Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize, string? search = null)
         {
             var studentRoleId = await GetStudentRoleIdAsync();
 
@@ -199,15 +199,24 @@ namespace DataAccess
                 .Where(w => w.SemesterId == semesterId && w.RoleId == studentRoleId)
                 .AsNoTracking();
 
-            // We need to filter in memory if we use the HashSet, OR we can use the list in SQL if it's small.
-            // For thousands of students, let's try to keep it in SQL for pagination.
-            var filteredQuery = query.AsEnumerable()
-                .Where(w => !string.IsNullOrEmpty(w.Email) && !teamedEmailSet.Contains(w.Email.Trim()))
-                .AsQueryable();
+            // We need to filter in memory if we use the HashSet
+            var filtered = query.AsEnumerable()
+                .Where(w => !string.IsNullOrEmpty(w.Email) && !teamedEmailSet.Contains(w.Email.Trim()));
 
-            var totalCount = filteredQuery.Count();
-            var items = filteredQuery
-                .OrderBy(w => w.FullName ?? w.Email)
+            // Apply Search filter
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim().ToLower();
+                filtered = filtered.Where(w => 
+                    (w.Email != null && w.Email.ToLower().Contains(s)) ||
+                    (w.FullName != null && w.FullName.ToLower().Contains(s)) ||
+                    (w.StudentCode != null && w.StudentCode.ToLower().Contains(s))
+                );
+            }
+
+            var list = filtered.OrderBy(w => w.FullName ?? w.Email).ToList();
+            var totalCount = list.Count;
+            var items = list
                 .Skip((pageIndex - 1) * pageSize)
                 .Take(pageSize)
                 .ToList();

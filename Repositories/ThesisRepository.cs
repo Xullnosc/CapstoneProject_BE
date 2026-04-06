@@ -31,6 +31,7 @@ namespace Repositories
         public Task<IEnumerable<Thesis>> GetAllThesesFilteredAsync(
             string? status,
             int? userId,
+            int? teamId = null,
             int? semesterId = null,
             bool? isLocked = null,
             bool lecturerOnly = false,
@@ -39,6 +40,7 @@ namespace Repositories
             _thesisDAO.GetAllThesesFilteredAsync(
                 status,
                 userId,
+                teamId,
                 semesterId,
                 isLocked,
                 lecturerOnly,
@@ -60,12 +62,16 @@ namespace Repositories
             int? semesterId = null
         ) => _thesisDAO.GetThesesByOwnerOrTeamAsync(ownerIds, teamIds, semesterId);
 
+        public Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int teamId, int? semesterId = null)
+            => _thesisDAO.GetThesisForInvitationAsync(leaderId, teamId, semesterId);
+        
+        public Task<IEnumerable<Thesis>> GetThesesByTeamIdAsync(int teamId)
+            => _thesisDAO.GetThesesByTeamIdAsync(teamId);
+        
         public Task<Thesis?> GetApprovedThesisByLeaderIdAsync(
             int leaderId,
             int? semesterId = null
         ) => _thesisDAO.GetApprovedThesisByLeaderIdAsync(leaderId, semesterId);
 
-        public Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int? semesterId = null) =>
-            _thesisDAO.GetThesisForInvitationAsync(leaderId, semesterId);
     }
 }
