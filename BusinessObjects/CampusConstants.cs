@@ -84,11 +84,15 @@ namespace BusinessObjects
             /// <summary>Đóng — Chỉ xem, không thao tác gì.</summary>
             public const string Closed = "Closed";
 
-            // ── Backward compatibility aliases (các giá trị cũ trong DB) ──────────
-            public const string Active = "Active";               // → Open
-            public const string Upcoming = "Upcoming";           // → Open
-            public const string ReviewThesis = "Review Thesis";  // → InProgress
-            public const string ReviewMiddle = "Review Middle Semester"; // → InProgress
+            // ── Legacy / Backward compatibility aliases (Giữ để không gãy logic cũ) ──
+            [Obsolete("Sử dụng Open thay thế")]
+            public const string Active = "Active";
+            [Obsolete("Sử dụng Open thay thế")]
+            public const string Upcoming = "Upcoming";
+            [Obsolete("Sử dụng InProgress thay thế")]
+            public const string ReviewThesis = "Review Thesis";
+            [Obsolete("Sử dụng InProgress thay thế")]
+            public const string ReviewMiddle = "Review Middle Semester";
 
             /// <summary>Kiểm tra semester có đang ở giai đoạn Mở không (cho phép mọi hoạt động).</summary>
             public static bool IsOpenStage(string? status) =>

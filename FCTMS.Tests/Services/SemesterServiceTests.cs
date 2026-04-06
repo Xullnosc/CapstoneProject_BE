@@ -493,7 +493,7 @@ namespace FCTMS.Tests.Services
                 EndDate = new DateTime(2026, 5, 1)
             };
 
-            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = "Upcoming" };
+            var currentSemester = new Semester { SemesterId = 1, CampusId = 1, Status = CampusConstants.SemesterStatus.Open };
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdSimpleAsync(updateDto.SemesterId)).ReturnsAsync(currentSemester);
             _mockSemesterRepository.Setup(r => r.GetSemesterByCodeAsync(updateDto.SemesterCode)).ReturnsAsync((Semester?)null);
 
@@ -530,7 +530,7 @@ namespace FCTMS.Tests.Services
         // {
         //     // Arrange
         //     int id = 5;
-        //     var semester = new Semester { SemesterId = id, Status = "Active", CampusId = 1 };
+        //     var semester = new Semester { SemesterId = id, Status = CampusConstants.SemesterStatus.Open, CampusId = 1 };
         //     _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync(semester);
         // 
         //     // Act
