@@ -20,7 +20,11 @@ namespace BusinessObjects.DTOs
         public string? OwnerEmail { get; set; }
         public string? OwnerAvatar { get; set; }
         public string? MentorEmail1 { get; set; }
+        public int? MentorId1 { get; set; }
         public string? MentorEmail2 { get; set; }
+        public int? MentorId2 { get; set; }
+        public int? TeamMentorId1 { get; set; }
+        public int? TeamMentorId2 { get; set; }
         public string? ThesisNameEn { get; set; }
         public string? ThesisNameVi { get; set; }
         public string? Abbreviation { get; set; }

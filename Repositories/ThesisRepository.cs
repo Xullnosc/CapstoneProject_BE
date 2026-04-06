@@ -62,8 +62,8 @@ namespace Repositories
             int? semesterId = null
         ) => _thesisDAO.GetThesesByOwnerOrTeamAsync(ownerIds, teamIds, semesterId);
 
-        public Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int? semesterId = null)
-            => _thesisDAO.GetThesisForInvitationAsync(leaderId, semesterId);
+        public Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int teamId, int? semesterId = null)
+            => _thesisDAO.GetThesisForInvitationAsync(leaderId, teamId, semesterId);
         
         public Task<IEnumerable<Thesis>> GetThesesByTeamIdAsync(int teamId)
             => _thesisDAO.GetThesesByTeamIdAsync(teamId);
@@ -73,7 +73,5 @@ namespace Repositories
             int? semesterId = null
         ) => _thesisDAO.GetApprovedThesisByLeaderIdAsync(leaderId, semesterId);
 
-        public Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int? semesterId = null) =>
-            _thesisDAO.GetThesisForInvitationAsync(leaderId, semesterId);
     }
 }

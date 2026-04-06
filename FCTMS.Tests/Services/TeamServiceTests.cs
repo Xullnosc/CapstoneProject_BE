@@ -168,6 +168,8 @@ namespace FCTMS.Tests.Services
             };
 
             _mockTeamRepository.Setup(x => x.GetByIdAsync(teamId)).ReturnsAsync(existingTeam);
+            _mockSemesterRepository.Setup(x => x.GetCurrentSemesterAsync())
+                .ReturnsAsync(new Semester { Status = CampusConstants.SemesterStatus.Active });
 
             // Act
             Func<Task> act = async () => await _teamService.UpdateTeamAsync(teamId, otherUserId, new UpdateTeamDTO());
@@ -220,6 +222,7 @@ namespace FCTMS.Tests.Services
             // Assert
             result.TeamCode.Should().Be("SE_16");
         }
+        #endregion
 
         #region ToggleSpecialFlagAsync Tests
 
@@ -315,34 +318,34 @@ namespace FCTMS.Tests.Services
 
         #region Auto-Generated Data Scenarios (Scenario 2000-2025)
 
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2000() { ValidationRunner(2000); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2001() { ValidationRunner(2001); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2002() { ValidationRunner(2002); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2003() { ValidationRunner(2003); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2004() { ValidationRunner(2004); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2005() { ValidationRunner(2005); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2006() { ValidationRunner(2006); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2007() { ValidationRunner(2007); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2008() { ValidationRunner(2008); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2009() { ValidationRunner(2009); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2010() { ValidationRunner(2010); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2011() { ValidationRunner(2011); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2012() { ValidationRunner(2012); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2013() { ValidationRunner(2013); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2014() { ValidationRunner(2014); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2015() { ValidationRunner(2015); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2016() { ValidationRunner(2016); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2017() { ValidationRunner(2017); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2018() { ValidationRunner(2018); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2019() { ValidationRunner(2019); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2020() { ValidationRunner(2020); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2021() { ValidationRunner(2021); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2022() { ValidationRunner(2022); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2023() { ValidationRunner(2023); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2024() { ValidationRunner(2024); }
-        [Fact] public void TeamServiceTests_DataValidation_Scenario2025() { ValidationRunner(2025); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2000() { await ValidationRunner(2000); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2001() { await ValidationRunner(2001); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2002() { await ValidationRunner(2002); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2003() { await ValidationRunner(2003); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2004() { await ValidationRunner(2004); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2005() { await ValidationRunner(2005); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2006() { await ValidationRunner(2006); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2007() { await ValidationRunner(2007); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2008() { await ValidationRunner(2008); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2009() { await ValidationRunner(2009); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2010() { await ValidationRunner(2010); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2011() { await ValidationRunner(2011); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2012() { await ValidationRunner(2012); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2013() { await ValidationRunner(2013); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2014() { await ValidationRunner(2014); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2015() { await ValidationRunner(2015); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2016() { await ValidationRunner(2016); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2017() { await ValidationRunner(2017); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2018() { await ValidationRunner(2018); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2019() { await ValidationRunner(2019); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2020() { await ValidationRunner(2020); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2021() { await ValidationRunner(2021); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2022() { await ValidationRunner(2022); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2023() { await ValidationRunner(2023); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2024() { await ValidationRunner(2024); }
+        [Fact] public async Task TeamServiceTests_DataValidation_Scenario2025() { await ValidationRunner(2025); }
 
-        private void ValidationRunner(int validationId)
+        private async Task ValidationRunner(int validationId)
         {
             // Arrange
             int hodUserId = 10;

@@ -108,7 +108,11 @@ namespace DataAccess
             int? excludeUserId = null
         )
         {
-            var query = _context.Theses.AsNoTracking().Include(t => t.User).AsQueryable();
+            var query = _context.Theses.AsNoTracking()
+                .Include(t => t.User)
+                .Include(t => t.Mentor1)
+                .Include(t => t.Mentor2)
+                .AsQueryable();
  
             if (!string.IsNullOrEmpty(status))
             {
@@ -180,6 +184,9 @@ namespace DataAccess
 
             var thesis = await _context
                 .Theses.Include(t => t.User)
+                .Include(t => t.Mentor1)
+                .Include(t => t.Mentor2)
+                .Include(t => t.Team)
                 .Include(t => t.ThesisHistories)
                     .ThenInclude(h => h.UploadedByUser)
                 .FirstOrDefaultAsync(t => t.ThesisId == id);
@@ -242,16 +249,17 @@ namespace DataAccess
             return await query.FirstOrDefaultAsync();
         }
 
-        public async Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int? semesterId = null)
+        public async Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int teamId, int? semesterId = null)
         {
             var query = _context
                 .Theses.AsNoTracking()
                 .Where(t =>
-                    t.UserId == leaderId
+                    (t.UserId == leaderId || (t.TeamId.HasValue && t.TeamId == teamId))
                     && (
                         t.Status == "On Mentor Inviting"
-                       
                         || t.Status == "Registered"
+                        || t.Status == "Reviewing"
+                        || t.Status == "Need Update"
                     )
                 );
  

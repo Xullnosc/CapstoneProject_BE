@@ -131,7 +131,7 @@ namespace Services
             }
 
             // Check if thesis is in "On Mentor Inviting" status for the current semester
-            var thesis = await _thesisRepo.GetThesisForInvitationAsync(leaderId, currentSemester.SemesterId);
+            var thesis = await _thesisRepo.GetThesisForInvitationAsync(leaderId, teamId, currentSemester.SemesterId);
             if (thesis == null)
             {
                 throw new Exception("Your team must have a thesis before inviting a mentor.");

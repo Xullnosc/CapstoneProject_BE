@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -1361,7 +1361,7 @@ namespace FCTMS.Tests.Services
             // Arrange
             _mockThesisRepository
                 .Setup(x => x.GetAllThesesFilteredAsync(
-                    It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(),
+                    It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<int?>(),
                     It.IsAny<bool?>(), It.IsAny<bool>(), It.IsAny<int?>()))
                 .ReturnsAsync(new List<Thesis>());
             _mockMapper
@@ -1369,7 +1369,7 @@ namespace FCTMS.Tests.Services
                 .Returns(new List<ThesisDTO>());
 
             // Act
-            var result = await _thesisService.GetFilteredThesesAsync("Cancelled", null, null, null, null, false, null, null);
+            var result = await _thesisService.GetFilteredThesesAsync("Cancelled", null, null, null, null, null, false, null, null);
 
             // Assert
             result.Should().NotBeNull();
@@ -1388,17 +1388,17 @@ namespace FCTMS.Tests.Services
                 .ReturnsAsync(new Semester { SemesterId = semesterId });
 
             _mockThesisRepository
-                .Setup(x => x.GetAllThesesFilteredAsync(status, null, semesterId, isLocked, false, null))
+                .Setup(x => x.GetAllThesesFilteredAsync(status, null, null, semesterId, isLocked, false, null))
                 .ReturnsAsync(new List<Thesis>());
             _mockMapper.Setup(m => m.Map<IEnumerable<ThesisDTO>>(It.IsAny<IEnumerable<Thesis>>()))
                 .Returns(new List<ThesisDTO>());
 
             // Act
-            await _thesisService.GetFilteredThesesAsync(status, null, null, semesterId, isLocked, false, null, null);
+            await _thesisService.GetFilteredThesesAsync(status, null, null, null, semesterId, isLocked, false, null, null);
 
             // Assert â€” verify all filter params are forwarded correctly
             _mockThesisRepository.Verify(x =>
-                x.GetAllThesesFilteredAsync(status, null, semesterId, isLocked, false, null),
+                x.GetAllThesesFilteredAsync(status, null, null, semesterId, isLocked, false, null),
                 Times.Once);
         }
 

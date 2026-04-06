@@ -471,7 +471,7 @@ namespace FCTMS.Tests.Controllers
             // Arrange
             int id = 1;
             var empty = new PagedResult<WhitelistDTO>(new List<WhitelistDTO>(), 0, 1, 10);
-            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>()))
+            _mockSemesterService.Setup(x => x.GetOrphanedStudentsAsync(id, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>()))
                 .ReturnsAsync(empty);
 
             // Act

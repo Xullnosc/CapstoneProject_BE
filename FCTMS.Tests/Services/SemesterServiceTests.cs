@@ -415,7 +415,7 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(id)).ReturnsAsync((Semester?)null);
 
             // Act
-            Func<Task> act = async () => await _semesterService.GetOrphanedStudentsAsync(id, 1, 10, null);
+            Func<Task> act = async () => await _semesterService.GetOrphanedStudentsAsync(id, 1, 10, It.IsAny<string?>());
 
             // Assert
             await act.Should().ThrowAsync<KeyNotFoundException>()
@@ -447,7 +447,7 @@ namespace FCTMS.Tests.Services
                 .ReturnsAsync(new List<User> { new User { Email = "orphan@fpt.edu.vn", Avatar = "avatar.png" } });
 
             // Act
-            var result = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize, null);
+            var result = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize, It.IsAny<string?>());
 
             // Assert
             result.Should().NotBeNull();
@@ -472,7 +472,7 @@ namespace FCTMS.Tests.Services
             _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(It.IsAny<List<Whitelist>>())).Returns(new List<WhitelistDTO>());
 
             // Act
-            var result = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize, null);
+            var result = await _semesterService.GetOrphanedStudentsAsync(id, page, pageSize, It.IsAny<string?>());
 
             // Assert
             result.Should().NotBeNull();
@@ -615,7 +615,7 @@ namespace FCTMS.Tests.Services
             };
 
             _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(semesterId)).ReturnsAsync(semester);
-            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(semesterId, 1, 10)).ReturnsAsync(paged);
+            _mockSemesterRepository.Setup(r => r.GetOrphanedStudentsAsync(semesterId, 1, 10, It.IsAny<string?>())).ReturnsAsync(paged);
             _mockMapper.Setup(m => m.Map<List<WhitelistDTO>>(whitelist)).Returns(dtos);
             _mockUserRepository.Setup(u => u.GetUsersByEmailsAsync(It.Is<List<string>>(e => e.Contains("a@fpt.edu.vn"))))
                 .ReturnsAsync(new List<User> { new User { Email = "a@fpt.edu.vn", Avatar = "avatar_url.png" } });

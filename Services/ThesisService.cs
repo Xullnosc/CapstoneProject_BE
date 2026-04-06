@@ -696,6 +696,11 @@ namespace Services
                     "You cannot review your own thesis proposal."
                 );
 
+            if (lecturer != null && (thesis.MentorId1 == lecturer.LecturerId || thesis.MentorId2 == lecturer.LecturerId))
+            {
+                throw new UnauthorizedAccessException("Mentors cannot submit reviews for their own teams.");
+            }
+
             if (
                 !isHod
                 && !string.Equals(thesis.Status, "Reviewing", StringComparison.OrdinalIgnoreCase)
@@ -748,11 +753,19 @@ namespace Services
             )
                 throw new ArgumentException("Invalid decision");
 
-            if (
-                string.Equals(decision, "Fail", StringComparison.OrdinalIgnoreCase)
-                && string.IsNullOrWhiteSpace(dto.Comment)
-            )
+            if (decision.Equals("Fail", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(dto.Comment))
                 throw new ArgumentException("Fail reason is required.");
+
+            // HOD Conflict Check: Proposer or Mentor cannot finalize
+            var thesis = await _thesisRepository.GetThesisByIdAsync(thesisId);
+            if (thesis == null) throw new KeyNotFoundException("Thesis not found.");
+            if (thesis.UserId == hodUserId) throw new UnauthorizedAccessException("You cannot finalize your own thesis proposal.");
+
+            var hod = await _lecturerRepository.GetByEmailAsync((await _userRepository.GetByIdAsync(hodUserId))?.Email ?? "");
+            if (hod != null && (thesis.MentorId1 == hod.LecturerId || thesis.MentorId2 == hod.LecturerId))
+            {
+                throw new UnauthorizedAccessException("Mentors cannot make final decisions for their own teams.");
+            }
 
             await _thesisReviewRepository.UpsertHodDecisionAsync(
                 thesisId,
@@ -988,32 +1001,31 @@ namespace Services
             );
             var dtos = _mapper.Map<IEnumerable<ThesisDTO>>(theses);
 
-            // Apply Reviewer restriction for "On Mentor Inviting"
+            // Apply Reviewer restrictions
             if (!string.IsNullOrEmpty(currentUserEmail))
             {
-                // user already fetched at line 840
-                if (
-                    user != null
-                    && !string.Equals(
-                        user.Role?.RoleName,
-                        CampusConstants.Roles.HOD,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
+                // 1. Conflict of Interest Check: If you are Mentor 1 or 2, you cannot see it in the review list
+                dtos = dtos.Where(d =>
+                    !string.Equals(d.MentorEmail1, currentUserEmail, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(d.MentorEmail2, currentUserEmail, StringComparison.OrdinalIgnoreCase)
+                );
+
+                // 2. Role-specific restrictions
+                if (user != null)
                 {
-                    var lecturer = await _lecturerRepository.GetByEmailAsync(currentUserEmail);
-                    if (lecturer != null && lecturer.IsReviewer)
+                    var role = user.Role?.RoleName;
+
+                    // Lecturers (non-HOD) have stricter visibility on "On Mentor Inviting"
+                    if (string.Equals(role, CampusConstants.Roles.Lecturer, StringComparison.OrdinalIgnoreCase))
                     {
-                        // Filter out "On Mentor Inviting" (unless they are the owner, but excludeUserId already handled their own proposals if requested)
-                        // Actually, let's strictly filter it for any reviewer who isn't the owner
-                        dtos = dtos.Where(d =>
-                            !string.Equals(
-                                d.Status,
-                                "On Mentor Inviting",
-                                StringComparison.OrdinalIgnoreCase
-                            )
-                            || d.UserId == user.UserId // Owner exception
-                        );
+                        var lecturer = await _lecturerRepository.GetByEmailAsync(currentUserEmail);
+                        if (lecturer != null && lecturer.IsReviewer)
+                        {
+                            dtos = dtos.Where(d =>
+                                !string.Equals(d.Status, "On Mentor Inviting", StringComparison.OrdinalIgnoreCase)
+                                || d.UserId == user.UserId // Owner exception
+                            );
+                        }
                     }
                 }
             }

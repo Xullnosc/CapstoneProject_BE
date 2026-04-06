@@ -471,7 +471,7 @@ namespace FCTMS.Tests.Controllers
             // Arrange
             _mockThesisService
                 .Setup(x => x.GetFilteredThesesAsync(
-                    null, null, null, null, null, false, It.IsAny<int?>(), It.IsAny<string?>()))
+                    null, null, null, null, null, null, false, It.IsAny<int?>(), It.IsAny<string?>()))
                 .ReturnsAsync(new List<ThesisDTO>());
 
             // Act
