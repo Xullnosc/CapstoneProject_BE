@@ -1,4 +1,4 @@
-﻿using BusinessObjects.Models;
+using BusinessObjects.Models;
 
 namespace Repositories
 {
@@ -11,5 +11,6 @@ namespace Repositories
         Task DeleteAsync(User user);
         Task<List<User>> SearchUsersAsync(string term);
         Task<List<User>> GetUsersByEmailsAsync(List<string> emails);
+        Task<DateTime?> GetLastLoginUtcAsync(int userId);
     }
 }

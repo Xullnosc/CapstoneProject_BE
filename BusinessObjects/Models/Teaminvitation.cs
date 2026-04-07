@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace BusinessObjects.Models;
@@ -9,7 +9,7 @@ public partial class Teaminvitation
 
     public int TeamId { get; set; }
 
-    public int StudentId { get; set; }
+    public int ReceiverId { get; set; }
 
     public int InvitedBy { get; set; }
 
@@ -23,7 +23,7 @@ public partial class Teaminvitation
 
     public virtual User InvitedByNavigation { get; set; } = null!;
 
-    public virtual User Student { get; set; } = null!;
+    public virtual User Receiver { get; set; } = null!;
 
     public virtual Team Team { get; set; } = null!;
 }

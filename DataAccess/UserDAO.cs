@@ -126,5 +126,14 @@ namespace DataAccess
 
             return new PagedResult<User>(items, totalCount, pageIndex, pageSize);
         }
+
+        public async Task<DateTime?> GetLastLoginUtcAsync(int userId)
+        {
+            return await _context.Users
+                .AsNoTracking()
+                .Where(u => u.UserId == userId)
+                .Select(u => u.LastLogin)
+                .FirstOrDefaultAsync();
+        }
     }
 }

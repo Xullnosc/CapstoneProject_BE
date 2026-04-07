@@ -95,9 +95,6 @@ public class ThesisReviewDAO : IThesisReviewDAO
         if (allAssignedReviewers.Count >= 2)
         {
             // Use the time of the last FINAL_DECISION as the boundary between rounds.
-            // Current round starts at the earliest REVIEWER_ASSIGNED event after that boundary.
-            // Using Min (not Max) ensures a reviewer who was assigned and decided before the
-            // second reviewer was even assigned is still counted in the same round.
             var lastFinalDecisionTime =
                 await _context
                     .ThesisReviewEvents.AsNoTracking()
@@ -176,8 +173,6 @@ public class ThesisReviewDAO : IThesisReviewDAO
                         finalRound
                     );
 
-                    // Build one merged final-decision note from reviewer decision comments only.
-                    // Only DECISION_RATIONALE comments are included (never replies/follow-ups).
                     var reviewerNameById = await _context
                         .Users.AsNoTracking()
                         .Where(u => allAssignedReviewers.Contains(u.UserId))
@@ -749,6 +744,23 @@ public class ThesisReviewDAO : IThesisReviewDAO
             VisibilityScope = comment.VisibilityScope,
             CreatedAt = comment.CreatedAt,
         };
+    }
+
+    public async Task AddRevisionEventAsync(string thesisId, int userId)
+    {
+        var currentRound = await _context.ThesisReviewEvents.AsNoTracking()
+            .Where(e => e.ThesisId == thesisId && !e.IsDeleted)
+            .MaxAsync(e => (int?)e.Round) ?? 1;
+
+        await CreateEventAsync(
+            thesisId,
+            "REVISION_UPDATED",
+            userId,
+            "AUTHOR",
+            null,
+            null,
+            currentRound
+        );
     }
 
     private async Task<ThesisReviewEvent> CreateEventAsync(

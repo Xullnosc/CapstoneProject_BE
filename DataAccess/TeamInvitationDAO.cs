@@ -30,12 +30,12 @@ namespace DataAccess
             return await _context.Teaminvitations
                 .Include(i => i.Team)
                 .Include(i => i.InvitedByNavigation)
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.InvitationId == invitationId);
         }
 
-        public async Task<List<Teaminvitation>> GetByStudentIdAsync(int studentId)
+        public async Task<List<Teaminvitation>> GetByReceiverIdAsync(int ReceiverId)
         {
             return await _context.Teaminvitations
                 .Include(i => i.Team)
@@ -43,14 +43,14 @@ namespace DataAccess
                 .Include(i => i.Team)
                     .ThenInclude(t => t.Leader)
                 .Include(i => i.InvitedByNavigation)
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                 .AsNoTracking()
-                .Where(i => i.StudentId == studentId)
+                .Where(i => i.ReceiverId == ReceiverId)
                 .OrderByDescending(i => i.CreatedAt)
                 .ToListAsync();
         }
 
-        public async Task<PagedResult<Teaminvitation>> GetByStudentIdAsync(int studentId, int pageIndex, int pageSize)
+        public async Task<PagedResult<Teaminvitation>> GetByReceiverIdAsync(int ReceiverId, int pageIndex, int pageSize)
         {
             var query = _context.Teaminvitations
                 .Include(i => i.Team)
@@ -58,9 +58,9 @@ namespace DataAccess
                 .Include(i => i.Team)
                     .ThenInclude(t => t.Leader)
                 .Include(i => i.InvitedByNavigation)
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                 .AsNoTracking()
-                .Where(i => i.StudentId == studentId);
+                .Where(i => i.ReceiverId == ReceiverId);
 
             var totalCount = await query.CountAsync();
 
@@ -78,7 +78,7 @@ namespace DataAccess
             return await _context.Teaminvitations
                 .Include(i => i.Team)
                 .Include(i => i.InvitedByNavigation)
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                 .AsNoTracking()
                 .Where(i => i.TeamId == teamId)
                 .ToListAsync();
@@ -89,7 +89,7 @@ namespace DataAccess
             var query = _context.Teaminvitations
                 .Include(i => i.Team)
                 .Include(i => i.InvitedByNavigation)
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                 .AsNoTracking()
                 .Where(i => i.TeamId == teamId);
 
@@ -129,7 +129,7 @@ namespace DataAccess
             return true;
         }
 
-        public async Task<List<Teaminvitation>> GetPendingInvitationsByStudentAsync(int studentId)
+        public async Task<List<Teaminvitation>> GetPendingInvitationsByReceiverAsync(int ReceiverId)
         {
             return await _context.Teaminvitations
                 .Include(i => i.Team)
@@ -137,14 +137,14 @@ namespace DataAccess
                 .Include(i => i.Team)
                     .ThenInclude(t => t.Leader)
                 .Include(i => i.InvitedByNavigation)
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                  .AsNoTracking()
-                 .Where(i => i.StudentId == studentId && i.Status == CampusConstants.InvitationStatus.Pending)
+                 .Where(i => i.ReceiverId == ReceiverId && i.Status == CampusConstants.InvitationStatus.Pending)
                  .OrderByDescending(i => i.CreatedAt)
                  .ToListAsync();
         }
 
-        public async Task<PagedResult<Teaminvitation>> GetPendingInvitationsByStudentAsync(int studentId, int pageIndex, int pageSize)
+        public async Task<PagedResult<Teaminvitation>> GetPendingInvitationsByReceiverAsync(int ReceiverId, int pageIndex, int pageSize)
         {
             var query = _context.Teaminvitations
                 .Include(i => i.Team)
@@ -152,9 +152,9 @@ namespace DataAccess
                 .Include(i => i.Team)
                     .ThenInclude(t => t.Leader)
                 .Include(i => i.InvitedByNavigation)
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                 .AsNoTracking()
-                .Where(i => i.StudentId == studentId && i.Status == CampusConstants.InvitationStatus.Pending);
+                .Where(i => i.ReceiverId == ReceiverId && i.Status == CampusConstants.InvitationStatus.Pending);
 
             var totalCount = await query.CountAsync();
 
@@ -167,10 +167,10 @@ namespace DataAccess
             return new PagedResult<Teaminvitation>(items, totalCount, pageIndex, pageSize);
         }
 
-        public async Task CancelAllPendingInvitationsForStudentAsync(int studentId)
+        public async Task CancelAllPendingInvitationsForReceiverAsync(int ReceiverId)
         {
              var pendingInvitations = await _context.Teaminvitations
-                .Where(i => i.StudentId == studentId && i.Status == CampusConstants.InvitationStatus.Pending)
+                .Where(i => i.ReceiverId == ReceiverId && i.Status == CampusConstants.InvitationStatus.Pending)
                 .ToListAsync(); // No AsNoTracking — needs tracking to update
 
             if (pendingInvitations.Any())
@@ -184,17 +184,34 @@ namespace DataAccess
             }
         }
 
-        public async Task<Teaminvitation?> GetByTeamAndStudentAsync(int teamId, int studentId)
+        public async Task<Teaminvitation?> GetByTeamAndReceiverAsync(int teamId, int ReceiverId)
         {
             return await _context.Teaminvitations
                 .Include(i => i.Team)
                 .Include(i => i.InvitedByNavigation)
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                 .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.TeamId == teamId && i.StudentId == studentId && i.Status == CampusConstants.InvitationStatus.Pending);
+                .FirstOrDefaultAsync(i => i.TeamId == teamId && i.ReceiverId == ReceiverId && i.Status == CampusConstants.InvitationStatus.Pending);
         }
 
         // --- Mentor Invitation Methods ---
+
+        public async Task CancelAllPendingMentorInvitationsForTeamAsync(int teamId)
+        {
+            var pending = await _context.Teaminvitations
+                .Where(i => i.TeamId == teamId && i.Type == CampusConstants.InvitationType.Mentor && i.Status == CampusConstants.InvitationStatus.Pending)
+                .ToListAsync();
+
+            if (pending.Any())
+            {
+                foreach (var inv in pending)
+                {
+                    inv.Status = CampusConstants.InvitationStatus.Cancelled;
+                    inv.RespondedAt = DateTime.UtcNow;
+                }
+                await _context.SaveChangesAsync();
+            }
+        }
 
         public async Task<List<Teaminvitation>> GetPendingMentorInvitationsByMentorIdAsync(int mentorId)
         {
@@ -204,9 +221,9 @@ namespace DataAccess
                 .Include(i => i.Team)
                     .ThenInclude(t => t.Leader)
                 .Include(i => i.InvitedByNavigation)
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                 .AsNoTracking()
-                .Where(i => i.StudentId == mentorId 
+                .Where(i => i.ReceiverId == mentorId 
                          && i.Type == CampusConstants.InvitationType.Mentor 
                          && i.Status == CampusConstants.InvitationStatus.Pending)
                 .OrderByDescending(i => i.CreatedAt)
@@ -221,9 +238,9 @@ namespace DataAccess
                 .Include(i => i.Team)
                     .ThenInclude(t => t.Leader)
                 .Include(i => i.InvitedByNavigation)
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                 .AsNoTracking()
-                .Where(i => i.StudentId == mentorId 
+                .Where(i => i.ReceiverId == mentorId 
                          && i.Type == CampusConstants.InvitationType.Mentor 
                          && i.Status == CampusConstants.InvitationStatus.Pending);
 
@@ -241,7 +258,7 @@ namespace DataAccess
         public async Task<List<Teaminvitation>> GetMentorInvitationsByTeamAsync(int teamId)
         {
             return await _context.Teaminvitations
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                 .Include(i => i.InvitedByNavigation)
                 .AsNoTracking()
                 .Where(i => i.TeamId == teamId && i.Type == CampusConstants.InvitationType.Mentor)
@@ -252,7 +269,7 @@ namespace DataAccess
         public async Task<PagedResult<Teaminvitation>> GetMentorInvitationsByTeamAsync(int teamId, int pageIndex, int pageSize)
         {
             var query = _context.Teaminvitations
-                .Include(i => i.Student)
+                .Include(i => i.Receiver)
                 .Include(i => i.InvitedByNavigation)
                 .AsNoTracking()
                 .Where(i => i.TeamId == teamId && i.Type == CampusConstants.InvitationType.Mentor);
@@ -273,7 +290,7 @@ namespace DataAccess
             return await _context.Teaminvitations
                 .AsNoTracking()
                 .FirstOrDefaultAsync(i => i.TeamId == teamId 
-                                       && i.StudentId == mentorId 
+                                       && i.ReceiverId == mentorId 
                                        && i.Type == CampusConstants.InvitationType.Mentor 
                                        && i.Status == CampusConstants.InvitationStatus.Pending);
         }
@@ -288,3 +305,5 @@ namespace DataAccess
         }
     }
 }
+
+

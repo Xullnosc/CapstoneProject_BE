@@ -66,7 +66,7 @@ namespace DataAccess
                     .Teaminvitations.AsNoTracking()
                     .Where(i =>
                         i.Type == mentorType
-                        && i.StudentId == userId
+                        && i.ReceiverId == userId
                         && i.Status == CampusConstants.InvitationStatus.Pending
                     )
                     .CountAsync(i =>
@@ -79,7 +79,7 @@ namespace DataAccess
                     .Teaminvitations.AsNoTracking()
                     .Where(i =>
                         i.Type == mentorType
-                        && i.StudentId == userId
+                        && i.ReceiverId == userId
                         && i.Status == CampusConstants.InvitationStatus.Accepted
                     )
                     .CountAsync(i =>
@@ -92,7 +92,7 @@ namespace DataAccess
                     .Teaminvitations.AsNoTracking()
                     .Where(i =>
                         i.Type == mentorType
-                        && i.StudentId == userId
+                        && i.ReceiverId == userId
                         && i.Status == CampusConstants.InvitationStatus.Declined
                     )
                     .CountAsync(i =>
@@ -105,7 +105,7 @@ namespace DataAccess
                     .Teaminvitations.AsNoTracking()
                     .Where(i =>
                         i.Type == mentorType
-                        && i.StudentId == userId
+                        && i.ReceiverId == userId
                         && i.Status == CampusConstants.InvitationStatus.Cancelled
                     )
                     .CountAsync(i =>
@@ -119,7 +119,7 @@ namespace DataAccess
                     join t in _context.Teams.AsNoTracking() on i.TeamId equals t.TeamId
                     where
                         i.Type == mentorType
-                        && i.StudentId == userId
+                        && i.ReceiverId == userId
                         && t.SemesterId == semesterId.Value
                     orderby i.CreatedAt descending
                     select new RecentMentorInvitationRowDTO
@@ -139,7 +139,7 @@ namespace DataAccess
                     .Teaminvitations.AsNoTracking()
                     .CountAsync(i =>
                         i.Type == mentorType
-                        && i.StudentId == userId
+                        && i.ReceiverId == userId
                         && i.Status == CampusConstants.InvitationStatus.Pending
                     );
 
@@ -147,7 +147,7 @@ namespace DataAccess
                     .Teaminvitations.AsNoTracking()
                     .CountAsync(i =>
                         i.Type == mentorType
-                        && i.StudentId == userId
+                        && i.ReceiverId == userId
                         && i.Status == CampusConstants.InvitationStatus.Accepted
                     );
 
@@ -155,7 +155,7 @@ namespace DataAccess
                     .Teaminvitations.AsNoTracking()
                     .CountAsync(i =>
                         i.Type == mentorType
-                        && i.StudentId == userId
+                        && i.ReceiverId == userId
                         && i.Status == CampusConstants.InvitationStatus.Declined
                     );
 
@@ -163,14 +163,14 @@ namespace DataAccess
                     .Teaminvitations.AsNoTracking()
                     .CountAsync(i =>
                         i.Type == mentorType
-                        && i.StudentId == userId
+                        && i.ReceiverId == userId
                         && i.Status == CampusConstants.InvitationStatus.Cancelled
                     );
 
                 mentorStats.RecentInvitations = await (
                     from i in _context.Teaminvitations.AsNoTracking()
                     join t in _context.Teams.AsNoTracking() on i.TeamId equals t.TeamId
-                    where i.Type == mentorType && i.StudentId == userId
+                    where i.Type == mentorType && i.ReceiverId == userId
                     orderby i.CreatedAt descending
                     select new RecentMentorInvitationRowDTO
                     {
@@ -415,3 +415,4 @@ namespace DataAccess
         }
     }
 }
+

@@ -31,7 +31,7 @@ public partial class User
 
     public virtual ICollection<Teaminvitation> TeaminvitationInvitedByNavigations { get; set; } = new List<Teaminvitation>();
 
-    public virtual ICollection<Teaminvitation> TeaminvitationStudents { get; set; } = new List<Teaminvitation>();
+    public virtual ICollection<Teaminvitation> TeaminvitationReceivers { get; set; } = new List<Teaminvitation>();
 
     public virtual ICollection<Teammember> Teammembers { get; set; } = new List<Teammember>();
 

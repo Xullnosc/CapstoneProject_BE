@@ -1,4 +1,4 @@
-﻿using BusinessObjects.DTOs;
+using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 
 namespace DataAccess
@@ -14,5 +14,6 @@ namespace DataAccess
         Task<PagedResult<User>> SearchUsersAsync(string term, int pageIndex, int pageSize);
         Task<List<User>> GetUsersByEmailsAsync(List<string> emails);
         Task<PagedResult<User>> GetUsersByEmailsAsync(List<string> emails, int pageIndex, int pageSize);
+        Task<DateTime?> GetLastLoginUtcAsync(int userId);
     }
 }

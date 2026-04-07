@@ -226,6 +226,51 @@ builder
             ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!)),
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userIdClaim = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var sessionStampClaim = context.Principal?.FindFirst("session_stamp")?.Value;
+
+                if (!int.TryParse(userIdClaim, out var userId) || string.IsNullOrWhiteSpace(sessionStampClaim))
+                {
+                    context.Fail("Invalid token claims.");
+                    return;
+                }
+
+                var userRepository = context.HttpContext.RequestServices.GetRequiredService<IUserRepository>();
+                var currentLastLogin = await userRepository.GetLastLoginUtcAsync(userId);
+                if (!currentLastLogin.HasValue)
+                {
+                    context.Fail("User not found.");
+                    return;
+                }
+
+                // Keep precision aligned with how `session_stamp` is generated (seconds).
+                // MySQL `datetime` is typically Kind=Unspecified when read via EF.
+                // Treat it as UTC (do not convert), then normalize to seconds to match token generation.
+                var dbRaw = currentLastLogin.Value;
+                var dbUtc = dbRaw.Kind == DateTimeKind.Unspecified
+                    ? DateTime.SpecifyKind(dbRaw, DateTimeKind.Utc)
+                    : dbRaw.ToUniversalTime();
+
+                var normalizedDbUtc = new DateTime(
+                    dbUtc.Year,
+                    dbUtc.Month,
+                    dbUtc.Day,
+                    dbUtc.Hour,
+                    dbUtc.Minute,
+                    dbUtc.Second,
+                    DateTimeKind.Utc
+                );
+                var currentStamp = normalizedDbUtc.Ticks.ToString();
+                if (!string.Equals(sessionStampClaim, currentStamp, StringComparison.Ordinal))
+                {
+                    context.Fail("Session invalidated by a newer login.");
+                }
+            }
+        };
     });
 
 builder.Services.AddAuthorization(options =>
