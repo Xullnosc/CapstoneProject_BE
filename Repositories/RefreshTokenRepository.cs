@@ -20,4 +20,7 @@ public class RefreshTokenRepository : IRefreshTokenRepository
 
     public Task RevokeByIdAsync(int id) =>
         _dao.RevokeByIdAsync(id);
+
+    public Task RevokeAllByUserIdAsync(int userId) =>
+        _dao.RevokeAllByUserIdAsync(userId);
 }

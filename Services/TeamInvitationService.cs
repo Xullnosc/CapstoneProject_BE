@@ -54,7 +54,7 @@ namespace Services
 
         public async Task<List<TeamInvitationDTO>> GetMyInvitationsAsync(int studentId)
         {
-            var invitations = await _invitationRepository.GetPendingInvitationsByStudentAsync(
+            var invitations = await _invitationRepository.GetPendingInvitationsByReceiverAsync(
                 studentId
             );
             return invitations.Select(MapToDTO).ToList();
@@ -80,7 +80,7 @@ namespace Services
             );
 
             // 5. Cancel other pending invitations
-            await _invitationRepository.CancelAllPendingInvitationsForStudentAsync(studentId);
+            await _invitationRepository.CancelAllPendingInvitationsForReceiverAsync(studentId);
 
             // 6. Update Team Status if needed
             await UpdateTeamStatusAfterJoinAsync(team);
@@ -92,7 +92,7 @@ namespace Services
                 invitation.InvitedBy,
                 NotificationType.TeamInvitation.ToString(),
                 "Invitation accepted",
-                $"{invitation.Student?.FullName ?? "A student"} accepted your invitation to join team {team.TeamName}.",
+                $"{invitation.Receiver?.FullName ?? "A student"} accepted your invitation to join team {team.TeamName}.",
                 "Team",
                 team.TeamId);
         }
@@ -110,7 +110,7 @@ namespace Services
                 invitation.InvitedBy,
                 NotificationType.TeamInvitation.ToString(),
                 "Invitation declined",
-                $"{invitation.Student?.FullName ?? "A student"} declined your invitation{(team == null ? string.Empty : $" to join team {team.TeamName}")}.",
+                $"{invitation.Receiver?.FullName ?? "A student"} declined your invitation{(team == null ? string.Empty : $" to join team {team.TeamName}")}.",
                 team == null ? null : "Team",
                 team?.TeamId);
         }
@@ -190,7 +190,7 @@ namespace Services
             }
 
             // 4. Check for existing pending invitation
-            var existingInvite = await _invitationRepository.GetByTeamAndStudentAsync(
+            var existingInvite = await _invitationRepository.GetByTeamAndReceiverAsync(
                 teamId,
                 student.UserId
             );
@@ -203,7 +203,7 @@ namespace Services
             var invitation = new Teaminvitation
             {
                 TeamId = teamId,
-                StudentId = student.UserId,
+                ReceiverId = student.UserId,
                 InvitedBy = inviterId,
                 Status = CampusConstants.InvitationStatus.Pending,
                 CreatedAt = DateTime.UtcNow,
@@ -299,7 +299,7 @@ namespace Services
             if (invitation == null)
                 throw new KeyNotFoundException("Invitation not found");
 
-            if (invitation.StudentId != studentId)
+            if (invitation.ReceiverId != studentId)
             {
                 throw new UnauthorizedAccessException(
                     "You are not the recipient of this invitation"
@@ -398,7 +398,7 @@ namespace Services
                     MemberCount = inv.Team?.Teammembers?.Count ?? 0,
                     LeaderName = inv.Team?.Leader?.FullName ?? "Unknown",
                 },
-                StudentId = inv.StudentId,
+                ReceiverId = inv.ReceiverId,
                 InvitedBy = new InvitedByDTO
                 {
                     UserId = inv.InvitedBy,
@@ -433,3 +433,4 @@ namespace Services
         #endregion
     }
 }
+

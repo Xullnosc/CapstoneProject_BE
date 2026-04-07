@@ -51,4 +51,7 @@ public class ThesisReviewRepository : IThesisReviewRepository
         string actorRole,
         CreateThesisReviewCommentDTO dto
     ) => _dao.AddCommentAsync(thesisId, authorUserId, actorRole, dto);
+
+    public Task AddRevisionEventAsync(string thesisId, int userId) =>
+        _dao.AddRevisionEventAsync(thesisId, userId);
 }

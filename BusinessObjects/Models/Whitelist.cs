@@ -12,6 +12,7 @@ public partial class Whitelist
     public string? StudentCode { get; set; }
 
     public string? FullName { get; set; }
+    public string? Status { get; set; }
 
     public int? RoleId { get; set; }
 

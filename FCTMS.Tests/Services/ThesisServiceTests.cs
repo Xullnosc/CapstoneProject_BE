@@ -505,7 +505,7 @@ namespace FCTMS.Tests.Services
         }
 
         [Fact]
-        public async Task UpdateThesisAsync_ShouldSyncTitleWithFileName_WhenFileProvidedAndNoTitle()
+        public async Task UpdateThesisAsync_ShouldPreserveTitleWhenEmpty_WhenFileProvidedAndNoTitle()
         {
             // Arrange
             string thesisId = "1";
@@ -537,13 +537,13 @@ namespace FCTMS.Tests.Services
                 .ReturnsAsync("new_url");
             _mockMapper
                 .Setup(m => m.Map<ThesisDTO>(It.IsAny<Thesis>()))
-                .Returns(new ThesisDTO { Title = "New_Thesis_File" });
+                .Returns(new ThesisDTO { Title = "Old Title" });
 
             // Act
             var result = await _thesisService.UpdateThesisAsync(thesisId, req, email);
 
             // Assert
-            thesis.Title.Should().Be("New_Thesis_File");
+            thesis.Title.Should().Be("Old Title");
             _mockThesisRepository.Verify(x => x.UpdateThesisAsync(thesis), Times.Once);
         }
 

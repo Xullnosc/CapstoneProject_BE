@@ -39,4 +39,5 @@ public interface IThesisReviewRepository
         string actorRole,
         CreateThesisReviewCommentDTO dto
     );
+    Task AddRevisionEventAsync(string thesisId, int userId);
 }

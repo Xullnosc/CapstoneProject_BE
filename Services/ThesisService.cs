@@ -370,24 +370,21 @@ namespace Services
 
                 // Update thesis with new file URL and transition status
                 thesis.FileUrl = newFileUrl;
-                thesis.Status = "Reviewing"; // Re-enter review queue
+                thesis.Status = "Reviewing";
+                await _thesisReviewRepository.AddRevisionEventAsync(thesisId, user.UserId);
             }
             else
             {
                 // If it was metadata-only update while in Need Update, we still move it to Reviewing 
                 // because the author signals they have addressed the "Need Update" feedback.
                 thesis.Status = "Reviewing";
+                await _thesisReviewRepository.AddRevisionEventAsync(thesisId, user.UserId);
             }
 
             // Update optional metadata fields
             if (!string.IsNullOrWhiteSpace(req.Title))
             {
                 thesis.Title = req.Title.Trim();
-            }
-            else if (req.File != null)
-            {
-                // Sync Title with filename if a new file is uploaded and no title provided
-                thesis.Title = System.IO.Path.GetFileNameWithoutExtension(req.File.FileName);
             }
 
             if (req.ShortDescription != null)
@@ -452,13 +449,98 @@ namespace Services
                     $"Cannot cancel a thesis that is '{thesis.Status}'."
                 );
 
-            using var transaction = await _context.Database.BeginTransactionAsync();
-            try
-            {
-                thesis.Status = "Cancelled";
-                thesis.UpdateDate = DateTime.UtcNow;
+            return await RevokeThesisAsync(thesisId, email);
+        }
 
-                // Reverted: Cascading Revocation removed per request
+        /// <summary>
+        /// Revoke a thesis proposal.
+        /// Handles different logic for lecturers vs student leaders.
+        /// </summary>
+        public async Task<ThesisDTO> RevokeThesisAsync(string thesisId, string email)
+        {
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null)
+                throw new UnauthorizedAccessException("User not found.");
+
+            var thesis = await _thesisRepository.GetThesisByIdWithHistoriesAsync(thesisId);
+            if (thesis == null)
+                throw new KeyNotFoundException("Thesis not found.");
+
+            // Only the owner can revoke/cancel
+            if (thesis.UserId != user.UserId)
+                throw new UnauthorizedAccessException(
+                    "You are not authorized to revoke this thesis."
+                );
+
+            // [LIFECYCLE GUARD]
+            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
+            if (currentSemester != null && !CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester.Status}'. Không thể thu hồi đề tài.");
+            }
+
+            var roleName = user.Role?.RoleName;
+            bool isLecturer = string.Equals(roleName, CampusConstants.Roles.Lecturer, StringComparison.OrdinalIgnoreCase);
+
+            if (isLecturer || string.Equals(roleName, CampusConstants.Roles.HOD, StringComparison.OrdinalIgnoreCase))
+            {
+                // Case 1: Lecturer/HOD proposed (and is current owner)
+                // If a team was already registered with this lecturer-proposed thesis, 
+                // the mentor should be removed from the team as well.
+                if (thesis.TeamId.HasValue)
+                {
+                    var team = await _teamRepository.GetByIdAsync(thesis.TeamId.Value);
+                    if (team != null)
+                    {
+                        if (team.MentorId == user.UserId) team.MentorId = null;
+                        if (team.MentorId2 == user.UserId) team.MentorId2 = null;
+                        await _teamRepository.UpdateAsync(team);
+                    }
+                }
+
+                // Revoke = Cancel + Remove Owner
+                thesis.Status = "Cancelled";
+                thesis.UserId = null;
+                thesis.TeamId = null;
+                thesis.MentorId1 = null;
+                thesis.MentorId2 = null;
+            }
+            else
+            {
+                // Case 2: Student Leader
+                bool isMentorProposed = false;
+                if (thesis.OriginalAuthorId.HasValue)
+                {
+                    var originalAuthor = await _userRepository.GetByIdAsync(thesis.OriginalAuthorId.Value);
+                    if (originalAuthor?.Role != null && 
+                        (string.Equals(originalAuthor.Role.RoleName, CampusConstants.Roles.Lecturer, StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(originalAuthor.Role.RoleName, CampusConstants.Roles.HOD, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        isMentorProposed = true;
+                    }
+                }
+
+                if (isMentorProposed)
+                {
+                    // Case 2a: Mentor's thesis return to original mentor
+                    thesis.UserId = thesis.OriginalAuthorId;
+                    thesis.TeamId = null;
+                    thesis.MentorId1 = null;
+                    thesis.MentorId2 = null;
+                    thesis.Status = "Published"; // Back to available
+                }
+                else
+                {
+                    // Case 2b: Student's own thesis: Cancelled
+                    thesis.Status = "Cancelled";
+                    thesis.TeamId = null;
+                    thesis.MentorId1 = null;
+                    thesis.MentorId2 = null;
+                }
+            }
+
+            thesis.UpdateDate = DateTime.UtcNow;
+            await _thesisRepository.UpdateThesisAsync(thesis);
 
                 await _thesisRepository.UpdateThesisAsync(thesis);
                 await transaction.CommitAsync();
@@ -514,31 +596,8 @@ namespace Services
                     foreach (var t in mentoredTeams)
                     {
                         teamIds.Add(t.TeamId);
-                        ownerIds.Add(t.LeaderId); // Fallback: See leader's thesis if TeamId is null
                     }
 
-                    // Add theses from teams that have a Pending mentor invitation for this lecturer
-                    var pendingInvitations =
-                        await _teamInvitationRepository.GetPendingMentorInvitationsByMentorIdAsync(
-                            user.UserId
-                        );
-                    var pendingTeamIds = pendingInvitations
-                        .Select(i => i.TeamId)
-                        .Distinct()
-                        .ToList();
-
-                    var pendingTeams = allTeams
-                        .Where(t =>
-                            pendingTeamIds.Contains(t.TeamId)
-                            && t.Status != CampusConstants.TeamStatus.Disbanded
-                        )
-                        .ToList();
-
-                    foreach (var t in pendingTeams)
-                    {
-                        teamIds.Add(t.TeamId);
-                        ownerIds.Add(t.LeaderId); // Also see leader's thesis for invitation review
-                    }
                 }
             }
             else
@@ -696,10 +755,9 @@ namespace Services
             if (thesis == null)
                 throw new KeyNotFoundException("Thesis not found.");
 
-            if (distinct.Contains(thesis.UserId))
-                throw new ArgumentException(
-                    "Thesis proposer cannot be a reviewer for their own thesis."
-                );
+            if (thesis.UserId.HasValue && distinct.Any(id => id == thesis.UserId.Value))
+                throw new ArgumentException("Thesis proposer cannot be a reviewer for their own thesis.");
+
 
             // Reset status to Reviewing when (re)assigning reviewers
             thesis.Status = "Reviewing";
@@ -861,7 +919,7 @@ namespace Services
                 throw new KeyNotFoundException("Thesis not found.");
 
             // HOD decision is FINAL (Priority 1)
-            if (status.HodDecision != null)
+            if (status?.HodDecision != null)
             {
                 var isPass = string.Equals(
                     status.HodDecision.Decision,
@@ -884,13 +942,13 @@ namespace Services
             }
 
             // Reviewer decisions (Priority 2)
-            if (string.Equals(status.OverallStatus, "Pass", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(status?.OverallStatus, "Pass", StringComparison.OrdinalIgnoreCase))
             {
                 thesis.Status = thesis.TeamId.HasValue ? "Registered" : "Published";
             }
             else if (
-                string.Equals(status.OverallStatus, "Fail", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(status.OverallStatus, "Split", StringComparison.OrdinalIgnoreCase)
+                string.Equals(status?.OverallStatus, "Fail", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status?.OverallStatus, "Split", StringComparison.OrdinalIgnoreCase)
             )
             {
                 thesis.Status = "Need Update";
@@ -937,14 +995,23 @@ namespace Services
                 var lecturer = await _lecturerRepository.GetByEmailAsync(user.Email);
                 if (lecturer != null)
                 {
-                    if (lecturer.IsReviewer)
-                        return "REVIEWER";
-
                     var isMentor =
                         thesis.MentorId1 == lecturer.LecturerId
                         || thesis.MentorId2 == lecturer.LecturerId;
+
+                    if (!isMentor && thesis.Team != null)
+                    {
+                        // Check if lecturer is a mentor of the team associated with this thesis
+                        isMentor =
+                            thesis.Team.MentorId == user.UserId
+                            || thesis.Team.MentorId2 == user.UserId;
+                    }
+
                     if (isMentor)
                         return "MENTOR";
+
+                    if (lecturer.IsReviewer)
+                        return "REVIEWER";
                 }
             }
 
@@ -1073,11 +1140,8 @@ namespace Services
             // Apply Reviewer restrictions
             if (!string.IsNullOrEmpty(currentUserEmail))
             {
-                // 1. Conflict of Interest Check: If you are Mentor 1 or 2, you cannot see it in the review list
-                dtos = dtos.Where(d =>
-                    !string.Equals(d.MentorEmail1, currentUserEmail, StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(d.MentorEmail2, currentUserEmail, StringComparison.OrdinalIgnoreCase)
-                );
+                // Removed: Conflict of Interest Check hiding theses from the list entirely. 
+                // Mentors can now see their own theses in the global list, but are blocked from evaluating them on the detail page.
 
                 // 2. Role-specific restrictions
                 if (user != null)
