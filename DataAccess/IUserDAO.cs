@@ -14,6 +14,7 @@ namespace DataAccess
         Task<PagedResult<User>> SearchUsersAsync(string term, int pageIndex, int pageSize);
         Task<List<User>> GetUsersByEmailsAsync(List<string> emails);
         Task<PagedResult<User>> GetUsersByEmailsAsync(List<string> emails, int pageIndex, int pageSize);
+        Task<List<User>> GetUsersByIdsAsync(List<int> ids);
         Task<DateTime?> GetLastLoginUtcAsync(int userId);
     }
 }

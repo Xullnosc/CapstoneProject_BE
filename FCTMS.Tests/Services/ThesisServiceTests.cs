@@ -8,12 +8,16 @@ using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Repositories;
 using Services;
 using Services.Helpers;
 using Services.Mappings;
 using Xunit;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using DataAccess;
 
 namespace FCTMS.Tests.Services
 {
@@ -27,8 +31,13 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ISemesterRepository> _mockSemesterRepository;
         private readonly Mock<ILecturerRepository> _mockLecturerRepository;
         private readonly Mock<ITeamInvitationRepository> _mockTeamInvitationRepository;
+        private readonly Mock<ITeamMemberRepository> _mockTeamMemberRepository;
+        private readonly Mock<IWhitelistRepository> _mockWhitelistRepository;
+        private readonly Mock<INotificationService> _mockNotificationService;
         private readonly Mock<IMapper> _mockMapper;
         private readonly Mock<ISystemParameterService> _mockSystemParameterService;
+        private readonly Mock<ILogger<ThesisService>> _mockLogger;
+        private readonly FctmsContext _fctmsContext; // Real context with InMemory database
         private readonly ThesisService _thesisService;
 
         public ThesisServiceTests()
@@ -41,8 +50,19 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository = new Mock<ISemesterRepository>();
             _mockLecturerRepository = new Mock<ILecturerRepository>();
             _mockTeamInvitationRepository = new Mock<ITeamInvitationRepository>();
+            _mockTeamMemberRepository = new Mock<ITeamMemberRepository>();
+            _mockWhitelistRepository = new Mock<IWhitelistRepository>();
+            _mockNotificationService = new Mock<INotificationService>();
             _mockMapper = new Mock<IMapper>();
             _mockSystemParameterService = new Mock<ISystemParameterService>();
+            _mockLogger = new Mock<ILogger<ThesisService>>();
+
+            // Setup real context with InMemory Database to support Transactions
+            var options = new DbContextOptionsBuilder<FctmsContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .ConfigureWarnings(x => x.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+                .Options;
+            _fctmsContext = new FctmsContext(options);
 
             // Default: registration open, 10MB limit â€” keeps all existing tests green
             _mockSystemParameterService
@@ -61,8 +81,17 @@ namespace FCTMS.Tests.Services
                 _mockSemesterRepository.Object,
                 _mockLecturerRepository.Object,
                 _mockTeamInvitationRepository.Object,
+                _mockTeamMemberRepository.Object,
+                _mockWhitelistRepository.Object,
+                _mockNotificationService.Object,
+                _fctmsContext, // Using real InMemory context instead of null!
                 _mockMapper.Object,
-                _mockSystemParameterService.Object
+                _mockSystemParameterService.Object,
+                null,  // checklistRepository
+                null,  // aiService
+                null,  // userAiSettingsService
+                null,  // httpClientFactory
+                _mockLogger.Object
             );
         }
 

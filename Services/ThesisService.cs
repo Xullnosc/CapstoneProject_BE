@@ -13,6 +13,7 @@ using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Repositories;
 using Services.AI.Configuration;
@@ -38,6 +39,10 @@ namespace Services
         private readonly IAIService? _aiService;
         private readonly IUserAISettingsService? _userAiSettingsService;
         private readonly IHttpClientFactory? _httpClientFactory;
+        private readonly ITeamMemberRepository _teamMemberRepository;
+        private readonly IWhitelistRepository _whitelistRepository;
+        private readonly INotificationService _notificationService;
+        private readonly FctmsContext _context;
         private readonly ILogger<ThesisService>? _logger;
 
         private const int MaxExtractedChars = 24000;
@@ -51,6 +56,10 @@ namespace Services
             ISemesterRepository semesterRepository,
             ILecturerRepository lecturerRepository,
             ITeamInvitationRepository teamInvitationRepository,
+            ITeamMemberRepository teamMemberRepository,
+            IWhitelistRepository whitelistRepository,
+            INotificationService notificationService,
+            FctmsContext context,
             IMapper mapper,
             ISystemParameterService systemParameterService,
             IChecklistRepository? checklistRepository = null,
@@ -68,6 +77,10 @@ namespace Services
             _semesterRepository = semesterRepository;
             _lecturerRepository = lecturerRepository;
             _teamInvitationRepository = teamInvitationRepository;
+            _teamMemberRepository = teamMemberRepository;
+            _whitelistRepository = whitelistRepository;
+            _notificationService = notificationService;
+            _context = context;
             _mapper = mapper;
             _systemParameterService = systemParameterService;
             _checklistRepository = checklistRepository;
@@ -178,48 +191,92 @@ namespace Services
             var hasAssignedMentor =
                 team?.MentorId.HasValue == true || team?.MentorId2.HasValue == true;
 
-            var thesis = new Thesis
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                CampusId = targetUser.CampusId ?? 1,
-                ThesisId = Guid.NewGuid().ToString(),
-                Title = string.IsNullOrWhiteSpace(req.Title)
-                    ? (
-                        req.File != null
-                            ? System.IO.Path.GetFileNameWithoutExtension(req.File.FileName)
-                            : "Untitled"
-                    )
-                    : req.Title.Trim(),
-                ShortDescription = req.ShortDescription,
-                UserId = targetUser.UserId,
-                FileUrl = fileUrl,
-                Status =
-                    isTargetStaff || isHodActingForOther
-                        ? "Reviewing"
-                        : (hasAssignedMentor ? "Reviewing" : "On Mentor Inviting"),
-                SemesterId = currentSemester?.SemesterId,
-                UpDate = DateTime.UtcNow,
-                UpdateDate = DateTime.UtcNow,
-
-                ThesisNameEn = req.ThesisNameEn,
-                ThesisNameVi = req.ThesisNameVi,
-                Abbreviation = req.Abbreviation,
-                IsFromEnterprise = req.IsFromEnterprise,
-                EnterpriseName = req.IsFromEnterprise ? req.EnterpriseName : null,
-                IsApplied = req.IsApplied,
-                IsAppUsed = req.IsAppUsed,
-                OriginalAuthorId = targetUser.UserId,
-            };
-
-            // Set TeamId based on role (Staff don't have teams)
-            if (!isTargetStaff)
-            {
-                if (team != null)
+                var thesis = new Thesis
                 {
-                    thesis.TeamId = team.TeamId;
+                    CampusId = targetUser.CampusId ?? 1,
+                    ThesisId = Guid.NewGuid().ToString(),
+                    Title = string.IsNullOrWhiteSpace(req.Title)
+                        ? (
+                            req.File != null
+                                ? System.IO.Path.GetFileNameWithoutExtension(req.File.FileName)
+                                : "Untitled"
+                        )
+                        : req.Title.Trim(),
+                    ShortDescription = req.ShortDescription,
+                    UserId = targetUser.UserId,
+                    FileUrl = fileUrl,
+                    Status =
+                        isTargetStaff || isHodActingForOther
+                            ? "Reviewing"
+                            : (hasAssignedMentor ? "Reviewing" : "On Mentor Inviting"),
+                    SemesterId = currentSemester?.SemesterId,
+                    UpDate = DateTime.UtcNow,
+                    UpdateDate = DateTime.UtcNow,
+
+                    ThesisNameEn = req.ThesisNameEn,
+                    ThesisNameVi = req.ThesisNameVi,
+                    Abbreviation = req.Abbreviation,
+                    IsFromEnterprise = req.IsFromEnterprise,
+                    EnterpriseName = req.IsFromEnterprise ? req.EnterpriseName : null,
+                    IsApplied = req.IsApplied,
+                    IsAppUsed = req.IsAppUsed,
+                    OriginalAuthorId = targetUser.UserId,
+                };
+
+                Team? createdTeam = null;
+                List<User>? members = null;
+
+                // [NEW] Direct Student Assignment (Lecturer proposing for students)
+                if (isTargetStaff && req.MemberIds != null && req.MemberIds.Any())
+                {
+                    if (!req.LeaderId.HasValue)
+                        throw new InvalidOperationException("Vui lòng chỉ định một trưởng nhóm khi gán sinh viên trực tiếp.");
+
+                    var result = await AutoCreateTeamAndAssignAsync(
+                        req.MemberIds,
+                        req.LeaderId.Value,
+                        targetUser,
+                        currentSemester.SemesterId,
+                        thesis.Title,
+                        req.Abbreviation);
+
+                    createdTeam = result.Team;
+                    members = result.Members;
+
+                    thesis.TeamId = createdTeam.TeamId;
+                    
+                    // Automatically assign the lecturer as MentorId1 in Thesis record
+                    var lecturer = await _lecturerRepository.GetByEmailAsync(targetUser.Email);
+                    thesis.MentorId1 = lecturer?.LecturerId;
+                    thesis.Status = "Reviewing"; // Lecturer-led team theses go to review immediately
                 }
+                else if (!isTargetStaff)
+                {
+                    if (team != null)
+                    {
+                        thesis.TeamId = team.TeamId;
+                    }
+                }
+
+                var createdThesis = await _thesisRepository.CreateThesisAsync(thesis);
+                await transaction.CommitAsync();
+
+                // Send Notifications AFTER successful commit
+                if (createdTeam != null && members != null)
+                {
+                    await SendTeamAssignmentNotificationAsync(createdTeam, createdThesis, members, targetUser);
+                }
+
+                return createdThesis;
             }
-            var createdThesis = await _thesisRepository.CreateThesisAsync(thesis);
-            return createdThesis;
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task<IEnumerable<Thesis>> GetAllThesesAsync() =>
@@ -387,7 +444,7 @@ namespace Services
                 "On Mentor Inviting",
                 "Need Update",
             };
-            if (!cancellable.Contains(thesis.Status))
+            if (!cancellable.Contains(thesis.Status, StringComparer.OrdinalIgnoreCase))
                 throw new InvalidOperationException(
                     $"Cannot cancel a thesis that is '{thesis.Status}'."
                 );
@@ -1818,6 +1875,194 @@ Thesis content:
             var updated = await _thesisRepository.GetThesisByIdWithHistoriesAsync(thesisId);
             return _mapper.Map<ThesisDTO>(updated!);
         }
+
+        #region Private Helpers for Direct Assignment
+
+        private async Task<(Team Team, List<User> Members)> AutoCreateTeamAndAssignAsync(
+            List<int> memberIds,
+            int leaderId,
+            User lecturerUser,
+            int semesterId,
+            string thesisTitle,
+            string? thesisAbbreviation)
+        {
+            // 1. Deduplicate & Validate count
+            var uniqueIds = memberIds.Distinct().ToList();
+            if (uniqueIds.Count < 4 || uniqueIds.Count > 5)
+                throw new InvalidOperationException($"Số lượng sinh viên phải từ 4 đến 5. Hiện tại có {uniqueIds.Count} sinh viên.");
+
+            if (!uniqueIds.Contains(leaderId))
+                throw new InvalidOperationException("Trưởng nhóm phải nằm trong danh sách sinh viên được chọn.");
+
+            // 2. Fetch/Create Users (Stub User logic)
+            var memberUsers = new List<User>();
+            foreach (var id in uniqueIds)
+            {
+                User? member;
+                if (id > 0)
+                {
+                    member = await _userRepository.GetByIdAsync(id);
+                    if (member == null) throw new KeyNotFoundException($"Không tìm thấy sinh viên với ID {id}.");
+                }
+                else
+                {
+                    // Negative ID case: find in Whitelist and create stub user
+                    var whitelistId = -id;
+                    var whitelist = await _whitelistRepository.GetByIdAsync(whitelistId);
+                    if (whitelist == null) throw new KeyNotFoundException($"Không tìm thấy thông tin sinh viên trong Whitelist (ID: {whitelistId}).");
+
+                    member = new User
+                    {
+                        Email = whitelist.Email,
+                        FullName = whitelist.FullName ?? "New User",
+                        Avatar = whitelist.Avatar ?? "",
+                        RoleId = whitelist.RoleId, // Should be Student role
+                        StudentCode = whitelist.StudentCode,
+                        CampusId = whitelist.CampusId,
+                        CreatedAt = DateTime.UtcNow,
+                        IsAuthorized = true
+                    };
+                    member = await _userRepository.AddAsync(member);
+                }
+                memberUsers.Add(member);
+            }
+
+            // 3. Validate Eligibility (Role, Whitelist, Current Team)
+            foreach (var m in memberUsers)
+            {
+                // Check whitelist for current semester
+                var isWhitelisted = await _whitelistRepository.IsWhitelistedInSemesterAsync(m.Email, semesterId);
+                if (!isWhitelisted)
+                    throw new InvalidOperationException($"Sinh viên {m.Email} không có tên trong Whitelist của học kỳ hiện tại.");
+
+                // Check if already in a team
+                var alreadyInTeam = await _teamMemberRepository.IsStudentInTeamAsync(m.UserId, semesterId);
+                if (alreadyInTeam)
+                    throw new InvalidOperationException($"Sinh viên {m.FullName} ({m.Email}) đã tham gia một nhóm khác trong học kỳ này.");
+            }
+
+            // 4. Create Team
+            // Use Abbreviation as Team Name if available, otherwise fallback to Title
+            var nameBasis = !string.IsNullOrWhiteSpace(thesisAbbreviation) ? thesisAbbreviation : thesisTitle;
+            var teamName = nameBasis.Length > 100 ? nameBasis.Substring(0, 97) + "..." : nameBasis;
+            
+            // Generate unique TeamCode
+            var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
+            var semPrefix = semester?.SemesterCode ?? "TEMP";
+            var teamCount = await _context.Teams.CountAsync(t => t.SemesterId == semesterId);
+            var teamCode = $"{semPrefix}_SE_{teamCount + 1:D2}";
+
+            var team = new Team
+            {
+                TeamName = teamName,
+                TeamCode = teamCode,
+                SemesterId = semesterId,
+                LeaderId = leaderId,
+                MentorId = lecturerUser.UserId,
+                CreatedAt = DateTime.UtcNow,
+                Status = CampusConstants.TeamStatus.Active, // Auto-assigned teams are active
+                IsSpecial = false,
+                CampusId = lecturerUser.CampusId ?? 1 // Fallback to campus 1 if not set
+            };
+
+            await _context.Teams.AddAsync(team);
+            await _context.SaveChangesAsync();
+
+            // 5. Add Teammembers (No Invitation)
+            foreach (var m in memberUsers)
+            {
+                var teameMember = new Teammember
+                {
+                    TeamId = team.TeamId,
+                    StudentId = m.UserId,
+                    Role = m.UserId == leaderId ? CampusConstants.TeamRole.Leader : CampusConstants.TeamRole.Member,
+                    JoinedAt = DateTime.UtcNow
+                };
+                await _context.Teammembers.AddAsync(teameMember);
+            }
+            await _context.SaveChangesAsync();
+
+            return (team, memberUsers);
+        }
+
+        private async Task SendTeamAssignmentNotificationAsync(Team team, Thesis thesis, List<User> members, User lecturer)
+        {
+            try
+            {
+                var memberIds = members.Select(m => m.UserId).ToList();
+                var title = $"Bạn đã được gán vào nhóm {team.TeamCode}";
+                var message = $"Giảng viên {lecturer.FullName} đã thêm bạn vào nhóm {team.TeamCode} cho đề tài '{thesis.Title}'. Dự án đã bắt đầu, hãy kiểm tra danh sách nhóm của bạn.";
+
+                // Premium HTML Email Template
+                var emailBody = $@"
+<div style=""font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #334155; background-color: #f8fafc; padding: 40px 20px;"">
+    <div style=""max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);"">
+        <!-- Header -->
+        <div style=""background-color: #1e293b; padding: 30px; text-align: center;"">
+            <h1 style=""color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 2px;"">FCTMS</h1>
+            <p style=""color: #94a3b8; margin: 5px 0 0 0; font-size: 13px;"">Capstone Thesis Management System</p>
+        </div>
+
+        <!-- Body -->
+        <div style=""padding: 40px;"">
+            <h2 style=""margin: 0 0 20px 0; color: #1e293b; font-size: 20px;"">Xin chào Sinh viên,</h2>
+            <p style=""margin-bottom: 25px; font-size: 16px;"">
+                Bạn đã được gán vào một nhóm đồ án mới bởi <b>Giảng viên {lecturer.FullName}</b>.
+            </p>
+
+            <!-- Info Card -->
+            <div style=""background-color: #f1f5f9; border-radius: 12px; padding: 25px; margin-bottom: 30px;"">
+                <div style=""margin-bottom: 15px;"">
+                    <span style=""text-transform: uppercase; font-size: 11px; font-weight: 900; color: #64748b; letter-spacing: 1px; display: block; margin-bottom: 4px;"">Mã nhóm</span>
+                    <span style=""font-size: 18px; font-weight: 700; color: #f97415;"">{team.TeamCode}</span>
+                </div>
+                <div>
+                    <span style=""text-transform: uppercase; font-size: 11px; font-weight: 900; color: #64748b; letter-spacing: 1px; display: block; margin-bottom: 4px;"">Đề tài đồ án</span>
+                    <span style=""font-size: 16px; font-weight: 600; color: #1e293b;"">{thesis.Title}</span>
+                </div>
+            </div>
+
+            <p style=""margin-bottom: 30px;"">
+                Giai đoạn làm đồ án chính thức bắt đầu. Hãy chủ động liên hệ với nhóm trưởng và các thành viên khác để bắt đầu công việc ngay nhé.
+            </p>
+
+            <!-- Action Button -->
+            <div style=""text-align: center;"">
+                <a href=""https://fctms-fe.vercel.app/"" style=""display: inline-block; background-color: #f97415; color: #ffffff; padding: 15px 35px; border-radius: 10px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 6px rgba(249, 116, 21, 0.2);"">
+                    TRUY CẬP HỆ THỐNG
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style=""background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;"">
+            <p style=""margin: 0; font-size: 12px; color: #94a3b8;"">
+                Đây là thông báo tự động từ hệ thống FCTMS. Vui lòng không phản hồi email này.
+            </p>
+        </div>
+    </div>
+</div>";
+
+                // 1. System Notifications + Background Email with HTML Template
+                await _notificationService.CreateBulkNotificationsAsync(
+                    memberIds,
+                    "TeamInvitation", // string type
+                    title,
+                    message, // Plain text for App
+                    "Team",
+                    team.TeamId,
+                    sendEmail: true,
+                    emailBody: emailBody); // Premium HTML for Email
+
+                _logger?.LogInformation("Sent automated team assignment notifications for Team {TeamCode}", team.TeamCode);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to send notifications for automated team assignment. TeamId: {TeamId}", team.TeamId);
+            }
+        }
+
+        #endregion
 
         #endregion
     }

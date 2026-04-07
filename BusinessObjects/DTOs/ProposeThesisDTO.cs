@@ -34,5 +34,8 @@ namespace BusinessObjects.DTOs
         public bool IsAppUsed { get; set; }
         
         public int? AuthorId { get; set; }
+
+        public List<int>? MemberIds { get; set; }
+        public int? LeaderId { get; set; }
     }
 }

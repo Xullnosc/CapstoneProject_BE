@@ -52,6 +52,11 @@ namespace Repositories
             return await _userDAO.GetUsersByEmailsAsync(emails);
         }
 
+        public async Task<List<User>> GetUsersByIdsAsync(List<int> ids)
+        {
+            return await _userDAO.GetUsersByIdsAsync(ids);
+        }
+
         public async Task<DateTime?> GetLastLoginUtcAsync(int userId)
         {
             return await _userDAO.GetLastLoginUtcAsync(userId);
