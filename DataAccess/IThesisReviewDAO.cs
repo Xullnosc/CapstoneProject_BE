@@ -41,5 +41,5 @@ public interface IThesisReviewDAO
         CreateThesisReviewCommentDTO dto
     );
 
-    Task AddRevisionEventAsync(string thesisId, int userId);
+    Task AddRevisionEventAsync(string thesisId, int userId, string? description = null);
 }

@@ -105,7 +105,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
                     )
                     .MaxAsync(e => (DateTime?)e.CreatedAt) ?? DateTime.MinValue;
 
-            var roundStartTime =
+            var firstAssignmentAfterFinal =
                 await _context
                     .ThesisReviewEvents.AsNoTracking()
                     .Where(e =>
@@ -114,7 +114,8 @@ public class ThesisReviewDAO : IThesisReviewDAO
                         && e.CreatedAt > lastFinalDecisionTime
                         && !e.IsDeleted
                     )
-                    .MinAsync(e => (DateTime?)e.CreatedAt) ?? DateTime.MinValue;
+                    .MinAsync(e => (DateTime?)e.CreatedAt);
+            var roundStartTime = firstAssignmentAfterFinal ?? lastFinalDecisionTime;
 
             var currentRoundDecisions = await _context
                 .ThesisReviewEvents.AsNoTracking()
@@ -320,12 +321,17 @@ public class ThesisReviewDAO : IThesisReviewDAO
         var reviewerUids = reviewerIds.Distinct().ToList();
         var relevantUserIds = new List<int>(reviewerUids);
 
+        var latestRevisionTime = await _context.ThesisReviewEvents.AsNoTracking()
+            .Where(e => e.ThesisId == thesisId && e.EventType == "REVISION_UPDATED" && !e.IsDeleted)
+            .MaxAsync(e => (DateTime?)e.CreatedAt) ?? DateTime.MinValue;
+
         var latestHodDecisionEvent = await _context
             .ThesisReviewEvents.AsNoTracking()
             .Where(e =>
                 e.ThesisId == thesisId
                 && e.EventType == "FINAL_DECISION"
                 && e.ActorRole == "HOD"
+                && e.CreatedAt > latestRevisionTime
                 && !e.IsDeleted
             )
             .OrderByDescending(e => e.CreatedAt)
@@ -360,6 +366,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
                 e.ThesisId == thesisId
                 && e.EventType == "REVIEWER_DECISION"
                 && e.ActorRole == "REVIEWER"
+                && e.CreatedAt > latestRevisionTime
                 && !e.IsDeleted
             )
             .OrderByDescending(e => e.CreatedAt)
@@ -746,21 +753,40 @@ public class ThesisReviewDAO : IThesisReviewDAO
         };
     }
 
-    public async Task AddRevisionEventAsync(string thesisId, int userId)
+    public async Task AddRevisionEventAsync(string thesisId, int userId, string? description = null)
     {
         var currentRound = await _context.ThesisReviewEvents.AsNoTracking()
             .Where(e => e.ThesisId == thesisId && !e.IsDeleted)
-            .MaxAsync(e => (int?)e.Round) ?? 1;
+            .MaxAsync(e => (int?)e.Round) ?? 0;
+        var nextRound = currentRound + 1;
 
-        await CreateEventAsync(
+        var revisionEvent = await CreateEventAsync(
             thesisId,
             "REVISION_UPDATED",
             userId,
             "AUTHOR",
             null,
             null,
-            currentRound
+            nextRound
         );
+
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            _context.ThesisReviewComments.Add(
+                new ThesisReviewComment
+                {
+                    EventId = revisionEvent.Id,
+                    ThesisId = thesisId,
+                    AuthorUserId = userId,
+                    Body = description.Trim(),
+                    CommentType = "FOLLOW_UP",
+                    VisibilityScope = "PUBLIC",
+                    CreatedAt = DateTime.UtcNow,
+                    IsDeleted = false,
+                }
+            );
+            await _context.SaveChangesAsync();
+        }
     }
 
     private async Task<ThesisReviewEvent> CreateEventAsync(

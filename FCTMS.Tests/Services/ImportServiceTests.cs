@@ -396,9 +396,9 @@ namespace FCTMS.Tests.Services
 
             await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
-            context.Whitelists.Count(w => w.Email == "student@example.com").Should().Be(1);
-            context.Whitelists.Single(w => w.Email == "student@example.com").SemesterId.Should().Be(1);
-            context.Whitelists.Single(w => w.Email == "student@example.com").FullName.Should().Be("Imported Student");
+            context.Whitelists.Count(w => w.Email == "student@example.com").Should().Be(2);
+            context.Whitelists.Single(w => w.Email == "student@example.com" && w.SemesterId == 1).FullName.Should().Be("Imported Student");
+            context.Whitelists.Single(w => w.Email == "student@example.com" && w.SemesterId == 2).FullName.Should().Be("Existing Student");
         }
 
 

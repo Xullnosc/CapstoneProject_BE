@@ -74,26 +74,27 @@ namespace DataAccess
                     .Where(w => w.SemesterId == semesterId && w.RoleId == studentRoleId)
                     .ToListAsync();
 
-                var existingMatchingWhitelists = await _context.Whitelists
+                // Only match whitelists that belong to the TARGET semester.
+                // Records from ended/other semesters must NOT be updated — a new row is always
+                // created for the current import semester instead.
+                var existingWhitelists = existingWhitelistsInSemester;
+
+                // We still need cross-semester matching emails/codes to load the User rows.
+                var crossSemesterMatchingWhitelists = await _context.Whitelists
                     .Where(w => w.RoleId == studentRoleId &&
                                 (importedEmails.Contains(w.Email.ToLower()) ||
                                  (w.StudentCode != null && importedStudentCodes.Contains(w.StudentCode.ToLower()))))
+                    .AsNoTracking()
                     .ToListAsync();
 
-                var existingWhitelists = existingWhitelistsInSemester
-                    .Concat(existingMatchingWhitelists)
-                    .GroupBy(w => w.WhitelistId)
-                    .Select(group => group.First())
-                    .ToList();
-
                 var candidateEmails = importedEmails
-                    .Concat(existingWhitelistsInSemester.Select(w => NormalizeEmail(w.Email)))
+                    .Concat(crossSemesterMatchingWhitelists.Select(w => NormalizeEmail(w.Email)))
                     .Where(v => !string.IsNullOrWhiteSpace(v))
                     .Distinct()
                     .ToList();
 
                 var candidateStudentCodes = importedStudentCodes
-                    .Concat(existingWhitelistsInSemester.Select(w => NormalizeKey(w.StudentCode)))
+                    .Concat(crossSemesterMatchingWhitelists.Select(w => NormalizeKey(w.StudentCode)))
                     .Where(v => !string.IsNullOrWhiteSpace(v))
                     .Distinct()
                     .ToList();
