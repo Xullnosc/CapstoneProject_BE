@@ -139,6 +139,34 @@ namespace FCTMS.Tests.Services
         }
 
         [Fact]
+        public async Task DisbandTeamAsync_ShouldTransferRegisteredThesisToMentor1_WhenTeamHasRegisteredThesis()
+        {
+            int teamId = 1, leaderId = 100, mentor1Id = 200;
+            var team = new Team { TeamId = teamId, LeaderId = leaderId, SemesterId = 1, MentorId = mentor1Id };
+            var registeredThesis = new Thesis
+            {
+                ThesisId = "t-1",
+                TeamId = teamId,
+                UserId = leaderId,
+                Status = "Registered",
+            };
+
+            _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { Status = "Open" });
+            _mockThesisRepository.Setup(r => r.GetThesesByUserIdAsync(leaderId)).ReturnsAsync(new List<Thesis>());
+            _mockThesisRepository.Setup(r => r.GetThesesByTeamIdAsync(teamId)).ReturnsAsync(new List<Thesis> { registeredThesis });
+            _mockTeamMemberRepository.Setup(r => r.RemoveAllMembersFromTeamAsync(teamId)).ReturnsAsync(true);
+
+            var result = await _teamService.DisbandTeamAsync(teamId, leaderId);
+
+            result.Should().BeTrue();
+            registeredThesis.UserId.Should().Be(mentor1Id);
+            registeredThesis.TeamId.Should().BeNull();
+            registeredThesis.Status.Should().Be("Published");
+            _mockThesisRepository.Verify(r => r.UpdateThesisAsync(registeredThesis), Times.Once);
+        }
+
+        [Fact]
         public async Task UpdateTeamAsync_ShouldThrow_WhenTeamNotFound()
         {
             // Arrange

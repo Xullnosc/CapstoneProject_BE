@@ -1008,7 +1008,8 @@ namespace FCTMS.Tests.Services
             Func<Task> act = async () => await _thesisService.SubmitReviewerDecisionAsync(thesisId, reviewerId, dto);
 
             // Assert
-            await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("You are not an assigned reviewer for this thesis.");
+            await act.Should().ThrowAsync<UnauthorizedAccessException>()
+                .WithMessage("You are not an assigned reviewer for this thesis or reviewer slots are already full.");
         }
 
         [Fact]

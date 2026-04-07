@@ -210,6 +210,25 @@ namespace Services
                 throw new InvalidOperationException("Cannot disband team while a published thesis is still active.");
             }
 
+            // If this team currently holds a registered thesis, return ownership to mentor1.
+            // Once team is disbanded, thesis is detached from team and goes back to Published.
+            var teamTheses = await _thesisRepository.GetThesesByTeamIdAsync(teamId) ?? new List<Thesis>();
+            var registeredThesis = teamTheses.FirstOrDefault(t =>
+                string.Equals(t.Status, "Registered", StringComparison.OrdinalIgnoreCase));
+            if (registeredThesis != null)
+            {
+                if (team.MentorId.HasValue)
+                {
+                    registeredThesis.UserId = team.MentorId.Value;
+                }
+                registeredThesis.TeamId = null;
+                registeredThesis.MentorId1 = null;
+                registeredThesis.MentorId2 = null;
+                registeredThesis.Status = "Published";
+                registeredThesis.UpdateDate = DateTime.UtcNow;
+                await _thesisRepository.UpdateThesisAsync(registeredThesis);
+            }
+
 
             // 2. Remove all members
             await _teamMemberRepository.RemoveAllMembersFromTeamAsync(teamId);
