@@ -542,16 +542,7 @@ namespace Services
             thesis.UpdateDate = DateTime.UtcNow;
             await _thesisRepository.UpdateThesisAsync(thesis);
 
-                await _thesisRepository.UpdateThesisAsync(thesis);
-                await transaction.CommitAsync();
-
-                return _mapper.Map<ThesisDTO>(thesis);
-            }
-            catch (Exception)
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
+            return _mapper.Map<ThesisDTO>(thesis);
         }
 
 
