@@ -1,4 +1,4 @@
-﻿using BusinessObjects.Models;
+using BusinessObjects.Models;
 using DataAccess;
 using System;
 using System.Collections.Generic;
@@ -50,6 +50,11 @@ namespace Repositories
         public async Task<List<User>> GetUsersByEmailsAsync(List<string> emails)
         {
             return await _userDAO.GetUsersByEmailsAsync(emails);
+        }
+
+        public async Task<List<User>> GetUsersByIdsAsync(List<int> ids)
+        {
+            return await _userDAO.GetUsersByIdsAsync(ids);
         }
     }
 }

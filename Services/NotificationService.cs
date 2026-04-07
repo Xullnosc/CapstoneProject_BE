@@ -155,7 +155,7 @@ namespace Services
         }
 
         public async Task CreateBulkNotificationsAsync(List<int> userIds, string type, string title, string message, 
-            string? relatedEntityType = null, int? relatedEntityId = null, bool sendEmail = true)
+            string? relatedEntityType = null, int? relatedEntityId = null, bool sendEmail = true, string? emailBody = null)
         {
             try
             {
@@ -206,10 +206,27 @@ namespace Services
 
                 if (sendEmail)
                 {
-                    foreach (var recipient in recipients)
+                    // Fire-and-Forget: Send emails in a background task so the API returns instantly
+                    // We capture the necessary data into local variables to avoid closure issues with disposed scopes
+                    var emailData = recipients.Select(r => new { r.Email, r.UserId }).ToList();
+                    
+                    _ = Task.Run(async () => 
                     {
-                        await TrySendNotificationEmailAsync(recipient.Email, title, message, recipient.UserId);
-                    }
+                        try 
+                        {
+                            // Use emailBody if available, fallback to message
+                            var finalizedBody = !string.IsNullOrEmpty(emailBody) ? emailBody : message;
+                            var tasks = emailData.Select(data => 
+                                TrySendNotificationEmailAsync(data.Email, title, finalizedBody, data.UserId)
+                            );
+                            await Task.WhenAll(tasks);
+                            _logger.LogInformation("Background email sending completed for {Count} recipients.", emailData.Count);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error sending background notification emails.");
+                        }
+                    });
                 }
             }
             catch (Exception ex)

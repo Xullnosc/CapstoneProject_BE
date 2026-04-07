@@ -126,5 +126,15 @@ namespace DataAccess
 
             return new PagedResult<User>(items, totalCount, pageIndex, pageSize);
         }
+
+        public async Task<List<User>> GetUsersByIdsAsync(List<int> ids)
+        {
+            if (ids == null || !ids.Any()) return new List<User>();
+
+            return await _context.Users
+                .Include(u => u.Role)
+                .Where(u => ids.Contains(u.UserId))
+                .ToListAsync();
+        }
     }
 }

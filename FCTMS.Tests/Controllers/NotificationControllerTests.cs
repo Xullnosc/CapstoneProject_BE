@@ -106,7 +106,7 @@ namespace FCTMS.Tests.Controllers
             };
 
             _mockNotificationService
-                .Setup(service => service.CreateBulkNotificationsAsync(request.UserIds, request.Type, request.Title, request.Message, request.RelatedEntityType, request.RelatedEntityId, request.SendEmail))
+                .Setup(service => service.CreateBulkNotificationsAsync(request.UserIds, request.Type, request.Title, request.Message, request.RelatedEntityType, request.RelatedEntityId, request.SendEmail, It.IsAny<string?>()))
                 .Returns(Task.CompletedTask);
 
             var result = await _controller.CreateBulkNotifications(request);

@@ -44,7 +44,7 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet("search")]
-        [Authorize(Roles = CampusConstants.Roles.Student)]
+        [Authorize(Roles = CampusConstants.Roles.Student + "," + CampusConstants.Roles.Lecturer + "," + CampusConstants.Roles.HOD)]
         public async Task<IActionResult> SearchStudents([FromQuery] string term, [FromQuery] int? teamId = null)
         {
             try
