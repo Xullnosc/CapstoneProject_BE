@@ -135,6 +135,13 @@ namespace DataAccess
                 .Include(u => u.Role)
                 .Where(u => ids.Contains(u.UserId))
                 .ToListAsync();
+        public async Task<DateTime?> GetLastLoginUtcAsync(int userId)
+        {
+            return await _context.Users
+                .AsNoTracking()
+                .Where(u => u.UserId == userId)
+                .Select(u => u.LastLogin)
+                .FirstOrDefaultAsync();
         }
     }
 }

@@ -101,7 +101,7 @@ namespace Services
 
                 if (teamId.HasValue && !dto.HasTeam && existingUser != null)
                 {
-                    var existingInvitation = await _teamInvitationRepository.GetByTeamAndStudentAsync(teamId.Value, existingUser.UserId);
+                    var existingInvitation = await _teamInvitationRepository.GetByTeamAndReceiverAsync(teamId.Value, existingUser.UserId);
                     if (existingInvitation != null && existingInvitation.Status == CampusConstants.InvitationStatus.Pending)
                     {
                         dto.PendingInvitationId = existingInvitation.InvitationId;
@@ -267,3 +267,4 @@ namespace Services
         }
     }
 }
+

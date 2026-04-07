@@ -374,6 +374,14 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
+                var semester = await _semesterService.GetSemesterByIdAsync(id);
+                if (semester == null) return NotFound(new { message = "Semester not found." });
+
+                if (CampusConstants.SemesterStatus.IsOpenStage(semester.Status))
+                {
+                    return BadRequest(new { message = "Cannot export evaluations while the semester is still in the 'Open' stage. Please log/lock the semester before exporting." });
+                }
+
                 var request = new ReviewerSummarySheetRequestDTO { SemesterId = id };
                 var bytes = await _thesisEvaluationExportService.GenerateWorkbookAsync(request, cancellationToken);
                 var fileName = $"thesis-evaluation-semester-{id}.xlsx";

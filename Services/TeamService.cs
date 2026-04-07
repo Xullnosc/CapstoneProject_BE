@@ -202,25 +202,14 @@ namespace Services
                 throw new UnauthorizedAccessException("Only the team leader can disband the team.");
             }
 
-            // 1. Handle associated theses
             var leaderTheses = await _thesisRepository.GetThesesByUserIdAsync(leaderId);
-            var teamTheses = leaderTheses.Where(t => t.TeamId == teamId).ToList();
-
-            foreach (var thesis in teamTheses)
+            if (leaderTheses.Any(t =>
+                (t.TeamId == teamId || t.TeamId == null) &&
+                string.Equals(t.Status, "Published", StringComparison.OrdinalIgnoreCase)))
             {
-                if (string.Equals(thesis.Status, "Published", StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException("Cannot disband a team that has an approved (Published) thesis.");
-                }
-
-                var cancellable = new[] { "Reviewing", "Registered", "On Mentor Inviting", "Need Update" };
-                if (cancellable.Contains(thesis.Status, StringComparer.OrdinalIgnoreCase))
-                {
-                    thesis.Status = "Cancelled";
-                    thesis.UpdateDate = DateTime.UtcNow;
-                    await _thesisRepository.UpdateThesisAsync(thesis);
-                }
+                throw new InvalidOperationException("Cannot disband team while a published thesis is still active.");
             }
+
 
             // 2. Remove all members
             await _teamMemberRepository.RemoveAllMembersFromTeamAsync(teamId);

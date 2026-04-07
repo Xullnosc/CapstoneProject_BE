@@ -82,6 +82,7 @@ namespace Services
                 existing.StudentCode = whitelist.StudentCode;
                 existing.RoleId = whitelist.RoleId;
                 existing.Avatar = whitelist.Avatar;
+                existing.Status = whitelist.Status ?? (existing.RoleId == 3 ? "Qualified" : null);
                 existing.CampusId = semester.CampusId;
                 existing.SemesterId = semester.SemesterId;
 
@@ -98,6 +99,10 @@ namespace Services
 
             whitelist.Email = whitelist.Email.Trim();
             whitelist.CampusId = semester.CampusId;
+            if (whitelist.RoleId == 3 && string.IsNullOrWhiteSpace(whitelist.Status))
+            {
+                whitelist.Status = "Qualified";
+            }
 
             await _whitelistRepository.AddAsync(whitelist);
             await InvalidateCache(whitelist.SemesterId);
@@ -120,6 +125,7 @@ namespace Services
             existing.RoleId = whitelist.RoleId;
             // existing.IsReviewer = whitelist.IsReviewer; // Property removed from models
             existing.Avatar = whitelist.Avatar;
+            existing.Status = whitelist.Status;
             existing.SemesterId = semester.SemesterId;
 
             await _whitelistRepository.UpdateAsync(existing);

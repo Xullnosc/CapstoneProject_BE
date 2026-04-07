@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -48,6 +49,7 @@ namespace DataAccess
             return await _context
                 .Theses.AsNoTracking()
                 .Include(t => t.User)
+                .Include(t => t.Team)
                 .FirstOrDefaultAsync(t => t.ThesisId == id);
         }
 
@@ -143,7 +145,7 @@ namespace DataAccess
                 query = query.Where(t => t.IsLocked == isLocked.Value);
 
             if (excludeUserId.HasValue)
-                query = query.Where(t => t.UserId != excludeUserId.Value);
+                query = query.Where(t => @t.UserId != excludeUserId.Value);
 
             if (lecturerOnly)
                 query = query.Where(t => t.User.Role != null && t.User.Role.RoleName == "Lecturer");
@@ -218,8 +220,10 @@ namespace DataAccess
                 .Theses.AsNoTracking()
                 .Include(t => t.User)
                 .Where(t =>
-                    ownerIds.Contains(t.UserId)
+                    (t.UserId.HasValue && ownerIds.Contains(t.UserId.Value))
                     || (t.TeamId.HasValue && teamIds.Contains(t.TeamId.Value))
+                    || (t.MentorId1.HasValue && ownerIds.Contains(t.MentorId1.Value))
+                    || (t.MentorId2.HasValue && ownerIds.Contains(t.MentorId2.Value))
                 );
 
             if (semesterId.HasValue)

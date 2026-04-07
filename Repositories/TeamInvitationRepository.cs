@@ -25,9 +25,9 @@ namespace Repositories
             return await _dao.GetByIdAsync(invitationId);
         }
 
-        public async Task<List<Teaminvitation>> GetByStudentIdAsync(int studentId)
+        public async Task<List<Teaminvitation>> GetByReceiverIdAsync(int studentId)
         {
-            return await _dao.GetByStudentIdAsync(studentId);
+            return await _dao.GetByReceiverIdAsync(studentId);
         }
 
         public async Task<List<Teaminvitation>> GetByTeamIdAsync(int teamId)
@@ -40,22 +40,24 @@ namespace Repositories
             return await _dao.UpdateStatusAsync(invitationId, status);
         }
 
-        public async Task<List<Teaminvitation>> GetPendingInvitationsByStudentAsync(int studentId)
+        public async Task<List<Teaminvitation>> GetPendingInvitationsByReceiverAsync(int studentId)
         {
-            return await _dao.GetPendingInvitationsByStudentAsync(studentId);
+            return await _dao.GetPendingInvitationsByReceiverAsync(studentId);
         }
 
-        public async Task CancelAllPendingInvitationsForStudentAsync(int studentId)
+        public async Task CancelAllPendingInvitationsForReceiverAsync(int studentId)
         {
-            await _dao.CancelAllPendingInvitationsForStudentAsync(studentId);
+            await _dao.CancelAllPendingInvitationsForReceiverAsync(studentId);
         }
 
-        public async Task<Teaminvitation?> GetByTeamAndStudentAsync(int teamId, int studentId)
+        public async Task<Teaminvitation?> GetByTeamAndReceiverAsync(int teamId, int studentId)
         {
-            return await _dao.GetByTeamAndStudentAsync(teamId, studentId);
+            return await _dao.GetByTeamAndReceiverAsync(teamId, studentId);
         }
 
         // --- Mentor Invitation Methods ---
+
+        public Task CancelAllPendingMentorInvitationsForTeamAsync(int teamId) => _dao.CancelAllPendingMentorInvitationsForTeamAsync(teamId);
 
         public async Task<List<Teaminvitation>> GetPendingMentorInvitationsByMentorIdAsync(int mentorId)
         {
@@ -88,3 +90,4 @@ namespace Repositories
         }
     }
 }
+

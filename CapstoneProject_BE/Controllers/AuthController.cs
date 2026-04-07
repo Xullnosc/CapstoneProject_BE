@@ -185,7 +185,9 @@ public class AuthController : ControllerBase
         {
             HttpOnly = true,
             Secure = !_env.IsDevelopment(),
-            SameSite = SameSiteMode.Lax,
+            // Allow cross-site cookie sending for refresh calls (FE x BE different origins).
+            // In dev we keep Lax to avoid Secure=false issues.
+            SameSite = _env.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None,
             Path = "/",
             MaxAge = expiresAt.HasValue ? (TimeSpan)(expiresAt.Value - DateTime.UtcNow) : TimeSpan.FromDays(7)
         };

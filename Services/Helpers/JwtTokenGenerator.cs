@@ -38,6 +38,27 @@ namespace Services.Helpers
                 claims.Add(new Claim("IsReviewer", "true"));
             }
 
+            // MySQL `datetime` often truncates sub-second precision; normalize to seconds
+            // so token stamp matches the value reloaded from DB during validation.
+            // IMPORTANT: MySQL `datetime` comes back as Kind=Unspecified; treat it as UTC (do not convert),
+            // otherwise ToUniversalTime() may apply a local-time shift and break the stamp match.
+            var lastLoginRaw = user.LastLogin ?? DateTime.UtcNow;
+            var lastLoginUtc = lastLoginRaw.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(lastLoginRaw, DateTimeKind.Utc)
+                : lastLoginRaw.ToUniversalTime();
+
+            var normalizedUtc = new DateTime(
+                lastLoginUtc.Year,
+                lastLoginUtc.Month,
+                lastLoginUtc.Day,
+                lastLoginUtc.Hour,
+                lastLoginUtc.Minute,
+                lastLoginUtc.Second,
+                DateTimeKind.Utc
+            );
+            var sessionStamp = normalizedUtc.Ticks.ToString();
+            claims.Add(new Claim("session_stamp", sessionStamp));
+
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 

@@ -11,7 +11,7 @@ public partial class Thesis
 
     public string? ShortDescription { get; set; }
 
-    public int UserId { get; set; }
+    public int? UserId { get; set; }
 
     public int? SemesterId { get; set; }
 
@@ -44,7 +44,7 @@ public partial class Thesis
 
     public virtual Campus Campus { get; set; } = null!;
 
-    public virtual User User { get; set; } = null!;
+    public virtual User? User { get; set; }
 
     public virtual User? OriginalAuthor { get; set; }
 

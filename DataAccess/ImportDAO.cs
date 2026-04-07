@@ -114,9 +114,6 @@ namespace DataAccess
                     var normalizedEmail = NormalizeEmail(importedItem.Email);
                     var normalizedStudentCode = NormalizeKey(importedItem.StudentCode);
 
-                    // Defensive guard: skip duplicate keys within the same import batch.
-                    // The service layer should already validate this and surface errors,
-                    // but this protects against unexpected duplicate payloads.
                     if (!string.IsNullOrWhiteSpace(normalizedEmail) && !processedEmails.Add(normalizedEmail))
                     {
                         continue;
@@ -137,13 +134,11 @@ namespace DataAccess
                     whitelistMatch.StudentCode = importedItem.StudentCode;
                     whitelistMatch.FullName = importedItem.FullName;
                     whitelistMatch.RoleId = studentRoleId;
-                    var campusRef = _context.Campuses.Local.FirstOrDefault(c => c.CampusId == importedItem.CampusId) 
-                                    ?? await _context.Campuses.FindAsync(importedItem.CampusId);
-                    string campusName = campusRef?.CampusName ?? "";
-
+                    
                     whitelistMatch.CampusId = importedItem.CampusId.Value;
                     whitelistMatch.SemesterId = semesterId;
                     whitelistMatch.AddedDate = whitelistMatch.AddedDate ?? now;
+                    whitelistMatch.Status = CampusConstants.WhitelistStatus.Qualified;
 
                     if (whitelistMatch.WhitelistId != 0)
                     {
@@ -173,22 +168,50 @@ namespace DataAccess
                     }
                 }
 
-                var usersToDelete = existingUsers.Where(u => !matchedUserIds.Contains(u.UserId)).ToList();
-                foreach (var userToDelete in usersToDelete)
-                {
-                    await DeleteStudentUserAsync(userToDelete, studentRoleId);
-                }
+                // Logic refined: Only perform soft-deactivation (Status = Unqualified) for Students in an Active Semester
+                var role = await _context.Roles.FindAsync(studentRoleId);
+                var isStudentRole = role?.RoleName == CampusConstants.Roles.Student;
+                
+                var semester = await _context.Semesters.FindAsync(semesterId);
+                var isActiveSemester = CampusConstants.SemesterStatus.IsOpenStage(semester?.Status);
 
-                var whitelistsToDelete = existingWhitelistsInSemester.Where(w => !matchedWhitelistIds.Contains(w.WhitelistId)).ToList();
-                foreach (var whitelistToDelete in whitelistsToDelete)
+                if (isStudentRole && isActiveSemester)
                 {
-                    bool alreadyRemovedWithUser = usersToDelete.Any(user =>
-                        NormalizeEmail(user.Email) == NormalizeEmail(whitelistToDelete.Email) ||
-                        NormalizeKey(user.StudentCode) == NormalizeKey(whitelistToDelete.StudentCode));
-
-                    if (!alreadyRemovedWithUser)
+                    var usersToDeactivate = existingUsers.Where(u => !matchedUserIds.Contains(u.UserId)).ToList();
+                    foreach (var userToDeactivate in usersToDeactivate)
                     {
-                        _context.Whitelists.Remove(whitelistToDelete);
+                        await DeactivateStudentUserAsync(userToDeactivate, studentRoleId);
+                    }
+
+                    var whitelistsToMark = existingWhitelistsInSemester.Where(w => !matchedWhitelistIds.Contains(w.WhitelistId)).ToList();
+                    foreach (var whitelistToMark in whitelistsToMark)
+                    {
+                        whitelistToMark.Status = CampusConstants.WhitelistStatus.Unqualified;
+                    }
+
+                    // --- Final synchronization pass for team statuses ---
+                    // This ensures teams that might have had members removed or "un-removed" 
+                    // always have the correct Qualified/Insufficient/Pending status.
+                    var allTeamsInSemester = await _context.Teams
+                        .Include(t => t.Teammembers)
+                        .Where(t => t.SemesterId == semesterId && t.Status != CampusConstants.TeamStatus.Disbanded)
+                        .ToListAsync();
+
+                    foreach (var team in allTeamsInSemester)
+                    {
+                        int count = team.Teammembers.Count;
+                        string newStatus = count switch
+                        {
+                            >= 5 => CampusConstants.TeamStatus.Active,
+                            >= 3 => CampusConstants.TeamStatus.PendingApproval,
+                            _ => CampusConstants.TeamStatus.Insufficient
+                        };
+
+                        if (team.Status != newStatus)
+                        {
+                            team.Status = newStatus;
+                            team.UpdatedAt = now;
+                        }
                     }
                 }
 
@@ -215,7 +238,7 @@ namespace DataAccess
             }
         }
 
-        private async Task DeleteStudentUserAsync(User user, int studentRoleId)
+        private async Task DeactivateStudentUserAsync(User user, int studentRoleId)
         {
             var relatedTeams = await _context.Teams
                 .Include(t => t.Teammembers)
@@ -236,15 +259,16 @@ namespace DataAccess
 
                     if (replacementLeader == null)
                     {
-                        // Requirement: If team has thesis and mentor, transfer authorid to mentor and set disbanded
                         var teamThesis = await _context.Theses.FirstOrDefaultAsync(t => t.TeamId == team.TeamId && t.SemesterId == team.SemesterId);
                         if (teamThesis != null && team.MentorId != null)
                         {
+                            teamThesis.UserId = team.MentorId.Value;
+                            teamThesis.UpdateDate = DateTime.UtcNow;
+                            
                             team.Status = CampusConstants.TeamStatus.Disbanded;
-                            team.LeaderId = team.MentorId.Value; // Move leadership to mentor for the record
                             team.UpdatedAt = DateTime.UtcNow;
-                            reassignedLeaderId = team.MentorId.Value;
-                            teamRemoved = false;
+                            _context.Teams.Remove(team);
+                            teamRemoved = true;
                         }
                         else
                         {
@@ -272,7 +296,7 @@ namespace DataAccess
                 await ReassignStudentArtifactsAsync(user.UserId, team.SemesterId, reassignedLeaderId);
 
                 var invitations = await _context.Teaminvitations
-                    .Where(i => i.TeamId == team.TeamId && (i.StudentId == user.UserId || i.InvitedBy == user.UserId))
+                    .Where(i => i.TeamId == team.TeamId && (i.ReceiverId == user.UserId || i.InvitedBy == user.UserId))
                     .ToListAsync();
 
                 if (invitations.Any())
@@ -288,59 +312,36 @@ namespace DataAccess
 
                 int remainingMemberCount = team.Teammembers.Count(m => m.StudentId != user.UserId);
                 
-                // If this was the last member, handle removals or status update
                 if (remainingMemberCount == 0)
                 {
-                    if (team.Status != CampusConstants.TeamStatus.Disbanded)
+                    var teamThesis = await _context.Theses.FirstOrDefaultAsync(t => t.TeamId == team.TeamId && t.SemesterId == team.SemesterId);
+                    if (teamThesis != null && team.MentorId != null)
                     {
-                        _context.Teams.Remove(team);
+                        teamThesis.UserId = team.MentorId.Value;
+                        teamThesis.UpdateDate = DateTime.UtcNow;
                     }
+
+                    _context.Teams.Remove(team);
                     continue;
                 }
 
                 team.Status = remainingMemberCount switch
                 {
-                    >= 4 => CampusConstants.TeamStatus.Active,
-                    3 => CampusConstants.TeamStatus.PendingApproval,
+                    >= 5 => CampusConstants.TeamStatus.Active,
+                    >= 3 => CampusConstants.TeamStatus.PendingApproval,
                     _ => CampusConstants.TeamStatus.Insufficient,
                 };
             }
 
             var remainingInvitations = await _context.Teaminvitations
-                .Where(i => i.StudentId == user.UserId || i.InvitedBy == user.UserId)
+                .Where(i => i.ReceiverId == user.UserId || i.InvitedBy == user.UserId)
                 .ToListAsync();
             if (remainingInvitations.Any())
             {
                 _context.Teaminvitations.RemoveRange(remainingInvitations);
             }
-
-            var remainingTheses = await _context.Theses
-                .Where(t => t.UserId == user.UserId)
-                .ToListAsync();
-            if (remainingTheses.Any())
-            {
-                throw new InvalidOperationException($"Cannot delete student {user.Email} because some theses could not be reassigned automatically.");
-            }
-
-            var remainingHistories = await _context.ThesisHistories
-                .Where(h => h.UploadedBy == user.UserId)
-                .ToListAsync();
-            if (remainingHistories.Any())
-            {
-                throw new InvalidOperationException($"Cannot delete student {user.Email} because thesis histories still reference the user.");
-            }
-
-            var studentWhitelists = await _context.Whitelists
-                .Where(w => w.RoleId == studentRoleId &&
-                            (w.Email == user.Email || (user.StudentCode != null && w.StudentCode == user.StudentCode)))
-                .ToListAsync();
-
-            if (studentWhitelists.Any())
-            {
-                _context.Whitelists.RemoveRange(studentWhitelists);
-            }
-
-            _context.Users.Remove(user);
+            
+            user.IsAuthorized = false;
         }
 
         private async Task ReassignStudentArtifactsAsync(int userId, int semesterId, int? targetUserId)
@@ -443,3 +444,5 @@ namespace DataAccess
         }
     }
 }
+
+

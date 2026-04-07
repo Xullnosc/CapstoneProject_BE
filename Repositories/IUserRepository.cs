@@ -12,5 +12,6 @@ namespace Repositories
         Task<List<User>> SearchUsersAsync(string term);
         Task<List<User>> GetUsersByEmailsAsync(List<string> emails);
         Task<List<User>> GetUsersByIdsAsync(List<int> ids);
+        Task<DateTime?> GetLastLoginUtcAsync(int userId);
     }
 }

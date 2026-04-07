@@ -197,7 +197,7 @@ namespace Services
             var invitation = new Teaminvitation
             {
                 TeamId = teamId,
-                StudentId = mentor.UserId, // Using StudentId column for Mentor UserId (Legacy schema)
+                ReceiverId = mentor.UserId, // Using ReceiverId column for Mentor UserId
                 InvitedBy = leaderId,
                 Type = CampusConstants.InvitationType.Mentor,
                 Status = CampusConstants.InvitationStatus.Pending,
@@ -265,7 +265,7 @@ namespace Services
                 throw new Exception("Invitation not found, already responded, or is not a mentor invitation.");
             }
 
-            if (invitation.StudentId != mentorId)
+            if (invitation.ReceiverId != mentorId)
             {
                 throw new UnauthorizedAccessException("You can only accept your own invitations.");
             }
@@ -299,6 +299,12 @@ namespace Services
             }
             await _teamRepo.UpdateAsync(team);
             await _invitationRepo.UpdateStatusAsync(invitationId, CampusConstants.InvitationStatus.Accepted);
+
+            // Auto-cancel remaining invitations if team reached 2 mentors limit
+            if (team.MentorId != null && team.MentorId2 != null)
+            {
+                await _invitationRepo.CancelAllPendingMentorInvitationsForTeamAsync(team.TeamId);
+            }
 
             // AUTO-TRANSITION Thesis Status & Mentor sync
             // Sync team mentors to thesis record and handle status migration
@@ -349,7 +355,7 @@ namespace Services
                 invitation.InvitedBy,
                 NotificationType.MentorChange.ToString(),
                 "Mentor invitation accepted",
-                $"{invitation.Student?.FullName ?? "A mentor"} accepted the mentor invitation for team {team.TeamName}.",
+                $"{invitation.Receiver?.FullName ?? "A mentor"} accepted the mentor invitation for team {team.TeamName}.",
                 "Team",
                 team.TeamId);
         }
@@ -362,7 +368,7 @@ namespace Services
                 throw new Exception("Invitation not found, already responded, or is not a mentor invitation.");
             }
 
-            if (invitation.StudentId != mentorId)
+            if (invitation.ReceiverId != mentorId)
             {
                 throw new UnauthorizedAccessException("You can only decline your own invitations.");
             }
@@ -377,7 +383,7 @@ namespace Services
                 invitation.InvitedBy,
                 NotificationType.MentorChange.ToString(),
                 "Mentor invitation declined",
-                $"{invitation.Student?.FullName ?? "A mentor"} declined the mentor invitation{(team == null ? string.Empty : $" for team {team.TeamName}")}.",
+                $"{invitation.Receiver?.FullName ?? "A mentor"} declined the mentor invitation{(team == null ? string.Empty : $" for team {team.TeamName}")}.",
                 team == null ? null : "Team",
                 team?.TeamId);
         }
@@ -420,9 +426,9 @@ namespace Services
                 TeamId = entity.TeamId,
                 TeamName = entity.Team?.TeamName ?? string.Empty,
                 TeamCode = DisplayHelper.FormatTeamCode(entity.Team?.TeamCode),
-                MentorId = entity.StudentId,
-                MentorEmail = entity.Student?.Email ?? string.Empty,
-                MentorName = entity.Student?.FullName ?? string.Empty,
+                MentorId = entity.ReceiverId,
+                MentorEmail = entity.Receiver?.Email ?? string.Empty,
+                MentorName = entity.Receiver?.FullName ?? string.Empty,
                 InvitedById = entity.InvitedBy,
                 InvitedByName = entity.InvitedByNavigation?.FullName ?? string.Empty,
                 InvitedByEmail = entity.InvitedByNavigation?.Email ?? string.Empty,
@@ -462,3 +468,4 @@ namespace Services
         }
     }
 }
+
