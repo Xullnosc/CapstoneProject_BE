@@ -5,6 +5,7 @@ namespace Repositories
     public interface IWhitelistRepository
     {
         Task<Whitelist?> GetByEmailAsync(string email);
+        Task<Whitelist?> GetByEmailAndSemesterAsync(string email, int semesterId);
         Task AddRangeAsync(IEnumerable<Whitelist> whitelists);
         Task<IEnumerable<Whitelist>> GetByRoleAsync(int roleId);
         Task<List<Whitelist>> GetBySemesterIdAsync(int semesterId);

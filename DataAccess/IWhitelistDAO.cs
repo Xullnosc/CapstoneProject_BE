@@ -6,6 +6,7 @@ namespace DataAccess
     public interface IWhitelistDAO
     {
         Task<Whitelist?> GetByEmailAsync(string email);
+        Task<Whitelist?> GetByEmailAndSemesterAsync(string email, int semesterId);
         Task<List<Whitelist>> GetBySemesterIdAsync(int semesterId);
         Task<PagedResult<Whitelist>> GetBySemesterIdAsync(int semesterId, int pageIndex, int pageSize);
         Task<List<Whitelist>> GetByRoleAsync(int roleId);

@@ -71,42 +71,59 @@ namespace Services
         public async Task<Whitelist> AddStudentToWhitelistAsync(Whitelist whitelist)
         {
             var semester = await GetRequiredSemesterAsync(whitelist.SemesterId);
-            var existing = await _whitelistRepository.GetByEmailAsync(whitelist.Email.Trim());
+            var normalizedEmail = whitelist.Email.Trim();
+            
+            // 1. Check if an entry already exists specifically in the target semester
+            var existingInSemester = await _whitelistRepository.GetByEmailAndSemesterAsync(normalizedEmail, semester.SemesterId);
 
-            if (existing != null)
+            if (existingInSemester != null)
             {
-                var previousSemesterId = existing.SemesterId;
+                // Update properties of the existing entry in the CURRENT semester
+                existingInSemester.Email = normalizedEmail;
+                existingInSemester.FullName = whitelist.FullName;
+                existingInSemester.StudentCode = whitelist.StudentCode;
+                existingInSemester.RoleId = whitelist.RoleId;
+                existingInSemester.Avatar = whitelist.Avatar;
+                
+                // If status is provided, use it; otherwise, if it's a student (Role 3), default to Qualified
+                existingInSemester.Status = whitelist.Status ?? (existingInSemester.RoleId == 3 ? "Qualified" : existingInSemester.Status);
+                existingInSemester.CampusId = semester.CampusId;
 
-                existing.Email = whitelist.Email.Trim();
-                existing.FullName = whitelist.FullName;
-                existing.StudentCode = whitelist.StudentCode;
-                existing.RoleId = whitelist.RoleId;
-                existing.Avatar = whitelist.Avatar;
-                existing.Status = whitelist.Status ?? (existing.RoleId == 3 ? "Qualified" : null);
-                existing.CampusId = semester.CampusId;
-                existing.SemesterId = semester.SemesterId;
-
-                await _whitelistRepository.UpdateAsync(existing);
-
-                if (previousSemesterId != existing.SemesterId)
-                {
-                    await InvalidateCache(previousSemesterId);
-                }
-
-                await InvalidateCache(existing.SemesterId);
-                return existing;
+                await _whitelistRepository.UpdateAsync(existingInSemester);
+                await InvalidateCache(existingInSemester.SemesterId);
+                return existingInSemester;
             }
 
-            whitelist.Email = whitelist.Email.Trim();
-            whitelist.CampusId = semester.CampusId;
-            if (whitelist.RoleId == 3 && string.IsNullOrWhiteSpace(whitelist.Status))
+            // 2. Not found in specific semester -> Create a NEW entry
+            // But first, check if they exist in ANY previous semester to determine qualification/basic info
+            var historicalEntry = await _whitelistRepository.GetByEmailAsync(normalizedEmail);
+            
+            var newEntry = new Whitelist
             {
-                whitelist.Status = "Qualified";
+                Email = normalizedEmail,
+                FullName = whitelist.FullName ?? historicalEntry?.FullName,
+                StudentCode = whitelist.StudentCode ?? historicalEntry?.StudentCode,
+                RoleId = whitelist.RoleId,
+                Avatar = whitelist.Avatar ?? historicalEntry?.Avatar,
+                CampusId = semester.CampusId,
+                SemesterId = semester.SemesterId,
+            };
+
+            // Status logic: if provided, use it. 
+            // If not provided:
+            // - If Role is Student (3) AND (they were in a previous whitelist OR we are adding them now), mark as Qualified (matching import logic)
+            if (!string.IsNullOrWhiteSpace(whitelist.Status))
+            {
+                newEntry.Status = whitelist.Status;
+            }
+            else if (newEntry.RoleId == 3)
+            {
+                newEntry.Status = "Qualified";
             }
 
-            await _whitelistRepository.AddAsync(whitelist);
-            await InvalidateCache(whitelist.SemesterId);
-            return whitelist;
+            await _whitelistRepository.AddAsync(newEntry);
+            await InvalidateCache(newEntry.SemesterId);
+            return newEntry;
         }
 
         public async Task UpdateWhitelistAsync(Whitelist whitelist)
