@@ -17,6 +17,11 @@ namespace Repositories
             return await _whitelistDAO.GetByEmailAsync(email);
         }
 
+        public async Task<Whitelist?> GetByEmailAndSemesterAsync(string email, int semesterId)
+        {
+            return await _whitelistDAO.GetByEmailAndSemesterAsync(email, semesterId);
+        }
+
         public async Task AddRangeAsync(IEnumerable<Whitelist> whitelists)
         {
             await _whitelistDAO.AddRangeAsync(whitelists);

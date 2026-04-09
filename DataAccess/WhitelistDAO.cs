@@ -27,6 +27,13 @@ namespace DataAccess
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<Whitelist?> GetByEmailAndSemesterAsync(string email, int semesterId)
+        {
+            return await _context.Whitelists
+                .Include(w => w.Role)
+                .FirstOrDefaultAsync(w => w.Email == email && w.SemesterId == semesterId);
+        }
+
         public async Task<List<Whitelist>> GetBySemesterIdAsync(int semesterId)
         {
             return await _context.Whitelists

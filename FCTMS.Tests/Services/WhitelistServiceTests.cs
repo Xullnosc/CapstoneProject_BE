@@ -79,15 +79,60 @@ namespace FCTMS.Tests.Services
             // Arrange
             var entry = new Whitelist { WhitelistId = 0, Email = "newstudent@fpt.edu.vn", RoleId = 2, SemesterId = 1 };
             _mockSemesterRepository.Setup(x => x.GetSemesterByIdAsync(1)).ReturnsAsync(new Semester { SemesterId = 1 });
-            _mockWhitelistRepository.Setup(x => x.GetByEmailAsync(entry.Email)).ReturnsAsync((Whitelist?)null);
-            _mockWhitelistRepository.Setup(x => x.AddAsync(entry)).Returns(Task.CompletedTask);
+            _mockWhitelistRepository.Setup(x => x.GetByEmailAndSemesterAsync(It.IsAny<string>(), 1)).ReturnsAsync((Whitelist?)null);
+            _mockWhitelistRepository.Setup(x => x.GetByEmailAsync(It.IsAny<string>())).ReturnsAsync((Whitelist?)null);
+            _mockWhitelistRepository.Setup(x => x.AddAsync(It.IsAny<Whitelist>())).Returns(Task.CompletedTask);
 
             // Act
             var result = await _whitelistService.AddStudentToWhitelistAsync(entry);
 
             // Assert
             result.Should().NotBeNull();
-            _mockWhitelistRepository.Verify(x => x.AddAsync(entry), Times.Once);
+            _mockWhitelistRepository.Verify(x => x.AddAsync(It.IsAny<Whitelist>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task AddStudentToWhitelistAsync_ShouldUpdate_WhenAlreadyInSemester()
+        {
+            // Arrange
+            var entry = new Whitelist { Email = "exists@fpt.edu.vn", RoleId = 3, SemesterId = 1, FullName = "New Name" };
+            var existing = new Whitelist { WhitelistId = 10, Email = "exists@fpt.edu.vn", RoleId = 3, SemesterId = 1, FullName = "Old Name" };
+            
+            _mockSemesterRepository.Setup(x => x.GetSemesterByIdAsync(1)).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockWhitelistRepository.Setup(x => x.GetByEmailAndSemesterAsync("exists@fpt.edu.vn", 1)).ReturnsAsync(existing);
+            _mockWhitelistRepository.Setup(x => x.UpdateAsync(existing)).Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _whitelistService.AddStudentToWhitelistAsync(entry);
+
+            // Assert
+            result.WhitelistId.Should().Be(10);
+            result.FullName.Should().Be("New Name");
+            _mockWhitelistRepository.Verify(x => x.UpdateAsync(existing), Times.Once);
+            _mockWhitelistRepository.Verify(x => x.AddAsync(It.IsAny<Whitelist>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task AddStudentToWhitelistAsync_ShouldCreateNew_WhenExistingInDifferentSemester()
+        {
+            // Arrange
+            var entry = new Whitelist { Email = "student@fpt.edu.vn", RoleId = 3, SemesterId = 2 };
+            var oldEntry = new Whitelist { WhitelistId = 10, Email = "student@fpt.edu.vn", RoleId = 3, SemesterId = 1, StudentCode = "SE123" };
+            
+            _mockSemesterRepository.Setup(x => x.GetSemesterByIdAsync(2)).ReturnsAsync(new Semester { SemesterId = 2 });
+            _mockWhitelistRepository.Setup(x => x.GetByEmailAndSemesterAsync("student@fpt.edu.vn", 2)).ReturnsAsync((Whitelist?)null);
+            _mockWhitelistRepository.Setup(x => x.GetByEmailAsync("student@fpt.edu.vn")).ReturnsAsync(oldEntry);
+            _mockWhitelistRepository.Setup(x => x.AddAsync(It.IsAny<Whitelist>())).Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _whitelistService.AddStudentToWhitelistAsync(entry);
+
+            // Assert
+            result.SemesterId.Should().Be(2);
+            result.StudentCode.Should().Be("SE123"); // Inherited from historical
+            result.Status.Should().Be("Qualified");
+            _mockWhitelistRepository.Verify(x => x.AddAsync(It.IsAny<Whitelist>()), Times.Once);
+            _mockWhitelistRepository.Verify(x => x.UpdateAsync(It.IsAny<Whitelist>()), Times.Never);
         }
 
         [Fact]
@@ -96,7 +141,8 @@ namespace FCTMS.Tests.Services
             // Arrange
             var entry = new Whitelist { Email = "lecturer@fpt.edu.vn", RoleId = 3, SemesterId = 1 };
             _mockSemesterRepository.Setup(x => x.GetSemesterByIdAsync(1)).ReturnsAsync(new Semester { SemesterId = 1 });
-            _mockWhitelistRepository.Setup(x => x.GetByEmailAsync(entry.Email)).ReturnsAsync((Whitelist?)null);
+            _mockWhitelistRepository.Setup(x => x.GetByEmailAndSemesterAsync(It.IsAny<string>(), 1)).ReturnsAsync((Whitelist?)null);
+            _mockWhitelistRepository.Setup(x => x.GetByEmailAsync(It.IsAny<string>())).ReturnsAsync((Whitelist?)null);
             _mockWhitelistRepository.Setup(x => x.AddAsync(It.IsAny<Whitelist>())).Returns(Task.CompletedTask);
 
             // Act
