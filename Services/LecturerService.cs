@@ -150,7 +150,19 @@ namespace Services
         public async Task AddLecturerAsync(Lecturer lecturer)
         {
             // Normalize data
-            if (lecturer.Email != null) lecturer.Email = lecturer.Email.Trim();
+            if (string.IsNullOrWhiteSpace(lecturer.Email))
+            {
+                throw new InvalidOperationException("Email giảng viên là bắt buộc.");
+            }
+            lecturer.Email = lecturer.Email.Trim();
+
+            // Check if lecturer already exists
+            var existing = await _lecturerRepository.GetByEmailAsync(lecturer.Email);
+            if (existing != null)
+            {
+                var campusName = CampusConstants.MapIdToFullName(existing.CampusId);
+                throw new InvalidOperationException($"Giảng viên này đã tồn tại ở cơ sở {campusName}.");
+            }
 
             // Security check & support manual CampusId
             var contextCampusId = _campusContextService.GetCurrentCampusId();
