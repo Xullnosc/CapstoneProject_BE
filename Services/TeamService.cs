@@ -232,6 +232,20 @@ namespace Services
                 await _thesisRepository.UpdateThesisAsync(registeredThesis);
             }
 
+            // If the team holds any pending thesis proposals, cancel them
+            var pendingTheses = leaderTheses.Where(t => 
+                (t.TeamId == teamId || t.TeamId == null) && 
+                (t.Status == CampusConstants.ThesisStatus.Draft || 
+                 t.Status == CampusConstants.ThesisStatus.OnMentorInviting ||
+                 t.Status == CampusConstants.ThesisStatus.Reviewing ||
+                 t.Status == CampusConstants.ThesisStatus.NeedUpdate)).ToList();
+
+            foreach(var pendingThesis in pendingTheses)
+            {
+                pendingThesis.Status = CampusConstants.ThesisStatus.Cancelled;
+                pendingThesis.UpdateDate = DateTime.UtcNow;
+                await _thesisRepository.UpdateThesisAsync(pendingThesis);
+            }
 
             // 2. Remove all members
             await _teamMemberRepository.RemoveAllMembersFromTeamAsync(teamId);

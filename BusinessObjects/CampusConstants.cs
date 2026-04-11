@@ -123,6 +123,7 @@ namespace BusinessObjects
             public const string NeedUpdate = "Need Update";
             public const string Published = "Published";
             public const string Rejected = "Rejected";
+            public const string Cancelled = "Cancelled";
         }
 
         public static class EvaluationChecklistStatus
