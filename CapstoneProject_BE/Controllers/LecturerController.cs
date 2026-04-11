@@ -25,9 +25,9 @@ namespace CapstoneProject_BE.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<BusinessObjects.DTOs.PagedResult<Lecturer>>> GetAll(int page = 1, int pageSize = 10, string? search = null)
+        public async Task<ActionResult<BusinessObjects.DTOs.PagedResult<Lecturer>>> GetAll(int page = 1, int pageSize = 10, string? search = null, int? campusId = null)
         {
-            var result = await _lecturerService.GetLecturersPaginatedAsync(page, pageSize, search);
+            var result = await _lecturerService.GetLecturersPaginatedAsync(page, pageSize, search, campusId);
             return Ok(result);
         }
 
@@ -41,12 +41,12 @@ namespace CapstoneProject_BE.Controllers
 
             if (pageIndex <= 0)
             {
-                return BadRequest("pageIndex must be greater than 0.");
+                pageIndex = 1;
             }
 
             if (pageSize <= 0 || pageSize > 100)
             {
-                return BadRequest("pageSize must be between 1 and 100.");
+                pageSize = 100;
             }
 
             var result = await _lecturerService.GetLecturersByCampusAsync(campus, pageIndex, pageSize);
@@ -88,6 +88,21 @@ namespace CapstoneProject_BE.Controllers
         {
             await _lecturerService.ToggleReviewerAsync(id, isReviewer);
             return NoContent();
+        }
+
+        [HttpPut("toggle-hod/{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ToggleHod(int id, [FromBody] bool isHod)
+        {
+            try
+            {
+                await _lecturerService.ToggleHodAsync(id, isHod);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpDelete("{id}")]

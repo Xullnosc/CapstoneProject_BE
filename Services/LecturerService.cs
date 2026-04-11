@@ -70,10 +70,15 @@ namespace Services
             return lecturers;
         }
 
-        public async Task<BusinessObjects.DTOs.PagedResult<Lecturer>> GetLecturersPaginatedAsync(int page, int pageSize, string? search = null)
+        public async Task<BusinessObjects.DTOs.PagedResult<Lecturer>> GetLecturersPaginatedAsync(int page, int pageSize, string? search = null, int? campusId = null)
         {
             var all = await _lecturerRepository.GetAllAsync();
             var query = all.AsEnumerable();
+
+            if (campusId.HasValue && campusId.Value > 0)
+            {
+                query = query.Where(l => l.CampusId == campusId.Value);
+            }
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -244,6 +249,60 @@ namespace Services
                 lecturer.IsReviewer = isReviewer;
                 await _lecturerRepository.UpdateAsync(lecturer);
             }
+        }
+
+        public async Task ToggleHodAsync(int id, bool isHod)
+        {
+            var lecturer = await _lecturerRepository.GetByIdAsync(id);
+            if (lecturer == null) throw new InvalidOperationException("Giảng viên không tồn tại.");
+
+            if (lecturer.IsHod == isHod) return;
+
+            // If promoting to HOD, check if campus already has one
+            if (isHod)
+            {
+                var allLecturers = await _lecturerRepository.GetAllAsync();
+                var existingHod = allLecturers.FirstOrDefault(l => l.CampusId == lecturer.CampusId && l.IsHod);
+                if (existingHod != null)
+                {
+                    throw new InvalidOperationException($"Cơ sở {CampusConstants.MapIdToFullName(lecturer.CampusId)} đã có HOD ({existingHod.FullName}). Vui lòng gỡ quyền HOD hiện tại trước khi bổ nhiệm mới.");
+                }
+            }
+
+            // 1. Update Lecturer table
+            lecturer.IsHod = isHod;
+            lecturer.UpdatedAt = DateTime.UtcNow;
+            await _lecturerRepository.UpdateAsync(lecturer);
+
+            // 2. Find Roles
+            var roles = await _semesterRepository.GetAllRolesAsync();
+            var hodRole = roles.FirstOrDefault(r => string.Equals(r.RoleName, CampusConstants.Roles.HOD, StringComparison.OrdinalIgnoreCase));
+            var lecturerRole = roles.FirstOrDefault(r => string.Equals(r.RoleName, CampusConstants.Roles.Lecturer, StringComparison.OrdinalIgnoreCase));
+
+            if (hodRole == null || lecturerRole == null) return;
+
+            int targetRoleId = isHod ? hodRole.RoleId : lecturerRole.RoleId;
+
+            // 3. Update User table
+            var user = await _userRepository.GetByEmailAsync(lecturer.Email);
+            if (user != null)
+            {
+                user.RoleId = targetRoleId;
+                await _userRepository.UpdateAsync(user);
+            }
+
+            // 4. Update Whitelist (sync for current/future entries)
+            var whitelists = await _whitelistRepository.GetByRoleAsync(isHod ? lecturerRole.RoleId : hodRole.RoleId);
+            var userWhitelists = whitelists.Where(w => w.Email != null && w.Email.Trim().Equals(lecturer.Email.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+
+            foreach (var w in userWhitelists)
+            {
+                w.RoleId = targetRoleId;
+                await _whitelistRepository.UpdateAsync(w);
+            }
+            
+            // Clear caches
+            await _redisService.RemoveByPrefixAsync("fctms:semester:");
         }
 
         private async Task SyncLecturerWithWhitelists(Lecturer lecturer, bool shouldBePresent, string? oldEmail = null)
