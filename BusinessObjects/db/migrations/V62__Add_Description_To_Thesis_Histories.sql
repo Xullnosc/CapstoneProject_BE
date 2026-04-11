@@ -3,4 +3,4 @@
 
 ALTER TABLE `thesis_histories`
 ADD COLUMN `Description` TEXT NULL AFTER `VersionNumber`;
--
+
