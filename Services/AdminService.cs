@@ -87,6 +87,18 @@ public class AdminService : IAdminService
 
         // Campus check
         var campusRef = await _context.Campuses.FirstOrDefaultAsync(c => c.CampusId == dto.CampusId);
+        if (campusRef == null)
+            throw new ArgumentException($"Campus with ID {dto.CampusId} not found.");
+
+        // Check for existing HOD in this campus (1 HOD per campus rule)
+        var existingHodInCampus = await _context.Users
+            .AnyAsync(u => u.CampusId == dto.CampusId 
+                && u.Role != null 
+                && u.Role.RoleName == CampusConstants.Roles.HOD 
+                && u.UserId != dto.UserId);
+        
+        if (existingHodInCampus)
+            throw new InvalidOperationException($"Campus '{campusRef.CampusName}' already has an HOD. Please remove the existing HOD before assigning a new one.");
 
         User? user = null;
         if (dto.UserId.HasValue)
