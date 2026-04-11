@@ -1245,9 +1245,10 @@ namespace Services
             var actor = await _userRepository.GetByIdAsync(actorUserId);
             var isAllowed =
                 actor?.Role?.RoleName == CampusConstants.Roles.HOD
-                || actor?.Role?.RoleName == CampusConstants.Roles.Admin;
+                || actor?.Role?.RoleName == CampusConstants.Roles.Admin
+                || actor?.Role?.RoleName == CampusConstants.Roles.Lecturer;
             if (!isAllowed)
-                throw new UnauthorizedAccessException("Only HOD or Admin can use AI review.");
+                throw new UnauthorizedAccessException("Only HOD, Admin or Lecturer can use AI review.");
 
             var thesis = await _thesisRepository.GetThesisByIdAsync(thesisId);
             if (thesis == null)
