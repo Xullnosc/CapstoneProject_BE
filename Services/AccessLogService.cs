@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using AutoMapper;
 using Repositories;
 using Services.DTOs;
+using BusinessObjects.Models;
 
 namespace Services
 {
@@ -22,6 +23,11 @@ namespace Services
             var (logs, totalCount) = await _accessLogRepository.GetPaginatedLogsAsync(page, pageSize);
             var logDTOs = _mapper.Map<IEnumerable<AccessLogDTO>>(logs);
             return (logDTOs, totalCount);
+        }
+
+        public async Task CreateLogAsync(AccessLog log)
+        {
+            await _accessLogRepository.CreateLogAsync(log);
         }
     }
 }

@@ -137,6 +137,36 @@ namespace DataAccess
                 .ToListAsync();
         }
         
+        public async Task<List<User>> GetUsersByRoleAsync(string roleName, string? search)
+        {
+            var query = _context.Users
+                .AsNoTracking()
+                .Include(u => u.Role)
+                .Include(u => u.CampusNavigation)
+                .Where(u => u.Role != null && u.Role.RoleName == roleName);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                query = query.Where(u =>
+                    (u.Email != null && u.Email.ToLower().Contains(term)) ||
+                    (u.FullName != null && u.FullName.ToLower().Contains(term))
+                );
+            }
+
+            return await query
+                .OrderBy(u => u.UserId)
+                .ToListAsync();
+        }
+
+        public async Task<bool> HasHodInCampusAsync(int campusId, int? excludeUserId)
+        {
+            return await _context.Users
+                .AnyAsync(u => u.CampusId == campusId
+                    && u.Role != null && u.Role.RoleName == CampusConstants.Roles.HOD
+                    && u.UserId != excludeUserId);
+        }
+
         public async Task<DateTime?> GetLastLoginUtcAsync(int userId)
         {
             return await _context.Users

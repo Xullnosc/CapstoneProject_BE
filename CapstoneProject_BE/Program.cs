@@ -173,6 +173,7 @@ builder.Services.AddScoped<ISystemSettingDAO, SystemSettingDAO>();
 builder.Services.AddScoped<IDashboardDAO, DashboardDAO>();
 builder.Services.AddScoped<ISystemParameterDAO, SystemParameterDAO>();
 builder.Services.AddScoped<ISystemErrorLogDAO, SystemErrorLogDAO>();
+builder.Services.AddScoped<IRegisteredEnterpriseDAO, RegisteredEnterpriseDAO>();
 builder.Services.AddScoped<CampusDAO>();
 
 //Repositories (Repositories Layer)
@@ -198,6 +199,7 @@ builder.Services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<ISystemParameterRepository, SystemParameterRepository>();
 builder.Services.AddScoped<ISystemErrorLogRepository, SystemErrorLogRepository>();
+builder.Services.AddScoped<IRegisteredEnterpriseRepository, RegisteredEnterpriseRepository>();
 builder.Services.AddScoped<ICampusRepository, CampusRepository>();
 
 //Middleware

@@ -34,6 +34,13 @@ public class SystemUserCredentialDAO : ISystemUserCredentialDAO
             .FirstOrDefaultAsync(c => c.UserId == userId);
     }
 
+    public async Task<List<SystemUserCredential>> GetByUserIdsAsync(List<int> userIds)
+    {
+        return await _context.SystemUserCredentials
+            .Where(c => userIds.Contains(c.UserId))
+            .ToListAsync();
+    }
+
     public async Task<SystemUserCredential> AddAsync(SystemUserCredential credential)
     {
         await _context.SystemUserCredentials.AddAsync(credential);
