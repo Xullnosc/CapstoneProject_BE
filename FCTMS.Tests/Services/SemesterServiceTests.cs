@@ -25,6 +25,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ILecturerRepository> _mockLecturerRepository;
         private readonly Mock<IWhitelistRepository> _mockWhitelistRepository;
         private readonly Mock<ICampusContextService> _mockCampusContextService;
+        private readonly Mock<INotificationService> _mockNotificationService;
         private readonly SemesterService _semesterService;
 
         public SemesterServiceTests()
@@ -37,6 +38,7 @@ namespace FCTMS.Tests.Services
             _mockLecturerRepository = new Mock<ILecturerRepository>();
             _mockWhitelistRepository = new Mock<IWhitelistRepository>();
             _mockCampusContextService = new Mock<ICampusContextService>();
+            _mockNotificationService = new Mock<INotificationService>();
             _mockCampusContextService.Setup(c => c.GetCurrentCampusId()).Returns(1);
 
             // Default redis mock behaviors
@@ -67,7 +69,8 @@ namespace FCTMS.Tests.Services
                 _mockConfiguration.Object,
                 _mockLecturerRepository.Object,
                 _mockWhitelistRepository.Object,
-                _mockCampusContextService.Object
+                _mockCampusContextService.Object,
+                _mockNotificationService.Object
             );
         }
 

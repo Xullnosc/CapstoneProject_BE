@@ -50,6 +50,8 @@ namespace DataAccess
                 .Theses.AsNoTracking()
                 .Include(t => t.User)
                 .Include(t => t.Team)
+                .Include(t => t.Mentor1)
+                .Include(t => t.Mentor2)
                 .FirstOrDefaultAsync(t => t.ThesisId == id);
         }
 
@@ -219,6 +221,8 @@ namespace DataAccess
             var query = _context
                 .Theses.AsNoTracking()
                 .Include(t => t.User)
+                .Include(t => t.Mentor1)
+                .Include(t => t.Mentor2)
                 .Where(t =>
                     (t.UserId.HasValue && ownerIds.Contains(t.UserId.Value))
                     || (t.TeamId.HasValue && teamIds.Contains(t.TeamId.Value))
@@ -279,6 +283,9 @@ namespace DataAccess
         {
             return await _context.Theses
                 .AsNoTracking()
+                .Include(t => t.User)
+                .Include(t => t.Mentor1)
+                .Include(t => t.Mentor2)
                 .Where(t => t.TeamId == teamId)
                 .ToListAsync();
         }

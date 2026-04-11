@@ -377,9 +377,10 @@ namespace CapstoneProject_BE.Controllers
                 var semester = await _semesterService.GetSemesterByIdAsync(id);
                 if (semester == null) return NotFound(new { message = "Semester not found." });
 
-                if (!CampusConstants.SemesterStatus.IsClosedStage(semester.Status))
+                if (!CampusConstants.SemesterStatus.IsLockedStage(semester.Status) && 
+                    !CampusConstants.SemesterStatus.IsClosedStage(semester.Status))
                 {
-                    return BadRequest(new { message = "Cannot export evaluations while the semester is not yet closed. Please close the semester before exporting." });
+                    return BadRequest(new { message = "Cannot export evaluations while the semester is still Open. Please lock submission or close the semester before exporting." });
                 }
 
                 var request = new ReviewerSummarySheetRequestDTO { SemesterId = id };

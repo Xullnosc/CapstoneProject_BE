@@ -19,6 +19,7 @@ namespace Services
         private readonly ILecturerRepository _lecturerRepository;
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly ICampusContextService _campusContextService;
+        private readonly INotificationService _notificationService;
         private readonly System.Threading.SemaphoreSlim _semaphore = new System.Threading.SemaphoreSlim(1, 1);
 
         public SemesterService(
@@ -29,7 +30,8 @@ namespace Services
             IConfiguration configuration,
             ILecturerRepository lecturerRepository,
             IWhitelistRepository whitelistRepository,
-            ICampusContextService campusContextService)
+            ICampusContextService campusContextService,
+            INotificationService notificationService)
         {
             _semesterRepository = semesterRepository;
             _mapper = mapper;
@@ -39,6 +41,7 @@ namespace Services
             _lecturerRepository = lecturerRepository;
             _whitelistRepository = whitelistRepository;
             _campusContextService = campusContextService;
+            _notificationService = notificationService;
         }
 
         /// <summary>
@@ -383,6 +386,13 @@ namespace Services
             semester.Status = CampusConstants.SemesterStatus.InProgress;
             await _semesterRepository.UpdateSemesterAsync(semester);
             await InvalidateSemesterCacheAsync(id);
+
+            // Notify everyone in the semester
+            await NotifyAllParticipantsAsync(
+                id,
+                "Submission Locked",
+                $"Kỳ học {semester.SemesterCode} đã chốt đơn đăng ký đề tài. Các nhóm đã đăng ký thành công sẽ chuyển sang giai đoạn thực hiện.",
+                NotificationType.SemesterDeadline.ToString());
         }
 
         /// <summary>
@@ -414,6 +424,13 @@ namespace Services
             semester.Status = CampusConstants.SemesterStatus.Closed;
             await _semesterRepository.UpdateSemesterAsync(semester);
             await InvalidateSemesterCacheAsync(id);
+
+            // Notify everyone in the semester
+            await NotifyAllParticipantsAsync(
+                id,
+                "Semester Closed",
+                $"Kỳ học {semester.SemesterCode} đã chính thức kết thúc. Chúc mừng các bạn đã hoàn thành kỳ học!",
+                NotificationType.SemesterDeadline.ToString());
         }
 
         public async Task<PagedResult<WhitelistDTO>> GetWhitelistsPaginatedAsync(int semesterId, int page, int pageSize, string? role = null, string? search = null)
@@ -598,6 +615,57 @@ namespace Services
                 {
                     wl.Campus = CampusConstants.MapCodeToFullName(wl.Campus);
                 }
+            }
+        }
+
+        private async Task NotifyAllParticipantsAsync(int semesterId, string title, string message, string type)
+        {
+            try
+            {
+                // 1. Get all whitelist entries for this semester
+                var whitelist = await _whitelistRepository.GetBySemesterIdAsync(semesterId);
+                var emails = whitelist
+                    .Where(w => !string.IsNullOrWhiteSpace(w.Email))
+                    .Select(w => w.Email.Trim().ToLower())
+                    .Distinct()
+                    .ToList();
+
+                // 2. Also include all active lecturers from the same campus context
+                try
+                {
+                    var campusCode = _campusContextService.GetCurrentCampusId()?.ToString();
+                    if (!string.IsNullOrEmpty(campusCode))
+                    {
+                        var lecturers = await _lecturerRepository.GetActiveLecturersAsync();
+                        // Filter by campus if needed, though usually GetActiveLecturers is already campus-aware in this repo
+                        var lecturerEmails = lecturers.Select(l => l.Email.Trim().ToLower()).ToList();
+                        emails.AddRange(lecturerEmails);
+                        emails = emails.Distinct().ToList();
+                    }
+                }
+                catch { /* Ignore campus lookup failures */ }
+
+                if (!emails.Any()) return;
+
+                // 3. Get UserIds for these emails
+                var users = await _userRepository.GetUsersByEmailsAsync(emails);
+                var userIds = users.Select(u => u.UserId).ToList();
+
+                if (!userIds.Any()) return;
+
+                // 4. Create bulk notifications
+                await _notificationService.CreateBulkNotificationsAsync(
+                    userIds,
+                    type,
+                    title,
+                    message,
+                    "Semester",
+                    semesterId,
+                    sendEmail: true);
+            }
+            catch (Exception)
+            {
+                // Log and swallow
             }
         }
     }

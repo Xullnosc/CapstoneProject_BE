@@ -22,6 +22,7 @@ namespace Services
         private readonly ISemesterService _semesterService;
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly ICampusContextService _campusContextService;
+        private readonly INotificationService _notificationService;
 
         public TeamService(
             ITeamRepository teamRepository, 
@@ -32,7 +33,8 @@ namespace Services
             IThesisRepository thesisRepository,
             ISemesterService semesterService,
             IWhitelistRepository whitelistRepository,
-            ICampusContextService campusContextService)
+            ICampusContextService campusContextService,
+            INotificationService notificationService)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
@@ -43,6 +45,7 @@ namespace Services
             _semesterService = semesterService;
             _whitelistRepository = whitelistRepository;
             _campusContextService = campusContextService;
+            _notificationService = notificationService;
         }
 
         public async Task<TeamDTO> CreateTeamAsync(int leaderId, CreateTeamDTO createTeamDto)
@@ -241,6 +244,20 @@ namespace Services
             // 4. Invalidate cache
             await _semesterService.InvalidateSemesterCacheAsync(team.SemesterId);
 
+            // 5. Notify members
+            if (team.Teammembers.Any())
+            {
+                var members = team.Teammembers.Select(m => m.StudentId).ToList();
+                await _notificationService.CreateBulkNotificationsAsync(
+                    members,
+                    NotificationType.TeamInvitation.ToString(),
+                    "Team Disbanded",
+                    $"Nhóm {team.TeamName} đã bị giải tán bởi trưởng nhóm.",
+                    "Team",
+                    team.TeamId,
+                    sendEmail: false);
+            }
+
             return true;
         }
 
@@ -404,6 +421,20 @@ namespace Services
                 await _thesisRepository.UpdateThesisAsync(activeThesis);
             }
 
+            // Notify all members about leadership transfer
+            var members = team.Teammembers.Select(m => m.StudentId).ToList();
+            if (members.Any())
+            {
+                await _notificationService.CreateBulkNotificationsAsync(
+                    members,
+                    NotificationType.TeamInvitation.ToString(),
+                    "Leadership Transferred",
+                    $"Quyền trưởng nhóm {team.TeamName} đã được chuyển cho {newLeaderMember.Student?.FullName ?? "thành viên mới"}.",
+                    "Team",
+                    team.TeamId,
+                    sendEmail: false);
+            }
+
             return true;
         }
 
@@ -436,6 +467,30 @@ namespace Services
                     }
                 }
                 await _semesterService.InvalidateSemesterCacheAsync();
+
+                // Notify removed member
+                await _notificationService.CreateNotificationAsync(
+                    studentId,
+                    NotificationType.TeamInvitation.ToString(),
+                    "Removed from Team",
+                    $"Bạn đã bị xóa khỏi nhóm bởi trưởng nhóm.",
+                    "Team",
+                    teamId,
+                    sendEmail: false);
+
+                // Notify remaining team
+                if (team.Teammembers.Any())
+                {
+                    var remainders = team.Teammembers.Select(m => m.StudentId).ToList();
+                    await _notificationService.CreateBulkNotificationsAsync(
+                        remainders,
+                        NotificationType.TeamInvitation.ToString(),
+                        "Team Member Removed",
+                        $"Một thành viên đã bị xóa khỏi nhóm {team.TeamName}.",
+                        "Team",
+                        team.TeamId,
+                        sendEmail: false);
+                }
             }
             return result;
         }
@@ -456,6 +511,17 @@ namespace Services
 
             await _teamRepository.UpdateAsync(team);
             await _semesterService.InvalidateSemesterCacheAsync();
+
+            // Notify Team Leader
+            await _notificationService.CreateNotificationAsync(
+                team.LeaderId,
+                NotificationType.HODAction.ToString(),
+                "Team Status Updated",
+                $"Nhóm của bạn đã được HOD đánh dấu là '{ (team.IsSpecial ? "Nhóm đặc biệt" : "Nhóm bình thường") }'.",
+                "Team",
+                team.TeamId,
+                sendEmail: false);
+
             return true;
         }
         public async Task<TeamDTO> ForceCreateTeamAsync(int hodUserId, ForceCreateTeamDTO dto)
@@ -554,6 +620,18 @@ namespace Services
 
             var createdTeam = await _teamRepository.CreateAsync(team);
             await _semesterService.InvalidateSemesterCacheAsync(dto.SemesterId);
+
+            // Notify all members
+            var memberIds = users.Select(u => u.UserId).ToList();
+            await _notificationService.CreateBulkNotificationsAsync(
+                memberIds,
+                NotificationType.TeamInvitation.ToString(),
+                "Added to New Team",
+                $"Bạn đã được HOD thêm vào nhóm mới: {createdTeam.TeamName}.",
+                "Team",
+                createdTeam.TeamId,
+                sendEmail: false);
+
             return await MapToDTOAsync(createdTeam);
         }
     }

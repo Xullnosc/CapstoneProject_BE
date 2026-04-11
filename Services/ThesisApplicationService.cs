@@ -17,6 +17,7 @@ namespace Services
         private readonly ITeamInvitationRepository _teamInvRepo;
         private readonly IUserRepository _userRepo;
         private readonly ILecturerRepository _lecturerRepo;
+        private readonly INotificationService _notificationService;
 
         public ThesisApplicationService(
             IThesisApplicationRepository appRepo,
@@ -25,7 +26,8 @@ namespace Services
             ISemesterRepository semesterRepo,
             ITeamInvitationRepository teamInvRepo,
             IUserRepository userRepo,
-            ILecturerRepository lecturerRepo)
+            ILecturerRepository lecturerRepo,
+            INotificationService notificationService)
         {
             _appRepo = appRepo;
             _thesisRepo = thesisRepo;
@@ -34,6 +36,7 @@ namespace Services
             _teamInvRepo = teamInvRepo;
             _userRepo = userRepo;
             _lecturerRepo = lecturerRepo;
+            _notificationService = notificationService;
         }
 
         public async Task<ThesisApplicationDTO> SubmitApplicationAsync(int userId, string thesisId)
@@ -107,6 +110,18 @@ namespace Services
             };
 
             var created = await _appRepo.CreateAsync(application);
+
+            // Notify Thesis Owner
+            if (thesis.UserId.HasValue)
+            {
+                await TryCreateNotificationAsync(
+                    thesis.UserId.Value,
+                    NotificationType.ThesisUpdate.ToString(),
+                    "New Thesis Application",
+                    $"Nhóm {team.TeamName} đã đăng ký đề tài '{thesis.Title}' của bạn.",
+                    "Thesis",
+                    thesis.ThesisId);
+            }
 
             return new ThesisApplicationDTO
             {
@@ -315,6 +330,20 @@ namespace Services
             {
                 team.MentorId = userId;
                 await _teamRepo.UpdateAsync(team);
+
+                // Notify Team Members
+                var members = team.Teammembers.Select(m => m.StudentId).ToList();
+                if (members.Any())
+                {
+                    await _notificationService.CreateBulkNotificationsAsync(
+                        members,
+                        NotificationType.ThesisUpdate.ToString(),
+                        "Thesis Application Approved",
+                        $"Đơn đăng ký đề tài '{app.Thesis.Title}' của nhóm bạn đã được duyệt bởi {user.FullName}. Chúc mừng nhóm!",
+                        "Thesis",
+                        null, // RelatedEntityId is int?, ThesisId is Guid string
+                        sendEmail: false);
+                }
             }
         }
 
@@ -355,6 +384,41 @@ namespace Services
 
             app.Status = "Rejected";
             await _appRepo.UpdateAsync(app);
+
+            // Notify Team Leader
+            var team = await _teamRepo.GetByIdAsync(app.TeamId);
+            if (team != null)
+            {
+                await TryCreateNotificationAsync(
+                    team.LeaderId,
+                    NotificationType.ThesisUpdate.ToString(),
+                    "Thesis Application Rejected",
+                    $"Rất tiếc, đơn đăng ký đề tài '{thesis.Title}' của nhóm bạn đã bị từ chối.",
+                    "Thesis",
+                    thesis.ThesisId);
+            }
+        }
+
+        private async Task TryCreateNotificationAsync(int userId, string type, string title, string message, string? relatedEntityType, string? relatedEntityId)
+        {
+            try
+            {
+                // Note: repository/entity typically use int for IDs, but ThesisId is Guid string in this project.
+                // Notification model uses int? for RelatedEntityId. We might need to handle this carefully.
+                // If RelatedEntityId must be int, we skip it for Thesis (string GUID).
+                await _notificationService.CreateNotificationAsync(
+                    userId,
+                    type,
+                    title,
+                    message,
+                    relatedEntityType,
+                    null, // Passing null because ThesisId is string GUID
+                    sendEmail: false);
+            }
+            catch (Exception)
+            {
+                // Log and swallow to prevent breaking flow
+            }
         }
     }
 }

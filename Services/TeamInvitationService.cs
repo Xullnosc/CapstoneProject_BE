@@ -88,13 +88,19 @@ namespace Services
             // 7. Invalidate Semester Cache
             await _semesterService.InvalidateSemesterCacheAsync();
 
-            await TryCreateNotificationAsync(
-                invitation.InvitedBy,
-                NotificationType.TeamInvitation.ToString(),
-                "Invitation accepted",
-                $"{invitation.Receiver?.FullName ?? "A student"} accepted your invitation to join team {team.TeamName}.",
-                "Team",
-                team.TeamId);
+            // Notify all current team members about the new participant
+            if (team.Teammembers.Any())
+            {
+                var members = team.Teammembers.Select(m => m.StudentId).ToList();
+                await _notificationService.CreateBulkNotificationsAsync(
+                    members,
+                    NotificationType.TeamInvitation.ToString(),
+                    "New Member Joined",
+                    $"Thành viên {invitation.Receiver?.FullName ?? "Mới"} đã đồng ý gia nhập nhóm {team.TeamName}.",
+                    "Team",
+                    team.TeamId,
+                    sendEmail: false);
+            }
         }
 
         public async Task DeclineInvitationAsync(int invitationId, int studentId)
