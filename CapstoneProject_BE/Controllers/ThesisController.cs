@@ -49,6 +49,25 @@ namespace CapstoneProject_BE.Controllers
         // ─── Phase 02: New Endpoints ─────────────────────────────────────────────
 
         /// <summary>
+        /// GET /api/thesis/enterprises/search?query=...
+        /// Returns a list of previously registered enterprise names that match the query.
+        /// </summary>
+        [HttpGet("enterprises/search")]
+        public async Task<IActionResult> SearchEnterprises([FromQuery] string query)
+        {
+            try
+            {
+                var results = await _thesisService.SearchEnterprisesAsync(query);
+                return Ok(results);
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = ex.InnerException?.Message ?? ex.Message;
+                return BadRequest(new { Message = errorMessage });
+            }
+        }
+
+        /// <summary>
         /// GET /api/thesis/my
         /// Returns all theses owned by the currently logged-in user.
         /// IMPORTANT: must be declared BEFORE /{id} to avoid route conflict.
