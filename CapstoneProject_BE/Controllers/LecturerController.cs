@@ -64,16 +64,30 @@ namespace CapstoneProject_BE.Controllers
         [HttpPost]
         public async Task<ActionResult<Lecturer>> Create([FromBody] Lecturer lecturer)
         {
-            await _lecturerService.AddLecturerAsync(lecturer);
-            return CreatedAtAction(nameof(GetById), new { id = lecturer.LecturerId }, lecturer);
+            try
+            {
+                await _lecturerService.AddLecturerAsync(lecturer);
+                return CreatedAtAction(nameof(GetById), new { id = lecturer.LecturerId }, lecturer);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] Lecturer lecturer)
         {
             if (id != lecturer.LecturerId) return BadRequest();
-            await _lecturerService.UpdateLecturerAsync(lecturer);
-            return NoContent();
+            try
+            {
+                await _lecturerService.UpdateLecturerAsync(lecturer);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPut("toggle-status/{id}")]
