@@ -161,6 +161,7 @@ namespace DataAccess
             return await _context.Theses
                 .AsNoTracking()
                 .IgnoreQueryFilters()
+                .Where(t => t.Status != "Cancelled")
                 .Include(t => t.Team)
                     .ThenInclude(team => team.Teammembers)
                         .ThenInclude(teamMember => teamMember.Student)
