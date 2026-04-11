@@ -424,7 +424,7 @@ namespace CapstoneProject_BE.Controllers
         /// This endpoint does not persist any decision.
         /// </summary>
         [HttpPost("{id}/ai-review-preview")]
-        [Authorize(Policy = "HodOrAdmin")]
+        [Authorize(Policy = "ReviewAuthority")]
         public async Task<IActionResult> GetAiReviewPreview(string id)
         {
             try

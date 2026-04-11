@@ -305,6 +305,16 @@ builder.Services.AddAuthorization(options =>
                 || context.User.HasClaim("IsReviewer", "true")
             )
     );
+
+    options.AddPolicy(
+        "ReviewAuthority",
+        policy =>
+            policy.RequireAssertion(context =>
+                context.User.IsInRole(BusinessObjects.CampusConstants.Roles.HOD)
+                || context.User.IsInRole(BusinessObjects.CampusConstants.Roles.Admin)
+                || context.User.IsInRole(BusinessObjects.CampusConstants.Roles.Lecturer)
+            )
+    );
 });
 
 // Configure Rate Limiting

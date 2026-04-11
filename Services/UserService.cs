@@ -130,7 +130,14 @@ namespace Services
 
             foreach (var l in globalLecturers)
             {
-                combinedList.Add(new LecturerSearchItem { Email = l.Email, FullName = l.FullName, RoleId = 2, Avatar = l.Avatar });
+                combinedList.Add(new LecturerSearchItem 
+                { 
+                    TempId = -l.LecturerId, // Unique negative ID
+                    Email = l.Email, 
+                    FullName = l.FullName, 
+                    RoleId = 2, 
+                    Avatar = l.Avatar 
+                });
             }
 
             if (whitelistedLecturers != null)
@@ -146,7 +153,14 @@ namespace Services
                                        
                         if (matches && !combinedList.Any(c => c.Email.Equals(w.Email, StringComparison.OrdinalIgnoreCase)))
                         {
-                            combinedList.Add(new LecturerSearchItem { Email = w.Email, FullName = w.FullName, RoleId = w.RoleId, Avatar = w.Avatar });
+                            combinedList.Add(new LecturerSearchItem 
+                            { 
+                                TempId = -(w.WhitelistId + 1000000), // Ensure different range from Lecturer Pool
+                                Email = w.Email, 
+                                FullName = w.FullName, 
+                                RoleId = w.RoleId, 
+                                Avatar = w.Avatar 
+                            });
                         }
                     }
                 }
@@ -178,7 +192,7 @@ namespace Services
 
                 var dto = new UserInfoDTO
                 {
-                    UserId = user?.UserId ?? 0,
+                    UserId = user?.UserId ?? item.TempId, // Use User record ID or unique Temp ID
                     Email = item.Email,
                     FullName = item.FullName ?? string.Empty,
                     Avatar = user?.Avatar ?? item.Avatar,
@@ -260,6 +274,7 @@ namespace Services
 
         private class LecturerSearchItem
         {
+            public int TempId { get; set; } // Added TempId
             public string Email { get; set; } = null!;
             public string? FullName { get; set; }
             public int? RoleId { get; set; }
