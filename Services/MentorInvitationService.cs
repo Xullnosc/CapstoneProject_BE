@@ -351,13 +351,19 @@ namespace Services
             await _redisService.DeleteValueAsync(MentorInvitationsKey(mentorId));
             await _redisService.DeleteValueAsync(MentorActiveCountKey(mentorId));
 
-            await TryCreateNotificationAsync(
-                invitation.InvitedBy,
-                NotificationType.MentorChange.ToString(),
-                "Mentor invitation accepted",
-                $"{invitation.Receiver?.FullName ?? "A mentor"} accepted the mentor invitation for team {team.TeamName}.",
-                "Team",
-                team.TeamId);
+            // Notify all team members about acceptance
+            if (team.Teammembers.Any())
+            {
+                var members = team.Teammembers.Select(m => m.StudentId).ToList();
+                await _notificationService.CreateBulkNotificationsAsync(
+                    members,
+                    NotificationType.MentorChange.ToString(),
+                    "Mentor invitation accepted",
+                    $"Giảng viên {invitation.Receiver?.FullName ?? "Mentor"} đã đồng ý hướng dẫn nhóm {team.TeamName}.",
+                    "Team",
+                    team.TeamId,
+                    sendEmail: false);
+            }
         }
 
         public async Task DeclineMentorInvitationAsync(int invitationId, int mentorId)
@@ -379,13 +385,18 @@ namespace Services
             await _redisService.DeleteValueAsync(MentorInvitationsKey(mentorId));
 
             var team = await _teamRepo.GetByIdAsync(invitation.TeamId);
-            await TryCreateNotificationAsync(
-                invitation.InvitedBy,
-                NotificationType.MentorChange.ToString(),
-                "Mentor invitation declined",
-                $"{invitation.Receiver?.FullName ?? "A mentor"} declined the mentor invitation{(team == null ? string.Empty : $" for team {team.TeamName}")}.",
-                team == null ? null : "Team",
-                team?.TeamId);
+            if (team != null && team.Teammembers.Any())
+            {
+                var members = team.Teammembers.Select(m => m.StudentId).ToList();
+                await _notificationService.CreateBulkNotificationsAsync(
+                    members,
+                    NotificationType.MentorChange.ToString(),
+                    "Mentor invitation declined",
+                    $"Rất tiếc, giảng viên {invitation.Receiver?.FullName ?? "Mentor"} đã từ chối lời mời hướng dẫn nhóm {team.TeamName}.",
+                    "Team",
+                    team.TeamId,
+                    sendEmail: false);
+            }
         }
 
         public async Task CancelMentorInvitationAsync(int invitationId, int leaderId)

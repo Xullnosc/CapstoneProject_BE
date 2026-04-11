@@ -167,8 +167,16 @@ namespace Services.Mappings
                     opt => opt.MapFrom(src => src.Mentor1 != null ? src.Mentor1.Email : null)
                 )
                 .ForMember(
+                    dest => dest.MentorName1,
+                    opt => opt.MapFrom(src => src.Mentor1 != null ? src.Mentor1.FullName : null)
+                )
+                .ForMember(
                     dest => dest.MentorEmail2,
                     opt => opt.MapFrom(src => src.Mentor2 != null ? src.Mentor2.Email : null)
+                )
+                .ForMember(
+                    dest => dest.MentorName2,
+                    opt => opt.MapFrom(src => src.Mentor2 != null ? src.Mentor2.FullName : null)
                 )
                 .ForMember(dest => dest.MentorId1, opt => opt.MapFrom(src => src.MentorId1))
                 .ForMember(dest => dest.MentorId2, opt => opt.MapFrom(src => src.MentorId2))
