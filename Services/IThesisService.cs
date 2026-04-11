@@ -14,6 +14,7 @@ namespace Services
         Task<Thesis?> GetThesisByIdAsync(string id);
         Task<IEnumerable<Thesis>> GetAllThesesAsync();
         Task<IEnumerable<Thesis>> GetThesesByUserIdAsync(int userId);
+        Task<IEnumerable<string>> SearchEnterprisesAsync(string query);
         Task UpdateThesisStatusAsync(string thesisId, string status);
 
         // Phase 02: New methods

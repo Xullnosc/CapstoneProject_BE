@@ -262,6 +262,21 @@ namespace Services
                 }
 
                 var createdThesis = await _thesisRepository.CreateThesisAsync(thesis);
+
+                // [NEW] Register Enterprise if applicable
+                if (thesis.IsFromEnterprise && !string.IsNullOrWhiteSpace(thesis.EnterpriseName))
+                {
+                    var normalizedName = thesis.EnterpriseName.Trim();
+                    var existingEnterprise = await _context.RegisteredEnterprises
+                        .FirstOrDefaultAsync(e => e.EnterpriseName.ToLower() == normalizedName.ToLower());
+                    if (existingEnterprise == null)
+                    {
+                        var newEnterprise = new RegisteredEnterprise { EnterpriseName = normalizedName, CreatedAt = DateTime.UtcNow };
+                        _context.RegisteredEnterprises.Add(newEnterprise);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
                 await transaction.CommitAsync();
 
                 // Send Notifications AFTER successful commit
@@ -297,6 +312,21 @@ namespace Services
             thesis.Status = status;
             thesis.UpdateDate = DateTime.UtcNow;
             await _thesisRepository.UpdateThesisAsync(thesis);
+        }
+
+        public async Task<IEnumerable<string>> SearchEnterprisesAsync(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query)) return new List<string>();
+
+            var normalizedQuery = query.Trim().ToLower();
+            var results = await _context.RegisteredEnterprises
+                .Where(e => e.EnterpriseName.ToLower().Contains(normalizedQuery))
+                .Select(e => e.EnterpriseName)
+                .Distinct()
+                .Take(20)
+                .ToListAsync();
+
+            return results;
         }
 
         #endregion

@@ -66,6 +66,7 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<SystemParameter> SystemParameters { get; set; }
     public virtual DbSet<SystemErrorLog> SystemErrorLogs { get; set; }
     public virtual DbSet<ImportBatch> ImportBatches { get; set; }
+    public virtual DbSet<RegisteredEnterprise> RegisteredEnterprises { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -82,6 +83,18 @@ public partial class FctmsContext : DbContext
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
         });
+
+        modelBuilder.Entity<RegisteredEnterprise>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("RegisteredEnterprises");
+            entity.HasIndex(e => e.EnterpriseName, "UQ_RegisteredEnterprises_Name").IsUnique();
+            entity.Property(e => e.EnterpriseName).HasMaxLength(255);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+        });
+
 
         modelBuilder.Entity<ThesisForm>(entity =>
         {
