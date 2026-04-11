@@ -48,13 +48,18 @@ public class ThesisReviewDAO : IThesisReviewDAO
             assignedReviewers.Add(reviewerId);
         }
 
+        var currentRound = await _context.ThesisReviewEvents.AsNoTracking()
+            .Where(e => e.ThesisId == thesisId && !e.IsDeleted)
+            .MaxAsync(e => (int?)e.Round) ?? 0;
+
         var reviewEvent = await CreateEventAsync(
             thesisId,
             "REVIEWER_DECISION",
             reviewerId,
             "REVIEWER",
             decision,
-            previous
+            previous,
+            currentRound > 0 ? currentRound : 1
         );
 
         ThesisReviewComment? decisionComment = null;
@@ -94,28 +99,28 @@ public class ThesisReviewDAO : IThesisReviewDAO
         var allAssignedReviewers = await GetActiveAssignedReviewerIdsAsync(thesisId);
         if (allAssignedReviewers.Count >= 2)
         {
-            // Use the time of the last FINAL_DECISION as the boundary between rounds.
-            var lastFinalDecisionTime =
+            // Use the time of the last boundary event as the boundary between rounds.
+            var lastReboundTime =
                 await _context
                     .ThesisReviewEvents.AsNoTracking()
                     .Where(e =>
                         e.ThesisId == thesisId
-                        && e.EventType == "FINAL_DECISION"
+                        && (e.EventType == "FINAL_DECISION" || e.EventType == "REVISION_UPDATED")
                         && !e.IsDeleted
                     )
                     .MaxAsync(e => (DateTime?)e.CreatedAt) ?? DateTime.MinValue;
 
-            var firstAssignmentAfterFinal =
+            var firstAssignmentAfterRebound =
                 await _context
                     .ThesisReviewEvents.AsNoTracking()
                     .Where(e =>
                         e.ThesisId == thesisId
                         && e.EventType == "REVIEWER_ASSIGNED"
-                        && e.CreatedAt > lastFinalDecisionTime
+                        && e.CreatedAt > lastReboundTime
                         && !e.IsDeleted
                     )
                     .MinAsync(e => (DateTime?)e.CreatedAt);
-            var roundStartTime = firstAssignmentAfterFinal ?? lastFinalDecisionTime;
+            var roundStartTime = firstAssignmentAfterRebound ?? lastReboundTime;
 
             var currentRoundDecisions = await _context
                 .ThesisReviewEvents.AsNoTracking()
@@ -142,7 +147,7 @@ public class ThesisReviewDAO : IThesisReviewDAO
                         e.ThesisId == thesisId
                         && e.EventType == "FINAL_DECISION"
                         && e.ActorRole == "REVIEWER"
-                        && e.CreatedAt >= roundStartTime
+                        && e.CreatedAt > lastReboundTime
                         && !e.IsDeleted
                     );
 
