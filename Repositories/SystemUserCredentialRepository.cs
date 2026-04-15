@@ -21,6 +21,9 @@ public class SystemUserCredentialRepository : ISystemUserCredentialRepository
     public Task<SystemUserCredential?> GetByUserIdAsync(int userId) =>
         _dao.GetByUserIdAsync(userId);
 
+    public Task<List<SystemUserCredential>> GetByUserIdsAsync(List<int> userIds) =>
+        _dao.GetByUserIdsAsync(userIds);
+
     public Task<SystemUserCredential> AddAsync(SystemUserCredential credential) =>
         _dao.AddAsync(credential);
 

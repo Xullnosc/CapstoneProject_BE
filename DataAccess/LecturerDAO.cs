@@ -32,7 +32,6 @@ namespace DataAccess
         {
             var l = await _context.Lecturers
                 .Include(l => l.CampusNavigation)
-                .AsNoTracking()
                 .FirstOrDefaultAsync(l => l.LecturerId == id);
             if (l != null) l.Campus = CampusConstants.MapIdToCode(l.CampusId);
             return l;
@@ -42,7 +41,6 @@ namespace DataAccess
         {
             var l = await _context.Lecturers
                 .Include(l => l.CampusNavigation)
-                .AsNoTracking()
                 .FirstOrDefaultAsync(l => l.Email == email);
             if (l != null) l.Campus = CampusConstants.MapIdToCode(l.CampusId);
             return l;

@@ -42,6 +42,7 @@ namespace Services
         private readonly ITeamMemberRepository _teamMemberRepository;
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly INotificationService _notificationService;
+        private readonly IRegisteredEnterpriseRepository _registeredEnterpriseRepository;
         private readonly FctmsContext _context;
         private readonly ILogger<ThesisService>? _logger;
 
@@ -59,6 +60,7 @@ namespace Services
             ITeamMemberRepository teamMemberRepository,
             IWhitelistRepository whitelistRepository,
             INotificationService notificationService,
+            IRegisteredEnterpriseRepository registeredEnterpriseRepository,
             FctmsContext context,
             IMapper mapper,
             ISystemParameterService systemParameterService,
@@ -80,6 +82,7 @@ namespace Services
             _teamMemberRepository = teamMemberRepository;
             _whitelistRepository = whitelistRepository;
             _notificationService = notificationService;
+            _registeredEnterpriseRepository = registeredEnterpriseRepository;
             _context = context;
             _mapper = mapper;
             _systemParameterService = systemParameterService;
@@ -267,13 +270,11 @@ namespace Services
                 if (thesis.IsFromEnterprise && !string.IsNullOrWhiteSpace(thesis.EnterpriseName))
                 {
                     var normalizedName = thesis.EnterpriseName.Trim();
-                    var existingEnterprise = await _context.RegisteredEnterprises
-                        .FirstOrDefaultAsync(e => e.EnterpriseName.ToLower() == normalizedName.ToLower());
+                    var existingEnterprise = await _registeredEnterpriseRepository.GetByNameAsync(normalizedName);
                     if (existingEnterprise == null)
                     {
                         var newEnterprise = new RegisteredEnterprise { EnterpriseName = normalizedName, CreatedAt = DateTime.UtcNow };
-                        _context.RegisteredEnterprises.Add(newEnterprise);
-                        await _context.SaveChangesAsync();
+                        await _registeredEnterpriseRepository.AddAsync(newEnterprise);
                     }
                 }
 
@@ -316,17 +317,7 @@ namespace Services
 
         public async Task<IEnumerable<string>> SearchEnterprisesAsync(string query)
         {
-            if (string.IsNullOrWhiteSpace(query)) return new List<string>();
-
-            var normalizedQuery = query.Trim().ToLower();
-            var results = await _context.RegisteredEnterprises
-                .Where(e => e.EnterpriseName.ToLower().Contains(normalizedQuery))
-                .Select(e => e.EnterpriseName)
-                .Distinct()
-                .Take(20)
-                .ToListAsync();
-
-            return results;
+            return await _registeredEnterpriseRepository.SearchNamesAsync(query);
         }
 
         #endregion

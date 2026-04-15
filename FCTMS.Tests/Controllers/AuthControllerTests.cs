@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -11,7 +11,7 @@ namespace FCTMS.Tests.Controllers
         private readonly Mock<IAuthService> _mockAuthService;
         private readonly Mock<ILogger<AuthController>> _mockLogger;
         private readonly Mock<IWebHostEnvironment> _mockEnv;
-        private readonly Mock<Repositories.IAccessLogRepository> _mockAccessLogRepository;
+        private readonly Mock<IAccessLogService> _mockAccessLogService;
         private readonly Mock<ICaptchaService> _mockCaptchaService;
         private readonly AuthController _controller;
 
@@ -20,7 +20,7 @@ namespace FCTMS.Tests.Controllers
             _mockAuthService = new Mock<IAuthService>();
             _mockLogger = new Mock<ILogger<AuthController>>();
             _mockEnv = new Mock<IWebHostEnvironment>();
-            _mockAccessLogRepository = new Mock<Repositories.IAccessLogRepository>();
+            _mockAccessLogService = new Mock<IAccessLogService>();
             _mockCaptchaService = new Mock<ICaptchaService>();
             
             _mockEnv.Setup(e => e.EnvironmentName).Returns("Development");
@@ -30,7 +30,7 @@ namespace FCTMS.Tests.Controllers
                 _mockAuthService.Object, 
                 _mockLogger.Object, 
                 _mockEnv.Object, 
-                _mockAccessLogRepository.Object,
+                _mockAccessLogService.Object,
                 _mockCaptchaService.Object);
             // Ensure Response.Cookies is available so SetRefreshTokenCookie does not throw (Login/LoginWithCredentials return Ok)
             _controller.ControllerContext = new ControllerContext

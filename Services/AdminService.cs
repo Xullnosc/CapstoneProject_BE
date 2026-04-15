@@ -1,8 +1,11 @@
 using BusinessObjects;
 using BusinessObjects.Models;
-using Microsoft.EntityFrameworkCore;
 using Repositories;
 using Services.DTOs;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Services;
 
@@ -11,47 +14,29 @@ public class AdminService : IAdminService
     private readonly IUserRepository _userRepository;
     private readonly ISystemUserCredentialRepository _credentialRepository;
     private readonly ISemesterRepository _semesterRepository;
-    private readonly FctmsContext _context;
+    private readonly ICampusRepository _campusRepository;
+    private readonly ILecturerRepository _lecturerRepository;
 
     public AdminService(
         IUserRepository userRepository,
         ISystemUserCredentialRepository credentialRepository,
         ISemesterRepository semesterRepository,
-        FctmsContext context)
+        ICampusRepository campusRepository,
+        ILecturerRepository lecturerRepository)
     {
         _userRepository = userRepository;
         _credentialRepository = credentialRepository;
         _semesterRepository = semesterRepository;
-        _context = context;
+        _campusRepository = campusRepository;
+        _lecturerRepository = lecturerRepository;
     }
 
     public async Task<List<HodAccountDTO>> GetHodAccountsAsync(string? search)
     {
-        var query = _context.Users
-            .AsNoTracking()
-            .Include(u => u.Role)
-            .Include(u => u.CampusNavigation)
-            .Where(u => u.Role != null && u.Role.RoleName == CampusConstants.Roles.HOD);
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim();
-            query = query.Where(u =>
-                (u.Email != null && u.Email.Contains(term)) ||
-                (u.FullName != null && u.FullName.Contains(term))
-            );
-        }
-
-        var users = await query
-            .OrderBy(u => u.UserId)
-            .ToListAsync();
-
+        var users = await _userRepository.GetUsersByRoleAsync(CampusConstants.Roles.HOD, search);
         var userIds = users.Select(u => u.UserId).ToList();
-        var creds = await _context.SystemUserCredentials
-            .AsNoTracking()
-            .Where(c => userIds.Contains(c.UserId))
-            .ToListAsync();
-
+        
+        var creds = await _credentialRepository.GetByUserIdsAsync(userIds);
         var credByUserId = creds.ToDictionary(c => c.UserId, c => c);
 
         return users.Select(u =>
@@ -86,18 +71,13 @@ public class AdminService : IAdminService
             throw new InvalidOperationException("HOD role not found in database.");
 
         // Campus check
-        var campusRef = await _context.Campuses.FirstOrDefaultAsync(c => c.CampusId == dto.CampusId);
+        var campusRef = await _campusRepository.GetByIdAsync(dto.CampusId);
         if (campusRef == null)
             throw new ArgumentException($"Campus with ID {dto.CampusId} not found.");
 
         // Check for existing HOD in this campus (1 HOD per campus rule)
-        var existingHodInCampus = await _context.Users
-            .AnyAsync(u => u.CampusId == dto.CampusId 
-                && u.Role != null 
-                && u.Role.RoleName == CampusConstants.Roles.HOD 
-                && u.UserId != dto.UserId);
-        
-        if (existingHodInCampus)
+        var hasExistingHod = await _userRepository.HasHodInCampusAsync(dto.CampusId, dto.UserId);
+        if (hasExistingHod)
             throw new InvalidOperationException($"Campus '{campusRef.CampusName}' already has an HOD. Please remove the existing HOD before assigning a new one.");
 
         User? user = null;
@@ -179,7 +159,7 @@ public class AdminService : IAdminService
         }
 
         // --- HOD to Lecturer Synchronization ---
-        var lecturer = await _context.Lecturers.FirstOrDefaultAsync(l => l.Email == user.Email);
+        var lecturer = await _lecturerRepository.GetByEmailAsync(user.Email);
         if (lecturer == null)
         {
             lecturer = new Lecturer
@@ -194,7 +174,7 @@ public class AdminService : IAdminService
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            await _context.Lecturers.AddAsync(lecturer);
+            await _lecturerRepository.AddAsync(lecturer);
         }
         else
         {
@@ -204,9 +184,8 @@ public class AdminService : IAdminService
             lecturer.IsActive = true;
             lecturer.IsHod = true;
             lecturer.UpdatedAt = DateTime.UtcNow;
-            _context.Lecturers.Update(lecturer);
+            await _lecturerRepository.UpdateAsync(lecturer);
         }
-        await _context.SaveChangesAsync();
     }
 
     public async Task DeleteHodAsync(int userId)
@@ -225,14 +204,13 @@ public class AdminService : IAdminService
         }
 
         // Remove from Lecturers table as well
-        var lecturer = await _context.Lecturers.FirstOrDefaultAsync(l => l.Email == user.Email);
+        var lecturer = await _lecturerRepository.GetByEmailAsync(user.Email);
         if (lecturer != null)
         {
-            _context.Lecturers.Remove(lecturer);
+            await _lecturerRepository.DeleteAsync(lecturer);
         }
 
         await _userRepository.DeleteAsync(user);
-        await _context.SaveChangesAsync();
     }
 
     public async Task UpdateHodEmailAsync(int userId, string newEmail)

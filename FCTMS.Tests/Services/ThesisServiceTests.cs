@@ -33,8 +33,9 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ITeamInvitationRepository> _mockTeamInvitationRepository;
         private readonly Mock<ITeamMemberRepository> _mockTeamMemberRepository;
         private readonly Mock<IWhitelistRepository> _mockWhitelistRepository;
-        private readonly Mock<INotificationService> _mockNotificationService;
         private readonly Mock<IMapper> _mockMapper;
+        private readonly Mock<INotificationService> _mockNotificationService;
+        private readonly Mock<IRegisteredEnterpriseRepository> _mockRegisteredEnterpriseRepository;
         private readonly Mock<ISystemParameterService> _mockSystemParameterService;
         private readonly Mock<ILogger<ThesisService>> _mockLogger;
         private readonly FctmsContext _fctmsContext; // Real context with InMemory database
@@ -53,6 +54,7 @@ namespace FCTMS.Tests.Services
             _mockTeamMemberRepository = new Mock<ITeamMemberRepository>();
             _mockWhitelistRepository = new Mock<IWhitelistRepository>();
             _mockNotificationService = new Mock<INotificationService>();
+            _mockRegisteredEnterpriseRepository = new Mock<IRegisteredEnterpriseRepository>();
             _mockMapper = new Mock<IMapper>();
             _mockSystemParameterService = new Mock<ISystemParameterService>();
             _mockLogger = new Mock<ILogger<ThesisService>>();
@@ -84,6 +86,7 @@ namespace FCTMS.Tests.Services
                 _mockTeamMemberRepository.Object,
                 _mockWhitelistRepository.Object,
                 _mockNotificationService.Object,
+                _mockRegisteredEnterpriseRepository.Object,
                 _fctmsContext, // Using real InMemory context instead of null!
                 _mockMapper.Object,
                 _mockSystemParameterService.Object,
