@@ -10,5 +10,6 @@ namespace Services
         Task<List<UserInfoDTO>> SearchStudentsAsync(string term, int currentUserId, int? teamId = null);
         Task<List<UserInfoDTO>> SearchLecturersAsync(string term, int currentUserId, int? teamId = null);
         Task<UserInfoDTO?> UpdateProfileAsync(int userId, UpdateProfileDTO profileDto);
+        Task<int> EnsureUserExistsAsync(int userId);
     }
 }

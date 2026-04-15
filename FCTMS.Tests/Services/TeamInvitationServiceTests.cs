@@ -47,6 +47,12 @@ namespace FCTMS.Tests.Services
             // Email template is now hardcoded, no need to mock configuration for it.
             _mockConfiguration.Setup(c => c["AllowedOrigins"]).Returns("http://localhost:5173");
 
+            // Default semester guard for service methods that require Open stage.
+            // Individual tests can override this setup when needed.
+            _mockSemesterRepository
+                .Setup(r => r.GetCurrentSemesterAsync())
+                .ReturnsAsync(new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Open });
+
             _service = new TeamInvitationService(
                 _mockInvitationRepository.Object,
                 _mockTeamMemberRepository.Object,
@@ -216,7 +222,7 @@ namespace FCTMS.Tests.Services
             // Assert
             _mockTeamMemberRepository.Verify(r => r.AddMemberAsync(It.Is<Teammember>(m => m.StudentId == ReceiverId && m.TeamId == teamId)), Times.Once);
             _mockInvitationRepository.Verify(r => r.UpdateStatusAsync(invitationId, CampusConstants.InvitationStatus.Accepted), Times.Once);
-            _mockInvitationRepository.Verify(r => r.CancelAllPendingInvitationsForReceiverAsync(ReceiverId), Times.Once);
+            _mockInvitationRepository.Verify(r => r.CancelAllPendingStudentInvitationsAsync(ReceiverId), Times.Once);
             // newCount = 1 (existing) + 1 (new) = 2. Insufficient status remains Insufficient if < 3. 
             // Wait, helper: if (newCount >= 3 && team.Status == Insufficient) -> Pending.
             // In this test, newCount is 2. So no status update.
@@ -494,7 +500,7 @@ namespace FCTMS.Tests.Services
                 },
                 Status = CampusConstants.TeamStatus.Insufficient // Currently Insufficient because < 3 members.
             };
-            var currentSemester = new Semester { SemesterId = 1 };
+            var currentSemester = new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Open };
 
             _mockInvitationRepository.Setup(r => r.GetByIdAsync(invitationId)).ReturnsAsync(invitation);
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
@@ -521,7 +527,7 @@ namespace FCTMS.Tests.Services
 
             // Other pending invitations for this student should be cancelled.
             _mockInvitationRepository.Verify(
-                r => r.CancelAllPendingInvitationsForReceiverAsync(ReceiverId),
+                r => r.CancelAllPendingStudentInvitationsAsync(ReceiverId),
                 Times.Once);
 
             // Team status should be promoted to Pending (3 = 3 minimum threshold).
@@ -556,7 +562,7 @@ namespace FCTMS.Tests.Services
                 },
                 Status = CampusConstants.TeamStatus.Insufficient // Still below threshold.
             };
-            var currentSemester = new Semester { SemesterId = 1 };
+            var currentSemester = new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Open };
 
             _mockInvitationRepository.Setup(r => r.GetByIdAsync(invitationId)).ReturnsAsync(invitation);
             _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(currentSemester);
@@ -691,7 +697,7 @@ namespace FCTMS.Tests.Services
             _mockTeamRepository.Setup(r => r.GetByIdAsync(teamId)).ReturnsAsync(team);
             _mockUserRepository.Setup(r => r.SearchUsersAsync(studentEmail)).ReturnsAsync(new List<User> { student });
             _mockUserRepository.Setup(r => r.GetByIdAsync(inviterId)).ReturnsAsync(inviter);
-            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1 });
+            _mockSemesterRepository.Setup(r => r.GetCurrentSemesterAsync()).ReturnsAsync(new Semester { SemesterId = 1, Status = CampusConstants.SemesterStatus.Open });
             _mockTeamMemberRepository.Setup(r => r.IsStudentInTeamAsync(student.UserId, 1)).ReturnsAsync(false);
             _mockInvitationRepository.Setup(r => r.GetByTeamAndReceiverAsync(teamId, student.UserId)).ReturnsAsync((Teaminvitation?)null);
 

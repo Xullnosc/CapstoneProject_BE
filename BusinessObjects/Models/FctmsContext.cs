@@ -68,6 +68,11 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<ImportBatch> ImportBatches { get; set; }
     public virtual DbSet<RegisteredEnterprise> RegisteredEnterprises { get; set; }
 
+    public virtual DbSet<UserSkill> UserSkills { get; set; }
+    public virtual DbSet<ChatConversation> ChatConversations { get; set; }
+    public virtual DbSet<ChatMessage> ChatMessages { get; set; }
+    public virtual DbSet<ChatReadStatus> ChatReadStatuses { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("utf8mb4_0900_ai_ci").HasCharSet("utf8mb4");
@@ -985,6 +990,94 @@ public partial class FctmsContext : DbContext
             entity
                 .Property(e => e.UpdatedAt)
                 .HasColumnType("datetime2");
+        });
+
+        modelBuilder.Entity<UserSkill>(entity =>
+        {
+            entity.HasKey(e => e.SkillId).HasName("PRIMARY");
+            entity.ToTable("user_skills");
+            entity.HasIndex(e => new { e.UserId, e.SkillTag }, "UQ_UserSkills_UserId_SkillTag").IsUnique();
+            entity.Property(e => e.SkillTag).HasMaxLength(255);
+            entity.Property(e => e.SkillLevel)
+                .HasDefaultValueSql("'Beginner'")
+                .HasMaxLength(255);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.HasOne(d => d.User)
+                .WithMany(p => p.UserSkills)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_UserSkills_Users");
+        });
+
+        modelBuilder.Entity<ChatConversation>(entity =>
+        {
+            entity.HasKey(e => e.ConversationId).HasName("PRIMARY");
+            entity.ToTable("chat_conversations");
+            entity.HasIndex(e => new { e.User1Id, e.User2Id, e.SemesterId }, "UQ_Conversation_Users_Semester").IsUnique();
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.HasOne(d => d.User1).WithMany()
+                .HasForeignKey(d => d.User1Id).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Conversations_User1");
+            entity.HasOne(d => d.User2).WithMany()
+                .HasForeignKey(d => d.User2Id).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Conversations_User2");
+            entity.HasOne(d => d.Semester).WithMany()
+                .HasForeignKey(d => d.SemesterId).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Conversations_Semester");
+        });
+
+        modelBuilder.Entity<ChatMessage>(entity =>
+        {
+            entity.HasKey(e => e.MessageId).HasName("PRIMARY");
+            entity.ToTable("chat_messages");
+            entity.HasIndex(e => new { e.ConversationId, e.CreatedAt }, "IX_Messages_ConversationId_CreatedAt");
+            entity.HasIndex(e => new { e.TeamId, e.CreatedAt }, "IX_Messages_TeamId_CreatedAt");
+            entity.Property(e => e.MessageType)
+                .HasDefaultValueSql("'text'")
+                .HasColumnType("enum('text','image','file')");
+            entity.Property(e => e.Content).HasColumnType("text");
+            entity.Property(e => e.AttachmentUrl).HasMaxLength(500);
+            entity.Property(e => e.AttachmentName).HasMaxLength(255);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.HasOne(d => d.Conversation).WithMany(p => p.Messages)
+                .HasForeignKey(d => d.ConversationId).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Messages_Conversation");
+            entity.HasOne(d => d.Team).WithMany()
+                .HasForeignKey(d => d.TeamId).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Messages_Team");
+            entity.HasOne(d => d.Sender).WithMany()
+                .HasForeignKey(d => d.SenderId).OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_Messages_Sender");
+        });
+
+        modelBuilder.Entity<ChatReadStatus>(entity =>
+        {
+            entity.HasKey(e => e.StatusId).HasName("PRIMARY");
+            entity.ToTable("chat_read_status");
+            entity.HasIndex(e => new { e.UserId, e.ConversationId }, "UQ_ReadStatus_User_Conversation").IsUnique();
+            entity.HasIndex(e => new { e.UserId, e.TeamId }, "UQ_ReadStatus_User_Team").IsUnique();
+            entity.Property(e => e.LastReadAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ReadStatus_User");
+            entity.HasOne(d => d.Conversation).WithMany()
+                .HasForeignKey(d => d.ConversationId).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ReadStatus_Conversation");
+            entity.HasOne(d => d.Team).WithMany()
+                .HasForeignKey(d => d.TeamId).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ReadStatus_Team");
         });
 
         OnModelCreatingPartial(modelBuilder);

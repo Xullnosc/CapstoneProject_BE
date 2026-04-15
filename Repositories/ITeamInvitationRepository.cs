@@ -14,7 +14,10 @@ namespace Repositories
         Task<bool> UpdateStatusAsync(int invitationId, string status);
         Task<List<Teaminvitation>> GetPendingInvitationsByReceiverAsync(int studentId);
         Task CancelAllPendingInvitationsForReceiverAsync(int studentId);
-        Task<Teaminvitation?> GetByTeamAndReceiverAsync(int teamId, int studentId);
+        Task CancelAllPendingStudentInvitationsAsync(int studentId);
+        Task CancelAllPendingStudentInvitationsForTeamAsync(int teamId);
+        Task<Teaminvitation?> GetByTeamAndReceiverAsync(int teamId, int receiverId);
+        Task<Teaminvitation?> GetByTeamAndInviterAsync(int teamId, int inviterId);
 
         // Mentor Invitation Methods
         Task CancelAllPendingMentorInvitationsForTeamAsync(int teamId);

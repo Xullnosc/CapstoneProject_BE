@@ -26,6 +26,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<IWhitelistRepository> _mockWhitelistRepository = new();
         private readonly Mock<ICampusContextService> _mockCampusContextService = new();
         private readonly Mock<INotificationService> _mockNotificationService = new();
+        private readonly Mock<ITeamInvitationRepository> _mockInvitationRepository = new();
 
         private TeamService CreateService()
         {
@@ -39,7 +40,8 @@ namespace FCTMS.Tests.Services
                 _mockSemesterService.Object,
                 _mockWhitelistRepository.Object,
                 _mockCampusContextService.Object,
-                _mockNotificationService.Object
+                _mockNotificationService.Object,
+                _mockInvitationRepository.Object
             );
         }
 

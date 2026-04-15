@@ -28,6 +28,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<IWhitelistRepository> _mockWhitelistRepository;
         private readonly Mock<ICampusContextService> _mockCampusContextService;
         private readonly Mock<INotificationService> _mockNotificationService;
+        private readonly Mock<ITeamInvitationRepository> _mockInvitationRepository;
         private readonly TeamService _teamService;
 
         public TeamServiceTests()
@@ -42,6 +43,7 @@ namespace FCTMS.Tests.Services
             _mockWhitelistRepository = new Mock<IWhitelistRepository>();
             _mockCampusContextService = new Mock<ICampusContextService>();
             _mockNotificationService = new Mock<INotificationService>();
+            _mockInvitationRepository = new Mock<ITeamInvitationRepository>();
             _mockCampusContextService.Setup(c => c.GetCurrentCampusId()).Returns(1);
             
             _teamService = new TeamService(
@@ -54,7 +56,8 @@ namespace FCTMS.Tests.Services
                 _mockSemesterService.Object,
                 _mockWhitelistRepository.Object,
                 _mockCampusContextService.Object,
-                _mockNotificationService.Object
+                _mockNotificationService.Object,
+                _mockInvitationRepository.Object
             );
         }
 
