@@ -20,8 +20,5 @@ namespace Repositories
         Task DeleteRangeAsync(IEnumerable<Team> teams);
         Task DeleteTeamAsync(Team team);
         Task<Team?> GetActiveTeamByStudentIdAsync(int studentId);
-        Task<List<Team>> GetTeamsByMentorIdAsync(int mentorId, int semesterId);
-        Task<bool> AddJoinRequestAsync(int studentId, int teamId);
-        Task CancelJoinRequestAsync(int studentId, int teamId);
     }
 }

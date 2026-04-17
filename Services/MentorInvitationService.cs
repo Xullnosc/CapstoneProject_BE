@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Services.Helpers;
-using BusinessObjects.Helpers;
 
 namespace Services
 {
@@ -260,14 +259,6 @@ namespace Services
 
         public async Task AcceptMentorInvitationAsync(int invitationId, int mentorId)
         {
-            // [LIFECYCLE GUARD]
-            var currentSemester = await _semesterRepo.GetCurrentSemesterAsync();
-            if (currentSemester == null) throw new InvalidOperationException("Active semester not found.");
-            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
-            {
-                throw new InvalidOperationException($"Học kỳ đang ở trạng thái '{currentSemester.Status}'. Không thể thực hiện chấp nhận lời mời.");
-            }
-
             var invitation = await _invitationRepo.GetByIdAsync(invitationId);
             if (invitation == null || invitation.Type != CampusConstants.InvitationType.Mentor || invitation.Status != CampusConstants.InvitationStatus.Pending)
             {
@@ -377,14 +368,6 @@ namespace Services
 
         public async Task DeclineMentorInvitationAsync(int invitationId, int mentorId)
         {
-            // [LIFECYCLE GUARD]
-            var currentSemester = await _semesterRepo.GetCurrentSemesterAsync();
-            if (currentSemester == null) throw new InvalidOperationException("Active semester not found.");
-            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
-            {
-                throw new InvalidOperationException($"Học kỳ đang ở trạng thái '{currentSemester.Status}'. Không thể thực hiện từ chối lời mời.");
-            }
-
             var invitation = await _invitationRepo.GetByIdAsync(invitationId);
             if (invitation == null || invitation.Type != CampusConstants.InvitationType.Mentor || invitation.Status != CampusConstants.InvitationStatus.Pending)
             {
@@ -418,14 +401,6 @@ namespace Services
 
         public async Task CancelMentorInvitationAsync(int invitationId, int leaderId)
         {
-            // [LIFECYCLE GUARD]
-            var currentSemester = await _semesterRepo.GetCurrentSemesterAsync();
-            if (currentSemester == null) throw new InvalidOperationException("Active semester not found.");
-            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemester.Status))
-            {
-                throw new InvalidOperationException($"Học kỳ đang ở trạng thái '{currentSemester.Status}'. Không thể thực hiện hủy lời mời.");
-            }
-
             var invitation = await _invitationRepo.GetByIdAsync(invitationId);
             if (invitation == null || invitation.Status != CampusConstants.InvitationStatus.Pending)
             {

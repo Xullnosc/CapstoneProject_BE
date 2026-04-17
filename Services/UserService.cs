@@ -222,9 +222,6 @@ namespace Services
             if (!string.IsNullOrWhiteSpace(profileDto.FullName))
                 user.FullName = profileDto.FullName;
 
-            if (profileDto.CampusId.HasValue)
-                user.CampusId = profileDto.CampusId.Value;
-
             await _userRepository.UpdateAsync(user);
 
             // Account detail (chỉ dùng bảng account_detail)
@@ -273,43 +270,6 @@ namespace Services
             }
 
             return result;
-        }
-
-        public async Task<int> EnsureUserExistsAsync(int userId)
-        {
-            if (userId >= 0) return userId;
-
-            // userId < 0 means it's a -WhitelistId
-            int whitelistId = Math.Abs(userId);
-            var whitelist = await _whitelistRepository.GetByIdAsync(whitelistId);
-            if (whitelist == null)
-            {
-                throw new Exception($"Virtual user with WhitelistId {whitelistId} not found.");
-            }
-
-            // Check if user already exists based on email (race condition or previous promotion)
-            var existingUser = await _userRepository.GetByEmailAsync(whitelist.Email);
-            if (existingUser != null)
-            {
-                return existingUser.UserId;
-            }
-
-            // Create new Stub User
-            var newUser = new User
-            {
-                Email = whitelist.Email,
-                FullName = whitelist.FullName,
-                StudentCode = whitelist.StudentCode,
-                CampusId = whitelist.CampusId,
-                RoleId = whitelist.RoleId,
-                Avatar = $"https://ui-avatars.com/api/?name={System.Net.WebUtility.UrlEncode(whitelist.FullName)}&background=random&color=fff",
-                IsAuthorized = (whitelist.Status == CampusConstants.WhitelistStatus.Qualified),
-                CreatedAt = DateTime.UtcNow,
-                LastLogin = null // Never logged in
-            };
-
-            var addedUser = await _userRepository.AddAsync(newUser);
-            return addedUser.UserId;
         }
 
         private class LecturerSearchItem
