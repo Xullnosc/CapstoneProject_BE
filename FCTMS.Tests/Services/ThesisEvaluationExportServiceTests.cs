@@ -46,8 +46,8 @@ public class ThesisEvaluationExportServiceTests
 
         worksheet.Should().NotBeNull();
         worksheet!.Cells[1, 1].Text.Should().Be("Thẩm định viên");
-        worksheet.Cells[1, 2].Text.Should().Be("Nothing");
-        worksheet.Cells[1, 3].Text.Should().Be("Nothing");
+        worksheet.Cells[1, 2].Text.Should().Be("");
+        worksheet.Cells[1, 3].Text.Should().Be("");
         worksheet.Cells[1, 4].Text.Should().Be("Số lượng thẩm định ");
 
         worksheet.Cells[2, 1].Text.Should().Be("longnx6");
