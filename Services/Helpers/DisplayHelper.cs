@@ -1,4 +1,4 @@
-namespace BusinessObjects.Helpers
+namespace Services.Helpers
 {
     public static class DisplayHelper
     {

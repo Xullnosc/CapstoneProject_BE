@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using Microsoft.EntityFrameworkCore;
@@ -211,63 +210,6 @@ namespace DataAccess
                         && t.Teammembers.Any(tm => tm.StudentId == studentId))
                 .OrderByDescending(t => t.CreatedAt)
                 .FirstOrDefaultAsync();
-        }
-
-        public async Task<List<Team>> GetTeamsByMentorIdAsync(int mentorId, int semesterId)
-        {
-            return await _context.Teams
-                .Include(t => t.Teammembers)
-                .ThenInclude(tm => tm.Student)
-                .Where(t => t.SemesterId == semesterId 
-                            && t.Status != "Disbanded"
-                            && (t.MentorId == mentorId || t.MentorId2 == mentorId))
-                .ToListAsync();
-        }
-
-        public async Task<bool> AddJoinRequestAsync(int studentId, int teamId)
-        {
-            var team = await _context.Teams.FindAsync(teamId);
-            if (team == null) return false;
-
-            // Spam prevention: Check if a pending request from this student to this team already exists
-            bool requestExists = await _context.Teaminvitations.AnyAsync(i => 
-                i.TeamId == teamId && 
-                i.InvitedBy == studentId && 
-                i.Type == CampusConstants.InvitationType.JoinRequest && 
-                i.Status == CampusConstants.InvitationStatus.Pending);
-            
-            if (requestExists) return false;
-
-            var request = new Teaminvitation
-            {
-                TeamId = teamId,
-                InvitedBy = studentId,
-                ReceiverId = team.LeaderId,
-                Status = CampusConstants.InvitationStatus.Pending,
-                Type = CampusConstants.InvitationType.JoinRequest,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await _context.Teaminvitations.AddAsync(request);
-            await _context.SaveChangesAsync();
-            return true;
-        }
-
-        public async Task CancelJoinRequestAsync(int studentId, int teamId)
-        {
-            var request = await _context.Teaminvitations
-                .FirstOrDefaultAsync(i => 
-                    i.TeamId == teamId && 
-                    i.InvitedBy == studentId && 
-                    i.Type == CampusConstants.InvitationType.JoinRequest && 
-                    i.Status == CampusConstants.InvitationStatus.Pending);
-
-            if (request != null)
-            {
-                request.Status = CampusConstants.InvitationStatus.Cancelled;
-                request.RespondedAt = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
-            }
         }
     }
 }
