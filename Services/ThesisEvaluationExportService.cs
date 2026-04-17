@@ -585,7 +585,9 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
     {
         var range = worksheet.Cells[startRow, column, endRow, column];
         range.Merge = startRow != endRow;
-        range.Value = value;
+        // Only populate the top-left cell so COUNTIFS counts each thesis once,
+        // not once per student row in the merged block.
+        worksheet.Cells[startRow, column].Value = value;
         range.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
         range.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
         range.Style.WrapText = true;
@@ -602,7 +604,7 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
     {
         var range = worksheet.Cells[startRow, column, endRow, column];
         range.Merge = startRow != endRow;
-        range.Value = value;
+        worksheet.Cells[startRow, column].Value = value;
         range.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
         range.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
         range.Style.WrapText = true;
