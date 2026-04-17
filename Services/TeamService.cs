@@ -8,6 +8,7 @@ using BusinessObjects.Models;
 using Repositories;
 using Services.Helpers;
 using BusinessObjects.Interfaces;
+using BusinessObjects.Helpers;
 
 namespace Services
 {
@@ -23,6 +24,7 @@ namespace Services
         private readonly IWhitelistRepository _whitelistRepository;
         private readonly ICampusContextService _campusContextService;
         private readonly INotificationService _notificationService;
+        private readonly ITeamInvitationRepository _invitationRepository;
 
         public TeamService(
             ITeamRepository teamRepository, 
@@ -34,7 +36,8 @@ namespace Services
             ISemesterService semesterService,
             IWhitelistRepository whitelistRepository,
             ICampusContextService campusContextService,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            ITeamInvitationRepository invitationRepository)
         {
             _teamRepository = teamRepository;
             _semesterRepository = semesterRepository;
@@ -46,6 +49,7 @@ namespace Services
             _whitelistRepository = whitelistRepository;
             _campusContextService = campusContextService;
             _notificationService = notificationService;
+            _invitationRepository = invitationRepository;
         }
 
         public async Task<TeamDTO> CreateTeamAsync(int leaderId, CreateTeamDTO createTeamDto)
@@ -113,6 +117,10 @@ namespace Services
             team.Teammembers.Add(member);
 
             var createdTeam = await _teamRepository.CreateAsync(team);
+
+            // 7. Cleanup pending invitations/requests for the new leader
+            await _invitationRepository.CancelAllPendingStudentInvitationsAsync(leaderId);
+
             await _semesterService.InvalidateSemesterCacheAsync(currentSemester.SemesterId);
             return await MapToDTOAsync(createdTeam);
         }
@@ -461,10 +469,18 @@ namespace Services
                 throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemester?.Status}'. Chỉ có thể xóa thành viên khỏi nhóm khi kỳ học đang mở (Open).");
             }
 
+            var team = await _teamRepository.GetByIdAsync(teamId);
+            if (team == null) return false;
+
+            if (team.LeaderId == studentId)
+            {
+                throw new InvalidOperationException("Không thể xóa nhóm trưởng khỏi nhóm. Vui lòng chuyển quyền trưởng nhóm trước khi thực hiện.");
+            }
+
             var result = await _teamMemberRepository.RemoveMemberAsync(teamId, studentId);
             if (result)
             {
-                var team = await _teamRepository.GetByIdAsync(teamId);
+                team = await _teamRepository.GetByIdAsync(teamId);
                 if (team != null)
                 {
                     int count = team.Teammembers?.Count ?? 1; // It already fetched without the removed member
@@ -633,6 +649,13 @@ namespace Services
             }
 
             var createdTeam = await _teamRepository.CreateAsync(team);
+
+            // 10. Cleanup pending invitations/requests for ALL added members
+            foreach (var user in users)
+            {
+                await _invitationRepository.CancelAllPendingStudentInvitationsAsync(user.UserId);
+            }
+
             await _semesterService.InvalidateSemesterCacheAsync(dto.SemesterId);
 
             // Notify all members

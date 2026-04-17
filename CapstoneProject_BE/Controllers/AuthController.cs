@@ -152,7 +152,7 @@ public class AuthController : ControllerBase
         var refreshToken = Request.Cookies[RefreshTokenCookieName];
         await _authService.RevokeRefreshTokenAsync(refreshToken);
         Response.Cookies.Delete(RefreshTokenCookieName);
-        
+
         // Log logout using claims
         var userIdStr = User.Claims.FirstOrDefault(c => c.Type == "id")?.Value;
         var userEmail = User.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
