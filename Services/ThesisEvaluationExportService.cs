@@ -583,6 +583,14 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         string? value
     )
     {
+        if (startRow < endRow)
+        {
+            for (var row = startRow + 1; row <= endRow; row++)
+            {
+                worksheet.Cells[row, column].Value = null;
+            }
+        }
+
         var range = worksheet.Cells[startRow, column, endRow, column];
         range.Merge = startRow != endRow;
         // Only populate the top-left cell so COUNTIFS counts each thesis once,
@@ -602,6 +610,14 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         Color backgroundColor
     )
     {
+        if (startRow < endRow)
+        {
+            for (var row = startRow + 1; row <= endRow; row++)
+            {
+                worksheet.Cells[row, column].Value = null;
+            }
+        }
+
         var range = worksheet.Cells[startRow, column, endRow, column];
         range.Merge = startRow != endRow;
         worksheet.Cells[startRow, column].Value = value;
