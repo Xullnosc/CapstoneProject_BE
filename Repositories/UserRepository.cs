@@ -2,8 +2,6 @@ using BusinessObjects.Models;
 using DataAccess;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Repositories
@@ -52,14 +50,9 @@ namespace Repositories
             return await _userDAO.GetUsersByEmailsAsync(emails);
         }
 
-        public async Task<List<User>> GetUsersByIdsAsync(List<int> ids)
-        {
-            return await _userDAO.GetUsersByIdsAsync(ids);
-        }
-
-        public async Task<DateTime?> GetLastLoginUtcAsync(int userId)
-        {
-            return await _userDAO.GetLastLoginUtcAsync(userId);
-        }
+        public async Task<List<User>> GetUsersByIdsAsync(List<int> ids) => await _userDAO.GetUsersByIdsAsync(ids);
+        public async Task<List<User>> GetUsersByRoleAsync(string roleName, string? search) => await _userDAO.GetUsersByRoleAsync(roleName, search);
+        public async Task<bool> HasHodInCampusAsync(int campusId, int? excludeUserId) => await _userDAO.HasHodInCampusAsync(campusId, excludeUserId);
+        public async Task<DateTime?> GetLastLoginUtcAsync(int userId) => await _userDAO.GetLastLoginUtcAsync(userId);
     }
 }

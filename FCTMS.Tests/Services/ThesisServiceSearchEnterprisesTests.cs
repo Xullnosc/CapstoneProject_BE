@@ -13,6 +13,7 @@ using Services.Helpers;
 using AutoMapper;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using DataAccess;
 
 namespace FCTMS.Tests.Services
 {
@@ -20,6 +21,9 @@ namespace FCTMS.Tests.Services
     {
         private ThesisService CreateServiceWithContext(FctmsContext context)
         {
+            var registeredEnterpriseDAO = new RegisteredEnterpriseDAO(context);
+            var registeredEnterpriseRepository = new RegisteredEnterpriseRepository(registeredEnterpriseDAO);
+
             return new ThesisService(
                 new Mock<IThesisRepository>().Object,
                 new Mock<IThesisReviewRepository>().Object,
@@ -32,6 +36,7 @@ namespace FCTMS.Tests.Services
                 new Mock<ITeamMemberRepository>().Object,
                 new Mock<IWhitelistRepository>().Object,
                 new Mock<INotificationService>().Object,
+                registeredEnterpriseRepository,
                 context,
                 new Mock<IMapper>().Object,
                 new Mock<ISystemParameterService>().Object,

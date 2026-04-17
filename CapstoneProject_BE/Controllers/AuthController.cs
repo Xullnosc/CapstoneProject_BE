@@ -14,15 +14,15 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly ILogger<AuthController> _logger;
     private readonly IWebHostEnvironment _env;
-    private readonly Repositories.IAccessLogRepository _accessLogRepository;
+    private readonly IAccessLogService _accessLogService;
     private readonly ICaptchaService _captchaService;
 
-    public AuthController(IAuthService authService, ILogger<AuthController> logger, IWebHostEnvironment env, IAccessLogRepository accessLogRepository, ICaptchaService captchaService)
+    public AuthController(IAuthService authService, ILogger<AuthController> logger, IWebHostEnvironment env, IAccessLogService accessLogService, ICaptchaService captchaService)
     {
         _authService = authService;
         _logger = logger;
         _env = env;
-        _accessLogRepository = accessLogRepository;
+        _accessLogService = accessLogService;
         _captchaService = captchaService;
     }
 
@@ -65,7 +65,7 @@ public class AuthController : ControllerBase
         catch (UnauthorizedAccessException ex)
         {
             var ipAddress = GetIpAddress();
-            await _accessLogRepository.CreateLogAsync(new BusinessObjects.Models.AccessLog
+            await _accessLogService.CreateLogAsync(new BusinessObjects.Models.AccessLog
             {
                 UserId = null,
                 UserEmail = request?.Campus ?? "Unknown", // Assuming campus as fallback
@@ -116,7 +116,7 @@ public class AuthController : ControllerBase
         catch (UnauthorizedAccessException ex)
         {
             var ipAddress = GetIpAddress();
-            await _accessLogRepository.CreateLogAsync(new BusinessObjects.Models.AccessLog
+            await _accessLogService.CreateLogAsync(new BusinessObjects.Models.AccessLog
             {
                 UserId = null,
                 UserEmail = request?.Username ?? "Unknown",
@@ -164,7 +164,7 @@ public class AuthController : ControllerBase
             userId = parsedId;
         }
 
-        await _accessLogRepository.CreateLogAsync(new BusinessObjects.Models.AccessLog
+        await _accessLogService.CreateLogAsync(new BusinessObjects.Models.AccessLog
         {
             UserId = userId,
             UserEmail = !string.IsNullOrEmpty(userEmail) ? userEmail : "Unknown (Logout)",
