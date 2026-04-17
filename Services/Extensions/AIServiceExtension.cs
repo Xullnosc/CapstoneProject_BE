@@ -43,6 +43,7 @@ public static class AIServiceExtension
         services.AddSingleton<ITfIdfService, TfIdfService>();
         services.AddSingleton<IHybridChunkingService, HybridChunkingService>();
         services.AddSingleton<IChunkPreFilterService, ChunkPreFilterService>();
+        services.AddScoped<IThesisDuplicationService, ThesisDuplicationService>();
 
         return services;
     }

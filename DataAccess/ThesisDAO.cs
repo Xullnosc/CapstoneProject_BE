@@ -290,5 +290,16 @@ namespace DataAccess
                 .Where(t => t.TeamId == teamId)
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<Thesis>> GetThesesBySemesterIdsAsync(IEnumerable<int> semesterIds)
+        {
+            var ids = semesterIds.ToList();
+            return await _context.Theses
+                .AsNoTracking()
+                .Where(t => t.SemesterId.HasValue
+                    && ids.Contains(t.SemesterId.Value)
+                    && t.Status == "Published")
+                .ToListAsync();
+        }
     }
 }

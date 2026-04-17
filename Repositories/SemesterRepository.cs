@@ -50,5 +50,8 @@ namespace Repositories
 
         public async Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize, string? search = null)
             => await _semesterDAO.GetOrphanedStudentsAsync(semesterId, pageIndex, pageSize, search);
+
+        public async Task<List<Semester>> GetPreviousClosedSemestersAsync(int currentSemesterId, int count)
+            => await _semesterDAO.GetPreviousClosedSemestersAsync(currentSemesterId, count);
     }
 }

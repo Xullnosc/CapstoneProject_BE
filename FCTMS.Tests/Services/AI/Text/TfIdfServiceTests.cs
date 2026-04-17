@@ -74,4 +74,57 @@ public class TfIdfServiceTests
 
         score.Should().Be(0d);
     }
+
+    [Fact]
+    public void BuildModel_WithCapstoneProfile_ShouldRemoveTemplateWords()
+    {
+        var docs = new Dictionary<string, string>
+        {
+            ["d1"] = "capstone project register objectives sprint backlog",
+            ["d2"] = "capstone project register objectives jwt rbac"
+        };
+
+        var model = _service.BuildModel(docs, new TfIdfOptions
+        {
+            DomainProfile = TfIdfOptions.DomainProfileCapstone
+        });
+
+        model.Vocabulary.Keys.Should().NotContain(new[] { "capstone", "register", "objectives" });
+        model.Vocabulary.Keys.Should().Contain(new[] { "sprint", "backlog", "jwt", "rbac" });
+    }
+
+    [Fact]
+    public void BuildModel_WithUnknownDomainProfile_ShouldThrow()
+    {
+        var docs = new Dictionary<string, string>
+        {
+            ["d1"] = "alpha beta",
+            ["d2"] = "beta gamma"
+        };
+
+        Action act = () => _service.BuildModel(docs, new TfIdfOptions { DomainProfile = "unknown-profile" });
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void BuildModel_WithCapstoneProfile_ShouldDownweightGenericTechTerms()
+    {
+        var docs = new Dictionary<string, string>
+        {
+            ["d1"] = "react alpha",
+            ["d2"] = "angular beta"
+        };
+
+        var model = _service.BuildModel(docs, new TfIdfOptions
+        {
+            DomainProfile = TfIdfOptions.DomainProfileCapstone
+        });
+
+        var d1Weights = model.Vectors["d1"].NormalizedWeights;
+        var reactTermId = model.Vocabulary["react"];
+        var alphaTermId = model.Vocabulary["alpha"];
+
+        d1Weights[reactTermId].Should().BeLessThan(d1Weights[alphaTermId]);
+    }
 }

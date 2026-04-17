@@ -73,5 +73,7 @@ namespace Repositories
             int? semesterId = null
         ) => _thesisDAO.GetApprovedThesisByLeaderIdAsync(leaderId, semesterId);
 
+        public Task<IEnumerable<Thesis>> GetThesesBySemesterIdsAsync(IEnumerable<int> semesterIds)
+            => _thesisDAO.GetThesesBySemesterIdsAsync(semesterIds);
     }
 }
