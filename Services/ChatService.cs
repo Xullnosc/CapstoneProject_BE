@@ -1,5 +1,4 @@
 using System;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -160,7 +159,8 @@ namespace Services
             var team = await _teamRepo.GetByIdAsync(teamId);
             if (team == null) return false;
             
-            return team.Teammembers.Any(tm => tm.StudentId == userId) 
+            return team.LeaderId == userId // Corrected: Include LeaderId
+                   || team.Teammembers.Any(tm => tm.StudentId == userId) 
                    || team.MentorId == userId 
                    || team.MentorId2 == userId;
         }
@@ -182,68 +182,18 @@ namespace Services
 
         public async Task<List<int>> GetUserTeamIdsAsync(int userId)
         {
-            var teamIds = new HashSet<int>();
             var currentSemester = await _semesterService.GetCurrentSemesterAsync();
             var semesterId = currentSemester?.SemesterId ?? 0;
+            if (semesterId == 0) return new List<int>();
 
-            var studentTeam = await _teamRepo.GetActiveTeamByStudentIdAsync(userId);
-            if (studentTeam != null)
-            {
-                teamIds.Add(studentTeam.TeamId);
-            }
-
-            if (semesterId > 0)
-            {
-                var mentoredTeams = await _teamRepo.GetTeamsByMentorIdAsync(userId, semesterId);
-                foreach (var team in mentoredTeams)
-                {
-                    teamIds.Add(team.TeamId);
-                }
-            }
-
-            return teamIds.ToList();
+            // Tech Lead optimization: Use the refactored chatRepo method which is more inclusive
+            var teams = await _chatRepo.GetActiveTeamsForUserAsync(userId, semesterId);
+            return teams.Select(t => t.TeamId).ToList();
         }
 
         public async Task<List<TeamChatInfoDto>> GetUserTeamChatListAsync(int userId, int semesterId)
         {
-            var results = new List<TeamChatInfoDto>();
-            var allTeams = new List<Team>();
-            
-            // 1. Get teams where user is a student member
-            var studentTeam = await _teamRepo.GetTeamByStudentIdAsync(userId, semesterId);
-            if (studentTeam != null)
-            {
-                allTeams.Add(studentTeam);
-            }
-
-            // 2. Get teams where user is a mentor (MentorId or MentorId2)
-            var mentoredTeams = await _teamRepo.GetTeamsByMentorIdAsync(userId, semesterId);
-            foreach (var team in mentoredTeams.Where(t => t.TeamId != studentTeam?.TeamId))
-            {
-                allTeams.Add(team);
-            }
-            
-            // 3. Batch fetch latest messages for all teams
-            var teamIds = allTeams.Select(t => t.TeamId).ToList();
-            var latestMessages = await _chatRepo.GetLastMessagesByTeamIdsAsync(teamIds);
-            var latestMessageMap = latestMessages.ToDictionary(m => m.TeamId.Value, m => m);
-
-            // 4. Transform to DTO
-            foreach (var team in allTeams)
-            {
-                latestMessageMap.TryGetValue(team.TeamId, out var latest);
-                var unreadCount = await _chatRepo.GetUnreadCountAsync(userId, null, team.TeamId);
-                results.Add(new TeamChatInfoDto(
-                    team.TeamId,
-                    team.TeamName,
-                    team.TeamAvatar,
-                    latest?.Content,
-                    latest?.CreatedAt,
-                    unreadCount
-                ));
-            }
-            
-            return results;
+            return await _chatRepo.GetUserTeamChatListAsync(userId, semesterId);
         }
     }
 }

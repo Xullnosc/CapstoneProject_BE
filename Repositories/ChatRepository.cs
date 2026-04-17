@@ -70,7 +70,14 @@ namespace Repositories
             {
                 var otherUser = c.User1Id == userId ? c.User2 : c.User1;
                 var lastMsg = await _chatDAO.GetLastMessageByConversationAsync(c.ConversationId);
+                
+                if (lastMsg == null) continue;
+
                 var unreadCount = await _chatDAO.GetUnreadCountAsync(userId, c.ConversationId, null);
+
+                // Tech Lead: Fetch leadership info natively
+                var otherUserTeams = await _chatDAO.GetActiveTeamsForUserAsync(otherUser.UserId, semesterId);
+                var leadingTeam = otherUserTeams.FirstOrDefault(t => t.LeaderId == otherUser.UserId);
 
                 results.Add(new ConversationDto(
                     c.ConversationId,
@@ -81,7 +88,8 @@ namespace Repositories
                         : otherUser.Avatar,
                     lastMsg?.Content,
                     lastMsg?.CreatedAt,
-                    unreadCount
+                    unreadCount,
+                    leadingTeam?.TeamName // New field
                 ));
             }
 
@@ -115,10 +123,10 @@ namespace Repositories
 
         public async Task<List<TeamChatInfoDto>> GetUserTeamChatListAsync(int userId, int semesterId)
         {
-            var team = await _chatDAO.GetActiveTeamByStudentIdAsync(userId, semesterId);
+            var teams = await _chatDAO.GetActiveTeamsForUserAsync(userId, semesterId);
             var results = new List<TeamChatInfoDto>();
 
-            if (team != null)
+            foreach (var team in teams)
             {
                 var lastMsg = await _chatDAO.GetLastMessageByTeamAsync(team.TeamId);
                 var unreadCount = await _chatDAO.GetUnreadCountAsync(userId, null, team.TeamId);
@@ -136,6 +144,11 @@ namespace Repositories
             return results;
         }
 
+        public async Task<List<Team>> GetActiveTeamsForUserAsync(int userId, int semesterId)
+        {
+            return await _chatDAO.GetActiveTeamsForUserAsync(userId, semesterId);
+        }
+
         public async Task<ConversationDto?> GetConversationDtoAsync(int conversationId, int userId)
         {
             var c = await _chatDAO.GetConversationByIdAsync(conversationId);
@@ -147,6 +160,10 @@ namespace Repositories
             var lastMsg = await _chatDAO.GetLastMessageByConversationAsync(c.ConversationId);
             var unreadCount = await _chatDAO.GetUnreadCountAsync(userId, c.ConversationId, null);
 
+            // Tech Lead: Fetch leadership info natively
+            var otherUserTeams = await _chatDAO.GetActiveTeamsForUserAsync(otherUser.UserId, c.SemesterId);
+            var leadingTeam = otherUserTeams.FirstOrDefault(t => t.LeaderId == otherUser.UserId);
+
             return new ConversationDto(
                 c.ConversationId,
                 otherUser.UserId,
@@ -156,7 +173,8 @@ namespace Repositories
                     : otherUser.Avatar,
                 lastMsg?.Content,
                 lastMsg?.CreatedAt,
-                unreadCount
+                unreadCount,
+                leadingTeam?.TeamName // New field
             );
         }
 

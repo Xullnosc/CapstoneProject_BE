@@ -26,7 +26,10 @@ namespace DataAccess
                             && (w.RoleId == 3 || (w.Role != null && w.Role.RoleName == BusinessObjects.CampusConstants.Roles.Student))
                             && w.Status == BusinessObjects.CampusConstants.WhitelistStatus.Qualified);
 
-            // 2. Filter out those already in a team in this semester
+            // 2. Filter out current user and those already in a team in this semester
+            var currentUser = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == currentUserId);
+            var currentUserEmail = currentUser?.Email?.ToLower() ?? "";
+
             var studentsInTeams = _context.Teammembers
                 .Where(tm => tm.Team.SemesterId == semesterId)
                 .Select(tm => tm.Student.Email);
@@ -35,7 +38,10 @@ namespace DataAccess
                 .Where(t => t.SemesterId == semesterId)
                 .Select(t => t.Leader.Email);
 
-            var query = baseQuery.Where(w => !studentsInTeams.Contains(w.Email) && !leadersInTeams.Contains(w.Email));
+            var query = baseQuery.Where(w => 
+                w.Email.ToLower() != currentUserEmail && 
+                !studentsInTeams.Contains(w.Email) && 
+                !leadersInTeams.Contains(w.Email));
 
             // 3. Optional Search Query (Database-side search on Name/Code)
             if (!string.IsNullOrEmpty(searchQuery))
@@ -65,14 +71,11 @@ namespace DataAccess
             var existingUsers = await _context.Users
                 .Include(u => u.AccountDetail)
                 .Include(u => u.UserSkills)
-                .Where(u => emails.Contains(u.Email) && u.UserId != currentUserId) // Exclude current user at DB level
+                .Where(u => emails.Contains(u.Email))
                 .ToListAsync();
 
-            var currentUser = await _context.Users.FindAsync(currentUserId);
-            var currentUserEmail = currentUser?.Email?.ToLower() ?? "";
-
             var items = new List<User>();
-            foreach (var w in whitelistItems.Where(x => x.Email.ToLower() != currentUserEmail))
+            foreach (var w in whitelistItems)
             {
                 var user = existingUsers.FirstOrDefault(u => u.Email == w.Email);
                 if (user != null)
@@ -108,7 +111,6 @@ namespace DataAccess
                 .Include(t => t.Teaminvitations)
                 .Where(t => t.SemesterId == semesterId 
                             && t.CampusId == campusId 
-                            && (t.Status == "Insufficient" || t.Status == "Pending")
                             && t.Teammembers.Count < 5
                             && !t.Teammembers.Any(tm => tm.StudentId == currentUserId)); // Filter out own team
 

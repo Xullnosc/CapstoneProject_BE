@@ -25,7 +25,7 @@ namespace DataAccess
         Task MarkReadAsync(int userId, int? conversationId, int? teamId);
         Task<int> GetUnreadCountAsync(int userId, int? conversationId, int? teamId);
         Task<int> GetTotalUnreadCountAsync(int userId, int semesterId);
-        Task<Team?> GetActiveTeamByStudentIdAsync(int userId, int semesterId);
+        Task<List<Team>> GetActiveTeamsForUserAsync(int userId, int semesterId);
 
         // User Skills
         Task<List<UserSkill>> GetUserSkillsAsync(int userId);

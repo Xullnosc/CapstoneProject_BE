@@ -21,5 +21,6 @@ namespace Repositories
         Task<List<UserSkill>> GetUserSkillsAsync(int userId);
         Task ReplaceUserSkillsAsync(int userId, List<UserSkill> newSkills);
         Task<List<TeamChatInfoDto>> GetUserTeamChatListAsync(int userId, int semesterId);
+        Task<List<Team>> GetActiveTeamsForUserAsync(int userId, int semesterId);
     }
 }

@@ -140,6 +140,7 @@ namespace DataAccess
         // ─────────────────────────────────────────────────────────────
         public async Task MarkReadAsync(int userId, int? conversationId, int? teamId)
         {
+            var now = DateTime.UtcNow;
             var status = await _context.ChatReadStatuses
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.ConversationId == conversationId && s.TeamId == teamId);
 
@@ -150,13 +151,13 @@ namespace DataAccess
                     UserId = userId,
                     ConversationId = conversationId,
                     TeamId = teamId,
-                    LastReadAt = DateTime.UtcNow
+                    LastReadAt = now
                 };
                 _context.ChatReadStatuses.Add(status);
             }
             else
             {
-                status.LastReadAt = DateTime.UtcNow;
+                status.LastReadAt = now;
             }
 
             await _context.SaveChangesAsync();
@@ -173,49 +174,40 @@ namespace DataAccess
             if (conversationId.HasValue) query = query.Where(m => m.ConversationId == conversationId);
             if (teamId.HasValue) query = query.Where(m => m.TeamId == teamId);
 
+            // Tech Lead: Using > lastRead is correct, but lastRead is default(DateTime) if no status exists.
             return await query.CountAsync(m => m.SenderId != userId && (lastRead == default || m.CreatedAt > lastRead));
         }
 
         public async Task<int> GetTotalUnreadCountAsync(int userId, int semesterId)
         {
-            // Count unread DM messages for conversations in this semester.
-            var dmUnread = await (from c in _context.ChatConversations
-                                  where (c.User1Id == userId || c.User2Id == userId) && c.SemesterId == semesterId
-                                  join s in _context.ChatReadStatuses 
-                                    on new { Id = (int?)c.ConversationId, Uid = userId } 
-                                    equals new { Id = s.ConversationId, Uid = s.UserId } into readStatus
-                                  from rs in readStatus.DefaultIfEmpty()
-                                  select _context.ChatMessages.Count(m => m.ConversationId == c.ConversationId 
-                                                                         && m.SenderId != userId 
-                                                                         && (rs == null || m.CreatedAt > rs.LastReadAt)))
-                                 .SumAsync();
-
-            // Count unread team messages for teams where user is either student member or mentor.
-            var userTeamIds = await _context.Teams
-                .Where(t =>
-                    t.SemesterId == semesterId
-                    && (t.MentorId == userId
-                        || t.MentorId2 == userId
-                        || t.Teammembers.Any(tm => tm.StudentId == userId)))
-                .Select(t => t.TeamId)
-                .Distinct()
+            // Get all semesters' teams/convs? No, just this semester as per UI requirements.
+            
+            // 1. DMs unread
+            var dmConversations = await _context.ChatConversations
+                .Where(c => (c.User1Id == userId || c.User2Id == userId) && c.SemesterId == semesterId)
+                .Select(c => c.ConversationId)
                 .ToListAsync();
 
-            int teamUnread = 0;
-            foreach (var teamId in userTeamIds)
+            int total = 0;
+            foreach (var cid in dmConversations)
             {
-                var lastRead = await _context.ChatReadStatuses
-                    .Where(s => s.UserId == userId && s.TeamId == teamId && s.ConversationId == null)
-                    .Select(s => s.LastReadAt)
-                    .FirstOrDefaultAsync();
-
-                teamUnread += await _context.ChatMessages.CountAsync(m =>
-                    m.TeamId == teamId
-                    && m.SenderId != userId
-                    && (lastRead == default || m.CreatedAt > lastRead));
+                total += await GetUnreadCountAsync(userId, cid, null);
             }
 
-            return dmUnread + teamUnread;
+            // 2. Teams unread
+            var teamIds = await _context.Teams
+                .Where(t => t.SemesterId == semesterId && 
+                           (t.LeaderId == userId || t.MentorId == userId || t.MentorId2 == userId || 
+                            t.Teammembers.Any(tm => tm.StudentId == userId)))
+                .Select(t => t.TeamId)
+                .ToListAsync();
+
+            foreach (var tid in teamIds)
+            {
+                total += await GetUnreadCountAsync(userId, null, tid);
+            }
+
+            return total;
         }
 
         // ─────────────────────────────────────────────────────────────
@@ -236,13 +228,15 @@ namespace DataAccess
             await _context.SaveChangesAsync();
         }
 
-        public async Task<Team?> GetActiveTeamByStudentIdAsync(int userId, int semesterId)
+        public async Task<List<Team>> GetActiveTeamsForUserAsync(int userId, int semesterId)
         {
-            return await _context.Teammembers
-                .Include(tm => tm.Team)
-                .Where(tm => tm.StudentId == userId && tm.Team.SemesterId == semesterId)
-                .Select(tm => tm.Team)
-                .FirstOrDefaultAsync();
+            return await _context.Teams
+                .Where(t => t.SemesterId == semesterId 
+                            && (t.LeaderId == userId 
+                                || t.MentorId == userId 
+                                || t.MentorId2 == userId 
+                                || t.Teammembers.Any(tm => tm.StudentId == userId)))
+                .ToListAsync();
         }
     }
 }

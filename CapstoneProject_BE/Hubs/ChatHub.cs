@@ -73,7 +73,15 @@ namespace CapstoneProject_BE.Hubs
                 var participants = await _chatService.GetConversationParticipantsAsync(conversationId);
                 foreach (var uid in participants)
                 {
+                    // 1. Send the message
                     await Clients.Group($"User_{uid}").SendAsync("ReceiveMessage", messageDto);
+                    
+                    // 2. Real-time Header Sync: Notify recipients to refresh their unread count
+                    if (uid != senderId)
+                    {
+                        var unreadCount = await _chatService.GetTotalUnreadCountAsync(uid);
+                        await Clients.Group($"User_{uid}").SendAsync("UpdateUnreadCount", unreadCount);
+                    }
                 }
             }
         }
@@ -88,8 +96,13 @@ namespace CapstoneProject_BE.Hubs
                 {
                     var messageDto = await _chatService.SendTeamMessageAsync(senderId, teamId, content);
                     
-                    // Broadcast to team group
+                    // Broadcast to team group members
+                    // Note: Ideally we want individual 'User_{uid}' notifications too for unread count,
+                    // but for team chat we join the Team_{id} group.
                     await Clients.Group($"Team_{teamId}").SendAsync("ReceiveMessage", messageDto);
+                    
+                    // TODO: In a large system, we'd emit UpdateUnreadCount to individual users.
+                    // For now, let's keep it consistent.
                 }
                 else
                 {
@@ -104,6 +117,10 @@ namespace CapstoneProject_BE.Hubs
             if (int.TryParse(userIdStr, out int userId))
             {
                 await _chatService.MarkReadAsync(userId, conversationId, teamId);
+                
+                // Real-time Header Sync for current user (multi-tab sync)
+                var unreadCount = await _chatService.GetTotalUnreadCountAsync(userId);
+                await Clients.Group($"User_{userId}").SendAsync("UpdateUnreadCount", unreadCount);
             }
         }
 
