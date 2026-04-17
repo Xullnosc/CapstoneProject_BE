@@ -25,7 +25,6 @@ namespace DataAccess
                 .IgnoreQueryFilters()
                 .Include(u => u.Role)
                 .Include(u => u.AccountDetail)
-                .Include(u => u.CampusNavigation)
                 .FirstOrDefaultAsync(u => u.Email == email);
         }
 
@@ -34,7 +33,6 @@ namespace DataAccess
             return await _context.Users
                 .Include(u => u.Role)
                 .Include(u => u.AccountDetail)
-                .Include(u => u.CampusNavigation)
                 .FirstOrDefaultAsync(u => u.UserId == id);
         }
 
