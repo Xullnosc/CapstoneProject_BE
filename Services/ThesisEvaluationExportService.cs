@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -89,8 +89,8 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
     private static void WriteSummaryHeaders(ExcelWorksheet worksheet)
     {
         worksheet.Cells[1, 1].Value = "Thẩm định viên";
-        worksheet.Cells[1, 2].Value = "Nothing";
-        worksheet.Cells[1, 3].Value = "Nothing";
+        worksheet.Cells[1, 2].Value = "";
+        worksheet.Cells[1, 3].Value = "";
         worksheet.Cells[1, 4].Value = "Số lượng thẩm định ";
 
         ApplyHeaderStyle(worksheet.Cells[1, 1, 1, 4]);
