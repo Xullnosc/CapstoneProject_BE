@@ -82,20 +82,5 @@ namespace Repositories
         {
             return _teamDAO.GetActiveTeamByStudentIdAsync(studentId);
         }
-
-        public async Task<List<Team>> GetTeamsByMentorIdAsync(int mentorId, int semesterId)
-        {
-            return await _teamDAO.GetTeamsByMentorIdAsync(mentorId, semesterId);
-        }
-
-        public async Task<bool> AddJoinRequestAsync(int studentId, int teamId)
-        {
-            return await _teamDAO.AddJoinRequestAsync(studentId, teamId);
-        }
-
-        public async Task CancelJoinRequestAsync(int studentId, int teamId)
-        {
-            await _teamDAO.CancelJoinRequestAsync(studentId, teamId);
-        }
     }
 }

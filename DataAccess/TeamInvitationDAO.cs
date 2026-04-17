@@ -194,56 +194,6 @@ namespace DataAccess
                 .FirstOrDefaultAsync(i => i.TeamId == teamId && i.ReceiverId == ReceiverId && i.Status == CampusConstants.InvitationStatus.Pending);
         }
 
-        public async Task<Teaminvitation?> GetByTeamAndInviterAsync(int teamId, int inviterId)
-        {
-            return await _context.Teaminvitations
-                .Include(i => i.Team)
-                .Include(i => i.InvitedByNavigation)
-                .Include(i => i.Receiver)
-                .AsNoTracking()
-                .FirstOrDefaultAsync(i => i.TeamId == teamId && i.InvitedBy == inviterId && i.Status == CampusConstants.InvitationStatus.Pending);
-        }
-        
-        public async Task CancelAllPendingStudentInvitationsAsync(int studentId)
-        {
-            // Cancel both: 
-            // 1. Invitations sent TO the student (Member invitations)
-            // 2. JoinRequests sent BY the student to teams
-            var pending = await _context.Teaminvitations
-                .Where(i => (i.ReceiverId == studentId || (i.InvitedBy == studentId && i.Type == CampusConstants.InvitationType.JoinRequest))
-                         && i.Status == CampusConstants.InvitationStatus.Pending)
-                .ToListAsync();
-
-            if (pending.Any())
-            {
-                foreach (var inv in pending)
-                {
-                    inv.Status = CampusConstants.InvitationStatus.Cancelled;
-                    inv.RespondedAt = DateTime.UtcNow;
-                }
-                await _context.SaveChangesAsync();
-            }
-        }
-
-        public async Task CancelAllPendingStudentInvitationsForTeamAsync(int teamId)
-        {
-            var pending = await _context.Teaminvitations
-                .Where(i => i.TeamId == teamId 
-                            && i.Status == CampusConstants.InvitationStatus.Pending
-                            && (i.Type == CampusConstants.InvitationType.Member || i.Type == CampusConstants.InvitationType.JoinRequest))
-                .ToListAsync();
-
-            if (pending.Any())
-            {
-                foreach (var inv in pending)
-                {
-                    inv.Status = CampusConstants.InvitationStatus.Cancelled;
-                    inv.RespondedAt = DateTime.UtcNow;
-                }
-                await _context.SaveChangesAsync();
-            }
-        }
-
         // --- Mentor Invitation Methods ---
 
         public async Task CancelAllPendingMentorInvitationsForTeamAsync(int teamId)

@@ -40,7 +40,6 @@ public partial class User
     public virtual ICollection<Team> Teams { get; set; } = new List<Team>();
 
     public virtual ICollection<Thesis> Theses { get; set; } = new List<Thesis>();
-    public virtual ICollection<UserSkill> UserSkills { get; set; } = new List<UserSkill>();
 
     public virtual AccountDetail? AccountDetail { get; set; }
 }

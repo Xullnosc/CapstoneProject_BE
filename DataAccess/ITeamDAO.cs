@@ -24,8 +24,5 @@ namespace DataAccess
         Task DeleteRangeAsync(IEnumerable<Team> teams);
         Task DeleteAsync(Team team);
         Task<Team?> GetActiveTeamByStudentIdAsync(int studentId);
-        Task<List<Team>> GetTeamsByMentorIdAsync(int mentorId, int semesterId);
-        Task<bool> AddJoinRequestAsync(int studentId, int teamId);
-        Task CancelJoinRequestAsync(int studentId, int teamId);
     }
 }
