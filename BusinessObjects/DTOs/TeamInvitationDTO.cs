@@ -10,6 +10,7 @@ namespace BusinessObjects.DTOs
         public int ReceiverId { get; set; }
         public InvitedByDTO? InvitedBy { get; set; } // Nested Inviter Object
         public string? Status { get; set; }
+        public string? Type { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 

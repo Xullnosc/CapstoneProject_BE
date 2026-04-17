@@ -50,9 +50,24 @@ namespace Repositories
             await _dao.CancelAllPendingInvitationsForReceiverAsync(studentId);
         }
 
+        public async Task CancelAllPendingStudentInvitationsAsync(int studentId)
+        {
+            await _dao.CancelAllPendingStudentInvitationsAsync(studentId);
+        }
+
+        public async Task CancelAllPendingStudentInvitationsForTeamAsync(int teamId)
+        {
+            await _dao.CancelAllPendingStudentInvitationsForTeamAsync(teamId);
+        }
+
         public async Task<Teaminvitation?> GetByTeamAndReceiverAsync(int teamId, int studentId)
         {
             return await _dao.GetByTeamAndReceiverAsync(teamId, studentId);
+        }
+
+        public async Task<Teaminvitation?> GetByTeamAndInviterAsync(int teamId, int inviterId)
+        {
+            return await _dao.GetByTeamAndInviterAsync(teamId, inviterId);
         }
 
         // --- Mentor Invitation Methods ---
