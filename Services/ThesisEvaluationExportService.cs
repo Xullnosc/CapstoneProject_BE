@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -89,8 +89,8 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
     private static void WriteSummaryHeaders(ExcelWorksheet worksheet)
     {
         worksheet.Cells[1, 1].Value = "Thẩm định viên";
-        worksheet.Cells[1, 2].Value = "Nothing";
-        worksheet.Cells[1, 3].Value = "Nothing";
+        worksheet.Cells[1, 2].Value = "";
+        worksheet.Cells[1, 3].Value = "";
         worksheet.Cells[1, 4].Value = "Số lượng thẩm định ";
 
         ApplyHeaderStyle(worksheet.Cells[1, 1, 1, 4]);
@@ -583,9 +583,19 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         string? value
     )
     {
+        if (startRow < endRow)
+        {
+            for (var row = startRow + 1; row <= endRow; row++)
+            {
+                worksheet.Cells[row, column].Value = null;
+            }
+        }
+
         var range = worksheet.Cells[startRow, column, endRow, column];
         range.Merge = startRow != endRow;
-        range.Value = value;
+        // Only populate the top-left cell so COUNTIFS counts each thesis once,
+        // not once per student row in the merged block.
+        worksheet.Cells[startRow, column].Value = value;
         range.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
         range.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
         range.Style.WrapText = true;
@@ -600,9 +610,17 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         Color backgroundColor
     )
     {
+        if (startRow < endRow)
+        {
+            for (var row = startRow + 1; row <= endRow; row++)
+            {
+                worksheet.Cells[row, column].Value = null;
+            }
+        }
+
         var range = worksheet.Cells[startRow, column, endRow, column];
         range.Merge = startRow != endRow;
-        range.Value = value;
+        worksheet.Cells[startRow, column].Value = value;
         range.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
         range.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
         range.Style.WrapText = true;

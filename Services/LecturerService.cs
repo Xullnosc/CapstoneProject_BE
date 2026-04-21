@@ -376,7 +376,7 @@ namespace Services
                         Avatar = lecturer.Avatar,
                         CampusId = lecturer.CampusId,
                         RoleId = lecturerRole.RoleId,
-                        SemesterId = currentSemester?.SemesterId, // Assigned current semester ID
+                        SemesterId = null, // Global lecturer
                         AddedDate = DateTime.UtcNow
                     });
                     changed = true;
