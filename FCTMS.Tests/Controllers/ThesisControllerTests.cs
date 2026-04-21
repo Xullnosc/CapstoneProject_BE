@@ -23,7 +23,8 @@ namespace FCTMS.Tests.Controllers
         public ThesisControllerTests()
         {
             _mockThesisService = new Mock<IThesisService>();
-            _controller = new ThesisController(_mockThesisService.Object);
+            var mockDuplicationService = new Mock<IThesisDuplicationService>();
+            _controller = new ThesisController(_mockThesisService.Object, mockDuplicationService.Object);
 
             // Mock claims for the controller
             var claims = new List<Claim>

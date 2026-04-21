@@ -26,6 +26,9 @@ namespace DataAccess
             int? semesterId = null
         );
 
+        // Duplication pipeline
+        Task<IEnumerable<Thesis>> GetThesesBySemesterIdsAsync(IEnumerable<int> semesterIds);
+
         // Mentor Invitation Methods
         Task<Thesis?> GetApprovedThesisByLeaderIdAsync(int leaderId, int? semesterId = null);
         Task<Thesis?> GetThesisForInvitationAsync(int leaderId, int teamId, int? semesterId = null);

@@ -7,6 +7,7 @@ using Services.AI.Configuration;
 using Services.AI.Monitoring;
 using Services.AI.Providers;
 using Services.AI.RateLimiting;
+using Services.AI.Text;
 
 namespace Services.Extensions;
 
@@ -39,6 +40,10 @@ public static class AIServiceExtension
         services.AddScoped<IAICache, RedisAICache>();
         services.AddScoped<IAIRateLimiter, RedisRateLimiter>();
         services.AddScoped<IAIService, AIService>();
+        services.AddSingleton<ITfIdfService, TfIdfService>();
+        services.AddSingleton<IHybridChunkingService, HybridChunkingService>();
+        services.AddSingleton<IChunkPreFilterService, ChunkPreFilterService>();
+        services.AddScoped<IThesisDuplicationService, ThesisDuplicationService>();
 
         return services;
     }

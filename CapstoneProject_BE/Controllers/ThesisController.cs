@@ -17,10 +17,14 @@ namespace CapstoneProject_BE.Controllers
     public class ThesisController : ControllerBase
     {
         private readonly IThesisService _thesisService;
+        private readonly IThesisDuplicationService _duplicationService;
 
-        public ThesisController(IThesisService thesisService)
+        public ThesisController(
+            IThesisService thesisService,
+            IThesisDuplicationService duplicationService)
         {
             _thesisService = thesisService;
+            _duplicationService = duplicationService;
         }
 
         // ─── Existing Endpoint (untouched) ───────────────────────────────────────
@@ -522,6 +526,29 @@ namespace CapstoneProject_BE.Controllers
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { Message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// POST /api/thesis/{id}/duplication-check
+        /// HOD/Admin/Lecturer: run TF-IDF duplication check against the two previous closed semesters.
+        /// </summary>
+        [HttpPost("{id}/duplication-check")]
+        [Authorize(Policy = "ReviewAuthority")]
+        public async Task<IActionResult> DuplicationCheck(string id)
+        {
+            try
+            {
+                var result = await _duplicationService.CheckAsync(id, HttpContext.RequestAborted);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { Message = ex.Message });
             }
             catch (Exception ex)
             {

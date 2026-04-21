@@ -21,6 +21,7 @@ namespace Repositories
         Task<bool> HasActiveSemesterAsync();
         Task<bool> SemesterExistsAsync(int semesterId);
         Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize, string? search = null);
+        Task<List<Semester>> GetPreviousClosedSemestersAsync(int currentSemesterId, int count);
     }
 }
 

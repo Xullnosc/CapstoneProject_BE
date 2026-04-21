@@ -176,6 +176,16 @@ namespace DataAccess
                 start.Date <= s.EndDate.Date && end.Date >= s.StartDate.Date);
         }
 
+        public async Task<List<Semester>> GetPreviousClosedSemestersAsync(int currentSemesterId, int count)
+        {
+            return await _context.Semesters
+                .AsNoTracking()
+                .Where(s => s.SemesterId != currentSemesterId && s.Status == "Closed")
+                .OrderByDescending(s => s.EndDate)
+                .Take(count)
+                .ToListAsync();
+        }
+
         public async Task<PagedResult<Whitelist>> GetOrphanedStudentsAsync(int semesterId, int pageIndex, int pageSize, string? search = null)
         {
             var studentRoleId = await GetStudentRoleIdAsync();
