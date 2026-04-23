@@ -25,6 +25,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ILogger<ImportService>> _mockLogger;
         private readonly Mock<IRedisService> _mockRedisService;
         private readonly Mock<ICampusContextService> _mockCampusContextService;
+        private readonly Mock<INotificationService> _mockNotificationService;
 
         public ImportServiceTests()
         {
@@ -32,6 +33,7 @@ namespace FCTMS.Tests.Services
             _mockLogger = new Mock<ILogger<ImportService>>();
             _mockRedisService = new Mock<IRedisService>();
             _mockCampusContextService = new Mock<ICampusContextService>();
+            _mockNotificationService = new Mock<INotificationService>();
             _mockCampusContextService.Setup(c => c.GetCurrentCampusId()).Returns(1);
             _mockRedisService.Setup(x => x.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
             _mockRedisService.Setup(x => x.RemoveByPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
@@ -40,7 +42,14 @@ namespace FCTMS.Tests.Services
         private ImportService CreateService(FctmsContext context)
         {
             IImportRepository importRepository = new ImportRepository(new ImportDAO(context));
-            return new ImportService(importRepository, _mockSemesterRepository.Object, _mockLogger.Object, _mockRedisService.Object, _mockCampusContextService.Object);
+            return new ImportService(
+                importRepository, 
+                _mockSemesterRepository.Object, 
+                _mockLogger.Object, 
+                _mockRedisService.Object, 
+                _mockCampusContextService.Object,
+                _mockNotificationService.Object,
+                new UserRepository(new UserDAO(context)));
         }
 
         private static FctmsContext CreateContext()

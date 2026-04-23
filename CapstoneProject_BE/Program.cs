@@ -16,7 +16,8 @@ using Services.Extensions;
 using Services.Helpers;
 using Services.Mappings;
 using StackExchange.Redis;
-using CapstoneProject_BE.Hubs;
+using Services.Hubs;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,6 +63,14 @@ builder
             .ReferenceHandler
             .IgnoreCycles;
     });
+
+// Configure Forwarded Headers for Azure/Docker Proxy
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddDbContext<FctmsContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("capstoneDb");
@@ -247,7 +256,8 @@ builder
             {
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chatHub"))
+                if (!string.IsNullOrEmpty(accessToken) && 
+                    (path.StartsWithSegments("/chatHub") || path.StartsWithSegments("/api/chatHub")))
                 {
                     context.Token = accessToken;
                 }
@@ -390,6 +400,9 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+// Must be at the very top of the pipeline for SignalR/Auth to recognize HTTPS behind proxy
+app.UseForwardedHeaders();
+
 // Allow enabling Swagger in non-development environments via config or env var.
 var enableSwagger =
     app.Environment.IsDevelopment()
@@ -432,7 +445,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers().RequireRateLimiting("Global");
-app.MapHub<ChatHub>("/chatHub");
+app.MapHub<ChatHub>("/api/chatHub");
 
 // Root endpoint: redirect to Swagger when Swagger is enabled, otherwise return a simple status JSON.
 app.MapGet(

@@ -8,7 +8,7 @@ using Services;
 using BusinessObjects.Interfaces;
 
 using Microsoft.AspNetCore.SignalR;
-using CapstoneProject_BE.Hubs;
+using Services.Hubs;
 
 namespace CapstoneProject_BE.Controllers
 {

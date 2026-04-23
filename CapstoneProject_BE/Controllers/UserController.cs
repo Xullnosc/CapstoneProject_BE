@@ -116,9 +116,12 @@ namespace CapstoneProject_BE.Controllers
         {
             try
             {
-                if (userId <= 0) return BadRequest(new { message = "Invalid userId." });
+                if (userId == 0) return BadRequest(new { message = "Invalid userId." });
 
-                var profile = await _userService.GetProfileAsync(userId);
+                // Promote virtual user (negative ID from whitelist) to real user
+                var realUserId = await _userService.EnsureUserExistsAsync(userId);
+                var profile = await _userService.GetProfileAsync(realUserId);
+                
                 if (profile == null) return NotFound(new { message = "User not found" });
 
                 return Ok(profile);

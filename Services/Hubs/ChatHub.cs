@@ -4,10 +4,9 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using Services;
 using BusinessObjects.DTOs;
 
-namespace CapstoneProject_BE.Hubs
+namespace Services.Hubs
 {
     [Authorize]
     public class ChatHub : Hub
@@ -97,12 +96,7 @@ namespace CapstoneProject_BE.Hubs
                     var messageDto = await _chatService.SendTeamMessageAsync(senderId, teamId, content);
                     
                     // Broadcast to team group members
-                    // Note: Ideally we want individual 'User_{uid}' notifications too for unread count,
-                    // but for team chat we join the Team_{id} group.
                     await Clients.Group($"Team_{teamId}").SendAsync("ReceiveMessage", messageDto);
-                    
-                    // TODO: In a large system, we'd emit UpdateUnreadCount to individual users.
-                    // For now, let's keep it consistent.
                 }
                 else
                 {
