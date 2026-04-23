@@ -253,13 +253,13 @@ namespace CapstoneProject_BE.Controllers
             {
                 return BadRequest(new { message = "File size exceeds the 5 MB limit." });
             }
-            var allowedExtensions = new[] { ".xlsx", ".xls" };
+            var allowedExtensions = new[] { ".xlsx" };
             var fileExtension = Path.GetExtension(file.FileName).ToLower();
 
             if (!allowedExtensions.Contains(fileExtension))
             {
                 return BadRequest(
-                    new { message = "Invalid file type. Only .xlsx and .xls files are allowed." }
+                    new { message = "Invalid file type. Only .xlsx files are allowed." }
                 );
             }
 
@@ -336,14 +336,19 @@ namespace CapstoneProject_BE.Controllers
                 // Database/system state issues
                 return BadRequest(new { message = "An error occurred while importing. Please verify the Excel file and try again." });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                var message = ex.Message.Contains("file is not in Open XML format", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("not a valid package", StringComparison.OrdinalIgnoreCase)
+                    ? "Unsupported Excel format. Please save the file as .xlsx and try again."
+                    : "An error occurred while importing the whitelist. Please check the file format and try again.";
+
                 // Generic exception - log internally, return generic message
                 return StatusCode(
                     500,
                     new
                     {
-                        message = "An error occurred while importing the whitelist. Please check the file format and try again.",
+                        message,
                     }
                 );
             }
