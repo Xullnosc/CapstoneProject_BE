@@ -23,6 +23,8 @@ public partial class FctmsContext : DbContext
 
     public virtual DbSet<Semester> Semesters { get; set; }
 
+    public virtual DbSet<MidtermReview> MidtermReviews { get; set; }
+
     public virtual DbSet<Team> Teams { get; set; }
 
     public virtual DbSet<Teaminvitation> Teaminvitations { get; set; }
@@ -231,6 +233,25 @@ public partial class FctmsContext : DbContext
                 .HasConstraintName("FK_Semesters_Campus");
 
             entity.HasQueryFilter(e => CurrentCampusId == null || e.CampusId == CurrentCampusId);
+        });
+
+        modelBuilder.Entity<MidtermReview>(entity =>
+        {
+            entity.HasKey(e => e.MidtermReviewId).HasName("PRIMARY");
+            entity.ToTable("MidtermReviews");
+
+            entity.HasIndex(e => e.SemesterId).IsUnique();
+
+            entity.Property(e => e.LockDate).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.Semester)
+                .WithOne(p => p.MidtermReview)
+                .HasForeignKey<MidtermReview>(d => d.SemesterId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_MidtermReviews_Semesters");
         });
 
         modelBuilder.Entity<Team>(entity =>

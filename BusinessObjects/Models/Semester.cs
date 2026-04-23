@@ -24,4 +24,6 @@ public partial class Semester
     public virtual ICollection<Team> Teams { get; set; } = new List<Team>();
 
     public virtual ICollection<Whitelist> Whitelists { get; set; } = new List<Whitelist>();
+
+    public virtual MidtermReview? MidtermReview { get; set; }
 }

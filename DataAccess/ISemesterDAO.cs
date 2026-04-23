@@ -13,6 +13,7 @@ namespace DataAccess
         Task<Semester?> GetByIdSimpleAsync(int id);
         Task<Semester> AddAsync(Semester semester);
         Task UpdateAsync(Semester semester);
+        Task UpdateMidtermReviewAsync(int semesterId, DateTime lockDate);
         Task<Semester?> GetCurrentSemesterAsync();
         Task<Semester?> GetByCodeAsync(string code);
         Task<int> GetStudentRoleIdAsync();

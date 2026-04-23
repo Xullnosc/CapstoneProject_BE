@@ -23,6 +23,7 @@ namespace DataAccess
             return await _context.Semesters
                 .Include(s => s.Teams)
                 .Include(s => s.Whitelists)
+                .Include(s => s.MidtermReview)
                 .AsNoTracking()
                 .OrderBy(s => s.Status == CampusConstants.SemesterStatus.Open ? 0 
                            : s.Status == CampusConstants.SemesterStatus.InProgress ? 1 
@@ -37,6 +38,7 @@ namespace DataAccess
             var query = _context.Semesters
                 .Include(s => s.Teams)
                 .Include(s => s.Whitelists)
+                .Include(s => s.MidtermReview)
                 .AsNoTracking();
 
             var totalCount = await query.CountAsync();
@@ -62,6 +64,7 @@ namespace DataAccess
                 .Include(s => s.Teams)
                     .ThenInclude(t => t.Leader)
                 .Include(s => s.Campus)
+                .Include(s => s.MidtermReview)
                 .Include(s => s.Whitelists)
                     .ThenInclude(w => w.Role)
                 .AsNoTracking()
@@ -96,10 +99,31 @@ namespace DataAccess
                     .SetProperty(x => x.CampusId, semester.CampusId));
         }
 
+        public async Task UpdateMidtermReviewAsync(int semesterId, DateTime lockDate)
+        {
+            var existing = await _context.MidtermReviews.FirstOrDefaultAsync(m => m.SemesterId == semesterId);
+            if (existing != null)
+            {
+                existing.LockDate = lockDate;
+                _context.MidtermReviews.Update(existing);
+            }
+            else
+            {
+                var review = new MidtermReview
+                {
+                    SemesterId = semesterId,
+                    LockDate = lockDate
+                };
+                await _context.MidtermReviews.AddAsync(review);
+            }
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<Semester?> GetCurrentSemesterAsync()
         {
             // Priority 1: Check for any "Live" semester using Stage logic from CampusConstants
             var activeSemester = await _context.Semesters
+                .Include(s => s.MidtermReview)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => 
                     s.Status == CampusConstants.SemesterStatus.Open || 
@@ -117,7 +141,9 @@ namespace DataAccess
             // Priority 2: Fallback to Date Range (Backward Compatibility)
             var now = DateTime.UtcNow;
             return await _context
-                .Semesters.AsNoTracking()
+                .Semesters
+                .Include(s => s.MidtermReview)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.StartDate <= now && s.EndDate >= now);
         }
 

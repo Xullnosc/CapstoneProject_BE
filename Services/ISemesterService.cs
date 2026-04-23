@@ -15,6 +15,7 @@ namespace Services
         Task StartSemesterAsync(int id);
         Task LockSubmissionAsync(int id);
         Task LockAllUpdatesAsync(int id);
+        Task AnnounceMidtermReviewAsync(int id, DateTime lockDate);
         Task CloseSemesterAsync(int id);
         Task<PagedResult<WhitelistDTO>> GetWhitelistsPaginatedAsync(int semesterId, int page, int pageSize, string? role = null, string? search = null);
         Task<PagedResult<WhitelistDTO>> GetOrphanedStudentsAsync(int semesterId, int page, int pageSize, string? search = null);
