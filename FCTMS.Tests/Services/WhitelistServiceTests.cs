@@ -20,6 +20,7 @@ namespace FCTMS.Tests.Services
         private readonly Mock<ILecturerRepository> _mockLecturerRepository;
         private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<ISystemUserCredentialRepository> _mockCredentialRepository;
+        private readonly Mock<INotificationService> _mockNotificationService;
 
         public WhitelistServiceTests()
         {
@@ -28,6 +29,7 @@ namespace FCTMS.Tests.Services
             _mockSemesterRepository = new Mock<ISemesterRepository>();
             _mockUserRepository = new Mock<IUserRepository>();
             _mockCredentialRepository = new Mock<ISystemUserCredentialRepository>();
+            _mockNotificationService = new Mock<INotificationService>();
             _mockRedisService = new Mock<IRedisService>();
             _mockRedisService.Setup(x => x.DeleteValueAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
             _mockRedisService.Setup(x => x.RemoveByPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
@@ -37,7 +39,8 @@ namespace FCTMS.Tests.Services
                 _mockRedisService.Object,
                 _mockLecturerRepository.Object,
                 _mockUserRepository.Object,
-                _mockCredentialRepository.Object);
+                _mockCredentialRepository.Object,
+                _mockNotificationService.Object);
         }
         [Fact]
         public async Task GetWhitelistByRoleAsync_ShouldReturnEntries_WhenRoleHasStudents()

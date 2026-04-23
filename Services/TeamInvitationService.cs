@@ -60,18 +60,32 @@ namespace Services
             return invitations.Select(MapToDTO).ToList();
         }
 
-        public async Task AcceptInvitationAsync(int invitationId, int studentId)
+        public async Task AcceptInvitationAsync(int invitationId, int userId)
         {
-            var invitation = await ValidateInvitationAsync(invitationId, studentId);
+            // [LIFECYCLE GUARD] Chỉ cho phép accept khi kỳ học ở trạng thái Open
+            var semesterCheck = await _semesterRepository.GetCurrentSemesterAsync();
+            if (!CampusConstants.SemesterStatus.IsOpenStage(semesterCheck?.Status))
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{semesterCheck?.Status}'. Chỉ có thể chấp nhận lời mời/yêu cầu khi kỳ học đang mở (Open).");
+            }
+
+            var invitation = await ValidateInvitationAsync(invitationId, userId);
+
+            int studentToJoinId = userId;
+            if (invitation.Type == CampusConstants.InvitationType.JoinRequest)
+            {
+                // For a join request, the joining student is the one who invited (InvitedBy)
+                studentToJoinId = invitation.InvitedBy;
+            }
 
             // 1. Check eligibility (Student not in team, Semester active)
-            await EnsureStudentCanJoinTeamAsync(studentId);
+            await EnsureStudentCanJoinTeamAsync(studentToJoinId);
 
             // 2. Check and Retrieve Team
             var team = await ValidateTeamForJoinAsync(invitation.TeamId);
 
             // 3. Add Member
-            await AddMemberToTeamAsync(team.TeamId, studentId);
+            await AddMemberToTeamAsync(team.TeamId, studentToJoinId);
 
             // 4. Update Invitation Status
             await _invitationRepository.UpdateStatusAsync(
@@ -79,16 +93,22 @@ namespace Services
                 CampusConstants.InvitationStatus.Accepted
             );
 
-            // 5. Cancel other pending invitations
-            await _invitationRepository.CancelAllPendingInvitationsForReceiverAsync(studentId);
+            // 5. Cancel all pending student-related invitations/requests (both incoming and outgoing)
+            await _invitationRepository.CancelAllPendingStudentInvitationsAsync(studentToJoinId);
 
-            // 6. Update Team Status if needed
+            // 6. If team is now full, cancel all pending invitations for the team
+            if (team.Teammembers.Count + 1 >= 5)
+            {
+                await _invitationRepository.CancelAllPendingStudentInvitationsForTeamAsync(team.TeamId);
+            }
+
+            // 7. Update Team Status if needed
             await UpdateTeamStatusAfterJoinAsync(team);
 
-            // 7. Invalidate Semester Cache
+            // 8. Invalidate Semester Cache
             await _semesterService.InvalidateSemesterCacheAsync();
 
-            // Notify all current team members about the new participant
+            // 9. Notify all current team members about the new participant
             if (team.Teammembers.Any())
             {
                 var members = team.Teammembers.Select(m => m.StudentId).ToList();
@@ -103,9 +123,16 @@ namespace Services
             }
         }
 
-        public async Task DeclineInvitationAsync(int invitationId, int studentId)
+        public async Task DeclineInvitationAsync(int invitationId, int userId)
         {
-            var invitation = await ValidateInvitationAsync(invitationId, studentId);
+            // [LIFECYCLE GUARD] Chỉ cho phép từ chối yêu cầu khi kỳ học ở trạng thái Open
+            var currentSemesterCheck = await _semesterRepository.GetCurrentSemesterAsync();
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemesterCheck?.Status))
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemesterCheck?.Status}'. Chỉ có thể từ chối lời mời/yêu cầu khi kỳ học đang mở (Open).");
+            }
+
+            var invitation = await ValidateInvitationAsync(invitationId, userId);
             await _invitationRepository.UpdateStatusAsync(
                 invitationId,
                 CampusConstants.InvitationStatus.Declined
@@ -184,12 +211,12 @@ namespace Services
             if (student.UserId == inviterId)
                 throw new InvalidOperationException("You cannot invite yourself");
 
-            var currentSemester = await _semesterRepository.GetCurrentSemesterAsync();
-            if (currentSemester != null)
+            // Reuse already-fetched currentSemesterCheck to avoid redundant DB call
+            if (currentSemesterCheck != null)
             {
                 bool alreadyInTeam = await _teamMemberRepository.IsStudentInTeamAsync(
                     student.UserId,
-                    currentSemester.SemesterId
+                    currentSemesterCheck.SemesterId
                 );
                 if (alreadyInTeam)
                     throw new InvalidOperationException("Student is already in a team");
@@ -226,7 +253,7 @@ namespace Services
                 var studentName = student.FullName;
 
                 // Dynamic Frontend URL
-                string frontendUrl = "http://localhost:5173"; // Default
+                string frontendUrl = "https://fctms-fe.vercel.app"; // Default
                 var allowedOrigins = _configuration["AllowedOrigins"];
                 if (!string.IsNullOrEmpty(allowedOrigins))
                 {
@@ -273,6 +300,13 @@ namespace Services
 
         public async Task CancelInvitationAsync(int invitationId, int userId)
         {
+            // [LIFECYCLE GUARD] Chỉ cho phép hủy yêu cầu khi kỳ học ở trạng thái Open
+            var currentSemesterCheck = await _semesterRepository.GetCurrentSemesterAsync();
+            if (!CampusConstants.SemesterStatus.IsOpenStage(currentSemesterCheck?.Status))
+            {
+                throw new InvalidOperationException($"Kỳ học đang ở trạng thái '{currentSemesterCheck?.Status}'. Chỉ có thể hủy lời mời/yêu cầu khi kỳ học đang mở (Open).");
+            }
+
             var invitation = await _invitationRepository.GetByIdAsync(invitationId);
             if (invitation == null)
                 throw new KeyNotFoundException("Invitation not found");
@@ -413,6 +447,7 @@ namespace Services
                     Avatar = inv.InvitedByNavigation?.Avatar ?? "",
                 },
                 Status = inv.Status,
+                Type = inv.Type,
                 CreatedAt = inv.CreatedAt ?? DateTime.UtcNow,
             };
         }

@@ -19,6 +19,9 @@ namespace DataAccess
         Task<PagedResult<Teaminvitation>> GetPendingInvitationsByReceiverAsync(int receiverId, int pageIndex, int pageSize);
         Task CancelAllPendingInvitationsForReceiverAsync(int receiverId);
         Task<Teaminvitation?> GetByTeamAndReceiverAsync(int teamId, int receiverId);
+        Task<Teaminvitation?> GetByTeamAndInviterAsync(int teamId, int inviterId);
+        Task CancelAllPendingStudentInvitationsAsync(int studentId);
+        Task CancelAllPendingStudentInvitationsForTeamAsync(int teamId);
 
         // Mentor Invitation Methods
         Task<List<Teaminvitation>> GetPendingMentorInvitationsByMentorIdAsync(int mentorId);

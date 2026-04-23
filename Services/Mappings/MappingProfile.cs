@@ -97,6 +97,10 @@ namespace Services.Mappings
                         opt.MapFrom(src =>
                             src.AccountDetail != null ? src.AccountDetail.EnrollmentYear : null
                         )
+                )
+                .ForMember(
+                    dest => dest.Campus,
+                    opt => opt.MapFrom(src => src.CampusNavigation != null ? src.CampusNavigation.CampusName : null)
                 );
 
             // Whitelist -> WhitelistDTO

@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Mail;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
+using Services.Hubs;
 
 namespace Services
 {
@@ -18,19 +20,22 @@ namespace Services
         private readonly IEmailService _emailService;
         private readonly IMapper _mapper;
         private readonly ILogger<NotificationService> _logger;
+        private readonly IHubContext<ChatHub> _hubContext;
 
         public NotificationService(
             INotificationRepository repository,
             IUserRepository userRepository,
             IEmailService emailService,
             IMapper mapper,
-            ILogger<NotificationService> logger)
+            ILogger<NotificationService> logger,
+            IHubContext<ChatHub> hubContext)
         {
             _repository = repository;
             _userRepository = userRepository;
             _emailService = emailService;
             _mapper = mapper;
             _logger = logger;
+            _hubContext = hubContext;
         }
 
         public async Task<PagedResult<NotificationDTO>> GetUserNotificationsAsync(int userId, int pageIndex, int pageSize)
@@ -109,7 +114,7 @@ namespace Services
         }
 
         public async Task<NotificationDTO> CreateNotificationAsync(int userId, string type, string title, string message, 
-            string? relatedEntityType = null, int? relatedEntityId = null, bool sendEmail = true)
+            string? relatedEntityType = null, int? relatedEntityId = null, bool sendEmail = true, string? emailBody = null)
         {
             try
             {
@@ -140,12 +145,24 @@ namespace Services
                 _logger.LogInformation("Created notification. UserId: {UserId}, Type: {Type}, Title: {Title}", 
                     userId, normalizedType, title);
 
+                var notificationDto = _mapper.Map<NotificationDTO>(notification);
+
+                // Push via SignalR (Real-time - Fast, await this)
+                await _hubContext.Clients.Group($"User_{userId}").SendAsync("ReceiveNotification", notificationDto);
+
                 if (sendEmail)
                 {
-                    await TrySendNotificationEmailAsync(user.Email, title, message, userId);
+                    // Capture email to avoid using 'user' object in background
+                    var recipientEmail = user.Email;
+                    var bodyToSend = !string.IsNullOrEmpty(emailBody) ? emailBody : message;
+                    
+                    _ = Task.Run(async () => 
+                    {
+                        await TrySendNotificationEmailAsync(recipientEmail, title, bodyToSend, userId);
+                    });
                 }
 
-                return _mapper.Map<NotificationDTO>(notification);
+                return notificationDto;
             }
             catch (Exception ex)
             {
@@ -204,30 +221,54 @@ namespace Services
                 _logger.LogInformation("Created bulk notifications. Count: {Count}, Type: {Type}, Title: {Title}", 
                     notifications.Count, normalizedType, title);
 
-                if (sendEmail)
+                // Construct DTOs for SignalR
+                var notificationDtos = _mapper.Map<List<NotificationDTO>>(notifications);
+
+                // 1. Push via SignalR (Very Fast - Await this to ensure UI update)
+                try 
                 {
-                    // Fire-and-Forget: Send emails in a background task so the API returns instantly
-                    // We capture the necessary data into local variables to avoid closure issues with disposed scopes
-                    var emailData = recipients.Select(r => new { r.Email, r.UserId }).ToList();
-                    
-                    _ = Task.Run(async () => 
-                    {
-                        try 
-                        {
-                            // Use emailBody if available, fallback to message
-                            var finalizedBody = !string.IsNullOrEmpty(emailBody) ? emailBody : message;
-                            var tasks = emailData.Select(data => 
-                                TrySendNotificationEmailAsync(data.Email, title, finalizedBody, data.UserId)
-                            );
-                            await Task.WhenAll(tasks);
-                            _logger.LogInformation("Background email sending completed for {Count} recipients.", emailData.Count);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Error sending background notification emails.");
-                        }
-                    });
+                    var pushTasks = notificationDtos.Select(dto => 
+                        _hubContext.Clients.Group($"User_{dto.UserId}").SendAsync("ReceiveNotification", dto)
+                    );
+                    await Task.WhenAll(pushTasks);
+                    _logger.LogInformation("SignalR notifications pushed successfully.");
                 }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to push SignalR notifications.");
+                }
+
+                    // 2. Send Emails
+                    if (sendEmail)
+                    {
+                        var finalizedBaseBody = !string.IsNullOrEmpty(emailBody) ? emailBody : message;
+                        var emailList = recipients.Select(r => new { r.Email, r.UserId }).ToList();
+
+                        _ = Task.Run(async () => 
+                        {
+                            try 
+                            {
+                                var emailTasks = emailList.Select(data => 
+                                {
+                                    // Personalize the body for each user if placeholder exists
+                                    string personalizedBody = finalizedBaseBody;
+                                    if (finalizedBaseBody.Contains("{UserName}"))
+                                    {
+                                        string prefix = data.Email.Split('@')[0];
+                                        personalizedBody = finalizedBaseBody.Replace("{UserName}", prefix);
+                                    }
+
+                                    return TrySendNotificationEmailAsync(data.Email, title, personalizedBody, data.UserId);
+                                });
+                                await Task.WhenAll(emailTasks);
+                                _logger.LogInformation("Background Personalized Email processing completed.");
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Error processing background Emails.");
+                            }
+                        });
+                    }
             }
             catch (Exception ex)
             {

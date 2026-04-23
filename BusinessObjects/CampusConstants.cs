@@ -173,6 +173,7 @@ namespace BusinessObjects
         {
             public const string Member = "Member";
             public const string Mentor = "Mentor";
+            public const string JoinRequest = "JoinRequest";
         }
 
         public static class MentorRecommendationStatus

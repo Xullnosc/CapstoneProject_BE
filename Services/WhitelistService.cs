@@ -13,6 +13,7 @@ namespace Services
         private readonly ILecturerRepository _lecturerRepository;
         private readonly IUserRepository _userRepository;
         private readonly ISystemUserCredentialRepository _credentialRepository;
+        private readonly INotificationService _notificationService;
 
         public WhitelistService(
             IWhitelistRepository whitelistRepository, 
@@ -20,7 +21,8 @@ namespace Services
             IRedisService redisService, 
             ILecturerRepository lecturerRepository,
             IUserRepository userRepository,
-            ISystemUserCredentialRepository credentialRepository)
+            ISystemUserCredentialRepository credentialRepository,
+            INotificationService notificationService)
         {
             _whitelistRepository = whitelistRepository;
             _semesterRepository = semesterRepository;
@@ -28,6 +30,7 @@ namespace Services
             _lecturerRepository = lecturerRepository;
             _userRepository = userRepository;
             _credentialRepository = credentialRepository;
+            _notificationService = notificationService;
         }
 
         public async Task<IEnumerable<Whitelist>> GetWhitelistByRoleAsync(int roleId)
@@ -122,7 +125,12 @@ namespace Services
             }
 
             await _whitelistRepository.AddAsync(newEntry);
+            await SyncWithUserAsync(newEntry);
             await InvalidateCache(newEntry.SemesterId);
+
+            // Notify User
+            await NotifyUserAsync(newEntry);
+
             return newEntry;
         }
 
@@ -146,7 +154,94 @@ namespace Services
             existing.SemesterId = semester.SemesterId;
 
             await _whitelistRepository.UpdateAsync(existing);
+            await SyncWithUserAsync(existing);
             await InvalidateCache(existing.SemesterId);
+
+            // Notify User
+            await NotifyUserAsync(existing);
+        }
+
+        private async Task NotifyUserAsync(Whitelist entry)
+        {
+            try
+            {
+                var user = await _userRepository.GetByEmailAsync(entry.Email);
+                if (user != null)
+                {
+                    var semester = await _semesterRepository.GetSemesterByIdAsync(entry.SemesterId ?? 0);
+                    string semesterName = semester?.SemesterName ?? "New Semester";
+                    
+                    string roleName = entry.RoleId switch
+                    {
+                        2 => BusinessObjects.CampusConstants.Roles.Lecturer,
+                        3 => BusinessObjects.CampusConstants.Roles.Student,
+                        4 => BusinessObjects.CampusConstants.Roles.HOD,
+                        _ => "User"
+                    };
+
+                    string statusMsg = string.Equals(entry.Status, BusinessObjects.CampusConstants.WhitelistStatus.Qualified, StringComparison.OrdinalIgnoreCase) 
+                        ? "qualified" 
+                        : "updated";
+
+                    // Construct stylized HTML email body
+                    string emailPrefix = user.Email.Split('@')[0];
+                    string emailBody = EmailTemplateConstants.WhitelistNotificationTemplate
+                        .Replace("{UserName}", emailPrefix)
+                        .Replace("{SemesterName}", semesterName)
+                        .Replace("{StatusMsg}", statusMsg)
+                        .Replace("{RoleName}", roleName)
+                        .Replace("{SystemLink}", "https://fctms-fe.vercel.app/")
+                        .Replace("{CurrentYear}", DateTime.Now.Year.ToString());
+
+                    await _notificationService.CreateNotificationAsync(
+                        user.UserId,
+                        "SystemAnnouncement",
+                        "FCTMS - Whitelist Update",
+                        $"Hello {user.FullName}, you have been confirmed as {statusMsg} for the {semesterName} semester.",
+                        "SystemAnnouncement",
+                        null,
+                        sendEmail: true,
+                        emailBody: emailBody
+                    );
+                }
+            }
+            catch (System.Exception ex)
+            {
+                // Log and continue - don't let notification failure break the whitelist creation
+            }
+        }
+
+        private async Task SyncWithUserAsync(Whitelist whitelist)
+        {
+            if (whitelist == null) return;
+
+            var existingUser = await _userRepository.GetByEmailAsync(whitelist.Email);
+            if (existingUser == null)
+            {
+                var newUser = new User
+                {
+                    Email = whitelist.Email,
+                    FullName = whitelist.FullName ?? "New User",
+                    StudentCode = whitelist.StudentCode,
+                    CampusId = whitelist.CampusId,
+                    RoleId = whitelist.RoleId,
+                    Avatar = string.IsNullOrWhiteSpace(whitelist.Avatar)
+                        ? $"https://ui-avatars.com/api/?name={System.Net.WebUtility.UrlEncode(whitelist.FullName ?? "User")}&background=random&color=fff"
+                        : whitelist.Avatar,
+                    IsAuthorized = (whitelist.Status == BusinessObjects.CampusConstants.WhitelistStatus.Qualified || whitelist.RoleId == 2),
+                    CreatedAt = System.DateTime.UtcNow
+                };
+                await _userRepository.AddAsync(newUser);
+            }
+            else
+            {
+                // Sync data if already exists
+                existingUser.FullName = whitelist.FullName ?? existingUser.FullName;
+                existingUser.StudentCode = whitelist.StudentCode ?? existingUser.StudentCode;
+                existingUser.RoleId = whitelist.RoleId;
+                existingUser.CampusId = whitelist.CampusId;
+                await _userRepository.UpdateAsync(existingUser);
+            }
         }
 
         public async Task DeleteWhitelistAsync(int id)

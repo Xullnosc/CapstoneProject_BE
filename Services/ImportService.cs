@@ -18,19 +18,25 @@ namespace Services
         private readonly ILogger<ImportService> _logger;
         private readonly IRedisService _redisService;
         private readonly ICampusContextService _campusContextService;
+        private readonly INotificationService _notificationService;
+        private readonly IUserRepository _userRepository;
 
         public ImportService(
             IImportRepository importRepository,
             ISemesterRepository semesterRepository,
             ILogger<ImportService> logger,
             IRedisService redisService,
-            ICampusContextService campusContextService)
+            ICampusContextService campusContextService,
+            INotificationService notificationService,
+            IUserRepository userRepository)
         {
             _importRepository = importRepository;
             _semesterRepository = semesterRepository;
             _logger = logger;
             _redisService = redisService;
             _campusContextService = campusContextService;
+            _notificationService = notificationService;
+            _userRepository = userRepository;
         }
 
         public async Task<ImportResult<WhitelistImportDTO>> ImportWhitelistFromExcel(
@@ -121,6 +127,9 @@ namespace Services
                         await _importRepository.ReconcileSemesterAsync(semesterGroup.Key, semesterGroup.ToList(), studentRoleId, now);
                         totalProcessed += semesterGroup.Count();
                         _logger.LogInformation("Successfully reconciled {count} whitelist rows for semester {semesterId}", semesterGroup.Count(), semesterGroup.Key);
+
+                        // Notify bulk import (Awaited to ensure context survival)
+                        await NotifyBulkImportAsync(semesterGroup.Key, semesterGroup.Select(i => i.Email).ToList());
                     }
                     catch (Exception ex)
                     {
@@ -152,6 +161,45 @@ namespace Services
                 _logger.LogError(ex, "Whitelist import failed. File: {fileUrl}, UploadedBy: {uploadedBy}", 
                     fileUrl, uploaderEmail);
                 throw;
+            }
+        }
+
+        private async Task NotifyBulkImportAsync(int semesterId, List<string> emails)
+        {
+            try
+            {
+                var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
+                var semesterName = semester?.SemesterName ?? "New Semester";
+
+                var normalizedEmails = emails.Select(e => e.Trim().ToLowerInvariant()).ToList();
+                var users = await _importRepository.GetUsersForConflictCheckAsync(normalizedEmails, new List<string>());
+
+                var userIds = users.Select(u => u.UserId).ToList();
+                if (userIds.Any())
+                {
+                    string bulkEmailBody = EmailTemplateConstants.WhitelistNotificationTemplate
+                        .Replace("{UserName}", "{UserName}") // Keep placeholder for NotificationService to individualize
+                        .Replace("{SemesterName}", semesterName)
+                        .Replace("{StatusMsg}", "qualified")
+                        .Replace("{RoleName}", "Member")
+                        .Replace("{SystemLink}", "https://fctms-fe.vercel.app/")
+                        .Replace("{CurrentYear}", DateTime.Now.Year.ToString());
+
+                    await _notificationService.CreateBulkNotificationsAsync(
+                        userIds,
+                        "SystemAnnouncement",
+                        "FCTMS - Qualification Announcement",
+                        $"Hello, your data has been successfully updated for the {semesterName} semester. You are now qualified to join the system.",
+                        "SystemAnnouncement",
+                        null,
+                        sendEmail: true,
+                        emailBody: bulkEmailBody
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send bulk notifications after import for semester {semesterId}.", semesterId);
             }
         }
 

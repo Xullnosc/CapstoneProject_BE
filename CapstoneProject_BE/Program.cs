@@ -16,6 +16,8 @@ using Services.Extensions;
 using Services.Helpers;
 using Services.Mappings;
 using StackExchange.Redis;
+using Services.Hubs;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,13 +30,19 @@ builder.Configuration.AddJsonFile(aiOverridePath, optional: true, reloadOnChange
 // EPPlus 8+: set license via the static `License` property
 ExcelPackage.License.SetNonCommercialOrganization("Capstone Project");
 
-//Redis Configuration
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 {
     var configuration =
         builder.Configuration.GetValue<string>("Redis:Connection") ?? "localhost:6379";
     return ConnectionMultiplexer.Connect(configuration);
 });
+
+// SignalR Configuration with Redis
+builder.Services.AddSignalR()
+    .AddStackExchangeRedis(builder.Configuration.GetValue<string>("Redis:Connection") ?? "localhost:6379", options =>
+    {
+        options.Configuration.ChannelPrefix = "FCTMS_CHAT_";
+    });
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -55,6 +63,14 @@ builder
             .ReferenceHandler
             .IgnoreCycles;
     });
+
+// Configure Forwarded Headers for Azure/Docker Proxy
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddDbContext<FctmsContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("capstoneDb");
@@ -149,6 +165,8 @@ builder.Services.AddScoped<ICaptchaService, CaptchaService>();
 
 // Register Background Services
 builder.Services.AddHostedService<MidtermLockReminderWorker>();
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IDiscoveryService, DiscoveryService>();
 
 // AI Services (BYOK/BYOA — keys configured via environment variables or the admin settings UI)
 builder.Services.AddAIServices(builder.Configuration, aiOverridePath);
@@ -177,6 +195,8 @@ builder.Services.AddScoped<IDashboardDAO, DashboardDAO>();
 builder.Services.AddScoped<ISystemParameterDAO, SystemParameterDAO>();
 builder.Services.AddScoped<ISystemErrorLogDAO, SystemErrorLogDAO>();
 builder.Services.AddScoped<IRegisteredEnterpriseDAO, RegisteredEnterpriseDAO>();
+builder.Services.AddScoped<IChatDAO, ChatDAO>();
+builder.Services.AddScoped<IDiscoveryDAO, DiscoveryDAO>();
 builder.Services.AddScoped<CampusDAO>();
 
 //Repositories (Repositories Layer)
@@ -203,6 +223,8 @@ builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<ISystemParameterRepository, SystemParameterRepository>();
 builder.Services.AddScoped<ISystemErrorLogRepository, SystemErrorLogRepository>();
 builder.Services.AddScoped<IRegisteredEnterpriseRepository, RegisteredEnterpriseRepository>();
+builder.Services.AddScoped<IChatRepository, ChatRepository>();
+builder.Services.AddScoped<IDiscoveryRepository, DiscoveryRepository>();
 builder.Services.AddScoped<ICampusRepository, CampusRepository>();
 
 //Middleware
@@ -233,6 +255,17 @@ builder
         };
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && 
+                    (path.StartsWithSegments("/chatHub") || path.StartsWithSegments("/api/chatHub")))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var userIdClaim = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -283,12 +316,20 @@ builder.Services.AddAuthorization(options =>
     // Reviewer policy: any user with IsReviewer=true (typically lecturers assigned as reviewer)
     options.AddPolicy("Reviewer", policy => policy.RequireClaim("IsReviewer", "true"));
 
+    options.AddPolicy(
+        "Student",
+        policy =>
+            policy.RequireAssertion(context =>
+                context.User.IsInRole(BusinessObjects.CampusConstants.Roles.Student)
+            )
+    );
+
     // Lecturer policy: role claim equals Lecturer
     options.AddPolicy(
         "Lecturer",
         policy =>
             policy.RequireAssertion(context =>
-                context.User.HasClaim("role", BusinessObjects.CampusConstants.Roles.Lecturer)
+                context.User.IsInRole(BusinessObjects.CampusConstants.Roles.Lecturer)
             )
     );
 
@@ -362,6 +403,9 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+// Must be at the very top of the pipeline for SignalR/Auth to recognize HTTPS behind proxy
+app.UseForwardedHeaders();
+
 // Allow enabling Swagger in non-development environments via config or env var.
 var enableSwagger =
     app.Environment.IsDevelopment()
@@ -404,6 +448,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers().RequireRateLimiting("Global");
+app.MapHub<ChatHub>("/api/chatHub");
 
 // Root endpoint: redirect to Swagger when Swagger is enabled, otherwise return a simple status JSON.
 app.MapGet(

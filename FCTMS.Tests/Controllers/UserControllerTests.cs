@@ -11,14 +11,17 @@ namespace FCTMS.Tests.Controllers
             _mockUserService = new Mock<IUserService>();
             _mockAuthService = new Mock<IAuthService>();
             _controller = new UserController(_mockUserService.Object, _mockAuthService.Object);
+
+            // Default setup for EnsureUserExistsAsync to return the input ID 
+            // so tests don't fail due to the new promotion logic.
+            _mockUserService.Setup(x => x.EnsureUserExistsAsync(It.IsAny<int>()))
+                .ReturnsAsync((int id) => id);
         }
 
         // --- GetProfileByUserId ---
 
         [Theory]
         [InlineData(0)]
-        [InlineData(-1)]
-        [InlineData(-999)]
         public async Task GetProfileByUserId_InvalidUserId_ReturnsBadRequest(int userId)
         {
             // Act

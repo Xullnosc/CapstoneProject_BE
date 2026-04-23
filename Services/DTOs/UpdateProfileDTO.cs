@@ -15,5 +15,6 @@ namespace Services.DTOs
         public string? PersonalId { get; set; }
         public string? PlaceOfBirth { get; set; }
         public int? EnrollmentYear { get; set; }
+        public int? CampusId { get; set; }
     }
 }
