@@ -1,0 +1,7 @@
+CREATE TABLE MidtermReviews (
+    MidtermReviewId INT AUTO_INCREMENT PRIMARY KEY,
+    SemesterId INT NOT NULL UNIQUE,
+    LockDate DATETIME NOT NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT FK_MidtermReviews_Semesters FOREIGN KEY (SemesterId) REFERENCES semesters(SemesterID) ON DELETE CASCADE
+);

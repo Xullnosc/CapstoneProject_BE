@@ -406,6 +406,31 @@ namespace Services
             throw new InvalidOperationException("LockAllUpdates is deprecated. Use LockSubmission (Open→InProgress) then CloseSemester (InProgress→Closed).");
         }
 
+        public async Task AnnounceMidtermReviewAsync(int id, DateTime lockDate)
+        {
+            var semester = await _semesterRepository.GetSemesterByIdSimpleAsync(id);
+            if (semester == null) throw new KeyNotFoundException($"Semester {id} not found");
+
+            if (!CampusConstants.SemesterStatus.IsOpenStage(semester.Status?.Trim()))
+            {
+                throw new InvalidOperationException($"Chỉ có thể thông báo khi kỳ học đang mở (Open). Trạng thái hiện tại: {semester.Status}");
+            }
+
+            if (lockDate.Date < semester.StartDate.Date || lockDate.Date > semester.EndDate.Date)
+            {
+                throw new ArgumentException($"Ngày chốt ({lockDate:dd/MM/yyyy}) phải nằm trong khoảng thời gian của kỳ học ({semester.StartDate:dd/MM/yyyy} - {semester.EndDate:dd/MM/yyyy}).");
+            }
+
+            await _semesterRepository.UpdateMidtermReviewAsync(semester.SemesterId, lockDate);
+            await InvalidateSemesterCacheAsync(id);
+
+            // Notify everyone in the semester
+            string title = "Thông báo: Ngày chốt học kỳ để Review Giữa Kỳ";
+            string message = $"Học kỳ {semester.SemesterCode} sẽ được hệ thống khóa vào ngày {lockDate:dd/MM/yyyy} để chuyển sang giai đoạn Review Giữa Kỳ. Vui lòng hoàn tất các công việc cần thiết trước thời hạn này.";
+            
+            await NotifyAllParticipantsAsync(id, title, message, NotificationType.SystemAnnouncement.ToString());
+        }
+
         /// <summary>
         /// Kết thúc kỳ học — chuyển sang Closed (chỉ xem).
         /// Hỗ trợ cả InProgress lẫn các giá trị cũ (Review Thesis, Review Middle Semester) để backward compat.

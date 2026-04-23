@@ -26,6 +26,7 @@ namespace Repositories
         public async Task<Semester> CreateSemesterAsync(Semester semester) => await _semesterDAO.AddAsync(semester);
 
         public async Task UpdateSemesterAsync(Semester semester) => await _semesterDAO.UpdateAsync(semester);
+        public async Task UpdateMidtermReviewAsync(int semesterId, DateTime lockDate) => await _semesterDAO.UpdateMidtermReviewAsync(semesterId, lockDate);
 
 
 

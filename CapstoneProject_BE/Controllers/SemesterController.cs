@@ -206,6 +206,34 @@ namespace CapstoneProject_BE.Controllers
             }
         }
 
+        public class AnnounceMidtermReviewRequest
+        {
+            public DateTime LockDate { get; set; }
+        }
+
+        [HttpPost("{id}/announce-midterm-review")]
+        [Authorize(Roles = CampusConstants.Roles.HOD)]
+        public async Task<IActionResult> AnnounceMidtermReview(int id, [FromBody] AnnounceMidtermReviewRequest request)
+        {
+            try
+            {
+                await _semesterService.AnnounceMidtermReviewAsync(id, request.LockDate);
+                return Ok(new { message = $"Semester {id} midterm review lock date announced for {request.LockDate:yyyy-MM-dd}." });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while announcing midterm review.", detail = ex.Message });
+            }
+        }
+
         [HttpPost("{id}/close")]
         [Authorize(Roles = CampusConstants.Roles.HOD)]
         public async Task<IActionResult> CloseSemester(int id)

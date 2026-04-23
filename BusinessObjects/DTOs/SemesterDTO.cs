@@ -10,6 +10,7 @@ namespace BusinessObjects.DTOs
         public string SemesterName { get; set; } = null!;
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
+        public DateTime? MidtermLockDate { get; set; }
         public string Status { get; set; } = "Upcoming";
         public int CampusId { get; set; }
 

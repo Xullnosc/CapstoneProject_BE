@@ -147,6 +147,9 @@ builder.Services.AddScoped<ISystemErrorLogService, SystemErrorLogService>();
 builder.Services.AddScoped<ICampusService, CampusService>();
 builder.Services.AddScoped<ICaptchaService, CaptchaService>();
 
+// Register Background Services
+builder.Services.AddHostedService<MidtermLockReminderWorker>();
+
 // AI Services (BYOK/BYOA — keys configured via environment variables or the admin settings UI)
 builder.Services.AddAIServices(builder.Configuration, aiOverridePath);
 

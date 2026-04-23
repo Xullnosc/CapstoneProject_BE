@@ -13,6 +13,7 @@ namespace Repositories
         Task<Semester?> GetSemesterByIdSimpleAsync(int id);
         Task<Semester> CreateSemesterAsync(Semester semester);
         Task UpdateSemesterAsync(Semester semester);
+        Task UpdateMidtermReviewAsync(int semesterId, DateTime lockDate);
         Task<Semester?> GetCurrentSemesterAsync();
         Task<Semester?> GetSemesterByCodeAsync(string code);
         Task<int> GetStudentRoleIdAsync();

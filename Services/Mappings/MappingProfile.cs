@@ -142,6 +142,10 @@ namespace Services.Mappings
                     dest => dest.Whitelists,
                     opt => opt.MapFrom(src => src.Whitelists ?? new List<Whitelist>())
                 )
+                .ForMember(
+                    dest => dest.MidtermLockDate,
+                    opt => opt.MapFrom(src => src.MidtermReview != null ? (DateTime?)src.MidtermReview.LockDate : null)
+                )
                 .ForMember(dest => dest.CampusId, opt => opt.MapFrom(src => src.CampusId));
 
             // Reverse map for Create/Update
