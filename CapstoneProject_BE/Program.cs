@@ -147,6 +147,12 @@ builder.Services.AddScoped<ISystemErrorLogService, SystemErrorLogService>();
 builder.Services.AddScoped<ICampusService, CampusService>();
 builder.Services.AddScoped<ICaptchaService, CaptchaService>();
 
+// Review Module Services
+builder.Services.AddScoped<IReviewPeriodService, ReviewPeriodService>();
+builder.Services.AddScoped<IReviewCouncilService, ReviewCouncilService>();
+builder.Services.AddScoped<IReviewScheduleService, ReviewScheduleService>();
+builder.Services.AddScoped<IReviewAssessmentService, ReviewAssessmentService>();
+
 // Register Background Services
 builder.Services.AddHostedService<MidtermLockReminderWorker>();
 
@@ -177,6 +183,12 @@ builder.Services.AddScoped<IDashboardDAO, DashboardDAO>();
 builder.Services.AddScoped<ISystemParameterDAO, SystemParameterDAO>();
 builder.Services.AddScoped<ISystemErrorLogDAO, SystemErrorLogDAO>();
 builder.Services.AddScoped<IRegisteredEnterpriseDAO, RegisteredEnterpriseDAO>();
+
+// Review Module DAOs
+builder.Services.AddScoped<IReviewPeriodDAO, ReviewPeriodDAO>();
+builder.Services.AddScoped<IReviewCouncilDAO, ReviewCouncilDAO>();
+builder.Services.AddScoped<IReviewScheduleDAO, ReviewScheduleDAO>();
+builder.Services.AddScoped<IReviewQuestionDAO, ReviewQuestionDAO>();
 builder.Services.AddScoped<CampusDAO>();
 
 //Repositories (Repositories Layer)
@@ -204,6 +216,12 @@ builder.Services.AddScoped<ISystemParameterRepository, SystemParameterRepository
 builder.Services.AddScoped<ISystemErrorLogRepository, SystemErrorLogRepository>();
 builder.Services.AddScoped<IRegisteredEnterpriseRepository, RegisteredEnterpriseRepository>();
 builder.Services.AddScoped<ICampusRepository, CampusRepository>();
+
+// Review Module Repositories
+builder.Services.AddScoped<IReviewPeriodRepository, ReviewPeriodRepository>();
+builder.Services.AddScoped<IReviewCouncilRepository, ReviewCouncilRepository>();
+builder.Services.AddScoped<IReviewScheduleRepository, ReviewScheduleRepository>();
+builder.Services.AddScoped<IReviewQuestionRepository, ReviewQuestionRepository>();
 
 //Middleware
 // AutoMapper

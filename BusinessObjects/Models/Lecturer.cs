@@ -14,6 +14,9 @@ public partial class Lecturer
     public string? Avatar { get; set; }
     
     [NotMapped]
+    public int? UserId { get; set; }
+    
+    [NotMapped]
     public string? Campus { get; set; }
 
     public bool IsHod { get; set; }

@@ -99,8 +99,8 @@ namespace Services.Mappings
                         )
                 );
 
-            // Whitelist -> WhitelistDTO
             CreateMap<Whitelist, WhitelistDTO>()
+                .ForMember(dest => dest.UserId, opt => opt.Ignore())
                 .ForMember(dest => dest.RoleId, opt => opt.MapFrom(src => src.RoleId))
                 .ForMember(
                     dest => dest.RoleName,
@@ -150,7 +150,32 @@ namespace Services.Mappings
 
             // Reverse map for Create/Update
             CreateMap<SemesterDTO, Semester>();
+            CreateMap<SemesterDTO, Semester>();
             CreateMap<SemesterCreateDTO, Semester>();
+
+            CreateMap<ReviewPeriod, ReviewPeriodDTO>().ReverseMap();
+
+            CreateMap<ReviewCouncil, ReviewCouncilDTO>()
+                .ForMember(dest => dest.CouncilId, opt => opt.MapFrom(src => src.Id))
+                .ForMember(dest => dest.Members, opt => opt.MapFrom(src => src.ReviewCouncilMembers))
+                .ForMember(dest => dest.Teams, opt => opt.MapFrom(src => src.ReviewCouncilTeams));
+
+            CreateMap<ReviewCouncilMember, ReviewCouncilMemberDTO>()
+                .ForMember(dest => dest.LecturerName, opt => opt.MapFrom(src => src.Lecturer != null ? src.Lecturer.FullName : null))
+                .ForMember(dest => dest.LecturerEmail, opt => opt.MapFrom(src => src.Lecturer != null ? src.Lecturer.Email : null));
+
+            CreateMap<ReviewCouncilTeam, ReviewCouncilTeamDTO>()
+                .ForMember(dest => dest.TeamCode, opt => opt.MapFrom(src => src.Team != null ? src.Team.TeamCode : null))
+                .ForMember(dest => dest.TeamName, opt => opt.MapFrom(src => src.Team != null ? src.Team.TeamName : null))
+                .ForMember(dest => dest.MentorName, opt => opt.MapFrom(src =>
+                    src.Team != null && src.Team.Mentor != null ? src.Team.Mentor.FullName : null));
+
+
+            CreateMap<ReviewSchedule, ReviewScheduleDTO>()
+                .ForMember(dest => dest.SetByLecturerName, opt => opt.MapFrom(src => src.SetByLecturer != null ? src.SetByLecturer.FullName : null));
+
+            CreateMap<ReviewQuestion, ReviewQuestionDTO>().ReverseMap();
+            CreateMap<ReviewQuestionResult, ReviewQuestionResultDTO>().ReverseMap();
 
             CreateMap<Thesis, ThesisDTO>()
                 .ForMember(

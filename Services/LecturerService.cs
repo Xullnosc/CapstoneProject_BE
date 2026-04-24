@@ -103,11 +103,18 @@ namespace Services
 
             foreach (var l in items)
             {
-                if (string.IsNullOrWhiteSpace(l.Avatar) || l.Avatar == "N/A")
+                if (string.IsNullOrWhiteSpace(l.Avatar) || l.Avatar == "N/A" || l.UserId == null)
                 {
                     if (avatarDict.TryGetValue(l.Email.Trim(), out var avatar))
                     {
                         l.Avatar = avatar;
+                    }
+                    
+                    // Also populate UserId
+                    var user = users.FirstOrDefault(u => string.Equals(u.Email, l.Email.Trim(), StringComparison.OrdinalIgnoreCase));
+                    if (user != null)
+                    {
+                        l.UserId = user.UserId;
                     }
                 }
             }

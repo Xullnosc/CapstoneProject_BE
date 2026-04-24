@@ -541,16 +541,17 @@ namespace Services
             if (emails.Any())
             {
                 var users = await _userRepository.GetUsersByEmailsAsync(emails);
-                var avatarDict = users
+                var userDict = users
                     .Where(u => !string.IsNullOrEmpty(u.Email))
                     .GroupBy(u => u.Email!.Trim(), StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(g => g.Key, g => g.First().Avatar, StringComparer.OrdinalIgnoreCase);
+                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
                 foreach (var wl in dtos)
                 {
-                    if (!string.IsNullOrWhiteSpace(wl.Email) && avatarDict.TryGetValue(wl.Email.Trim(), out var avatar))
+                    if (!string.IsNullOrWhiteSpace(wl.Email) && userDict.TryGetValue(wl.Email.Trim(), out var user))
                     {
-                        wl.Avatar = avatar;
+                        wl.Avatar = user.Avatar;
+                        wl.UserId = user.UserId;
                     }
                 }
             }
@@ -585,6 +586,7 @@ namespace Services
             // Fetch users for avatars
             var users = await _userRepository.GetUsersByEmailsAsync(emails);
             var avatarDict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            var userIdDict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             foreach (var user in users)
             {
                 if (!string.IsNullOrEmpty(user.Email))
@@ -593,6 +595,7 @@ namespace Services
                     if (!avatarDict.ContainsKey(key))
                     {
                         avatarDict[key] = user.Avatar;
+                        userIdDict[key] = user.UserId;
                     }
                 }
             }
@@ -623,6 +626,12 @@ namespace Services
                 if (hasNoAvatar && avatarDict.TryGetValue(emailKey, out var avatar) && !string.IsNullOrWhiteSpace(avatar))
                 {
                     wl.Avatar = avatar;
+                }
+
+                // Populate UserId
+                if (userIdDict.TryGetValue(emailKey, out var uid))
+                {
+                    wl.UserId = uid;
                 }
 
                 // Update Reviewer status

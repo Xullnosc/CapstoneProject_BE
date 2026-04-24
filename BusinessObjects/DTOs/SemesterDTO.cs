@@ -54,6 +54,7 @@ namespace BusinessObjects.DTOs
         public int CampusId { get; set; }
         public string? StudentCode { get; set; }
         public bool IsReviewer { get; set; }
+        public int? UserId { get; set; }
         public string? Status { get; set; }
     }
 }

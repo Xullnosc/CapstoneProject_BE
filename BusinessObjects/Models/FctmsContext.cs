@@ -69,6 +69,13 @@ public partial class FctmsContext : DbContext
     public virtual DbSet<SystemErrorLog> SystemErrorLogs { get; set; }
     public virtual DbSet<ImportBatch> ImportBatches { get; set; }
     public virtual DbSet<RegisteredEnterprise> RegisteredEnterprises { get; set; }
+    public virtual DbSet<ReviewCouncil> ReviewCouncils { get; set; }
+    public virtual DbSet<ReviewCouncilMember> ReviewCouncilMembers { get; set; }
+    public virtual DbSet<ReviewCouncilTeam> ReviewCouncilTeams { get; set; }
+    public virtual DbSet<ReviewSchedule> ReviewSchedules { get; set; }
+    public virtual DbSet<ReviewQuestion> ReviewQuestions { get; set; }
+    public virtual DbSet<ReviewQuestionResult> ReviewQuestionResults { get; set; }
+    public virtual DbSet<ReviewPeriod> ReviewPeriods { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1006,6 +1013,169 @@ public partial class FctmsContext : DbContext
             entity
                 .Property(e => e.UpdatedAt)
                 .HasColumnType("datetime2");
+        });
+
+        modelBuilder.Entity<ReviewCouncil>(entity =>
+        {
+            entity.ToTable("review_councils");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.SemesterId).HasColumnName("semester_id");
+            entity.Property(e => e.CouncilName).HasColumnName("council_name").HasMaxLength(255);
+            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(50).HasDefaultValueSql("'Draft'");
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType("datetime").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Semester)
+                .WithMany()
+                .HasForeignKey(d => d.SemesterId)
+                .HasConstraintName("FK_ReviewCouncils_Semesters");
+        });
+
+        modelBuilder.Entity<ReviewCouncilMember>(entity =>
+        {
+            entity.ToTable("review_council_members");
+            entity.HasKey(e => new { e.CouncilId, e.LecturerId });
+            entity.Property(e => e.CouncilId).HasColumnName("council_id");
+            entity.Property(e => e.LecturerId).HasColumnName("lecturer_id");
+            entity.Property(e => e.Role).HasColumnName("role").HasMaxLength(50);
+
+            entity.HasOne(d => d.Council)
+                .WithMany(p => p.ReviewCouncilMembers)
+                .HasForeignKey(d => d.CouncilId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ReviewCouncilMembers_Councils");
+
+            entity.HasOne(d => d.Lecturer)
+                .WithMany()
+                .HasForeignKey(d => d.LecturerId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ReviewCouncilMembers_Lecturers");
+        });
+
+        modelBuilder.Entity<ReviewCouncilTeam>(entity =>
+        {
+            entity.ToTable("review_council_teams");
+            entity.HasKey(e => new { e.CouncilId, e.TeamId });
+            entity.Property(e => e.CouncilId).HasColumnName("council_id");
+            entity.Property(e => e.TeamId).HasColumnName("team_id");
+            entity.Property(e => e.AssignedAt).HasColumnName("assigned_at").HasColumnType("datetime").HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.Round1Status).HasColumnName("round1_status").HasMaxLength(20).HasDefaultValueSql("'Pending'");
+            entity.Property(e => e.Round2Status).HasColumnName("round2_status").HasMaxLength(20).HasDefaultValueSql("'Pending'");
+            entity.Property(e => e.Round3Status).HasColumnName("round3_status").HasMaxLength(20).HasDefaultValueSql("'Pending'");
+            entity.Property(e => e.Round3Grade).HasColumnName("round3_grade").HasColumnType("decimal(4,2)");
+            entity.Property(e => e.IsOverride).HasColumnName("is_override").HasDefaultValueSql("0");
+            entity.Property(e => e.OverallComment).HasColumnName("overall_comment").HasColumnType("text");
+
+            entity.HasOne(d => d.Council)
+                .WithMany(p => p.ReviewCouncilTeams)
+                .HasForeignKey(d => d.CouncilId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ReviewCouncilTeams_Councils");
+
+            entity.HasOne(d => d.Team)
+                .WithMany()
+                .HasForeignKey(d => d.TeamId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ReviewCouncilTeams_Teams");
+        });
+
+        modelBuilder.Entity<ReviewSchedule>(entity =>
+        {
+            entity.ToTable("review_schedules");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CouncilId).HasColumnName("council_id");
+            entity.Property(e => e.ReviewRound).HasColumnName("review_round");
+            entity.Property(e => e.ScheduledDate).HasColumnName("scheduled_date").HasColumnType("date");
+            entity.Property(e => e.StartTime).HasColumnName("start_time").HasColumnType("time");
+            entity.Property(e => e.EndTime).HasColumnName("end_time").HasColumnType("time");
+            entity.Property(e => e.MeetLink).HasColumnName("meet_link").HasMaxLength(255);
+            entity.Property(e => e.NotifiedAt).HasColumnName("notified_at").HasColumnType("datetime");
+            entity.Property(e => e.SetByLecturerId).HasColumnName("set_by_lecturer_id");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType("datetime").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Council)
+                .WithMany(p => p.ReviewSchedules)
+                .HasForeignKey(d => d.CouncilId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ReviewSchedules_Councils");
+
+            entity.HasOne(d => d.SetByLecturer)
+                .WithMany()
+                .HasForeignKey(d => d.SetByLecturerId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ReviewSchedules_Lecturers");
+        });
+
+        modelBuilder.Entity<ReviewQuestion>(entity =>
+        {
+            entity.ToTable("review_questions");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CouncilId).HasColumnName("council_id");
+            entity.Property(e => e.ReviewRound).HasColumnName("review_round");
+            entity.Property(e => e.Category).HasColumnName("category").HasMaxLength(100);
+            entity.Property(e => e.QuestionText).HasColumnName("question_text").HasColumnType("text");
+            entity.Property(e => e.QuestionType).HasColumnName("question_type").HasMaxLength(20).HasDefaultValueSql("'YesNo'");
+            entity.Property(e => e.Priority).HasColumnName("priority").HasMaxLength(50);
+            entity.Property(e => e.DisplayOrder).HasColumnName("display_order").HasDefaultValueSql("0");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasColumnType("datetime").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Council)
+                .WithMany(p => p.ReviewQuestions)
+                .HasForeignKey(d => d.CouncilId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ReviewQuestions_Councils");
+        });
+
+        modelBuilder.Entity<ReviewQuestionResult>(entity =>
+        {
+            entity.ToTable("review_question_results");
+            entity.HasKey(e => new { e.QuestionId, e.TeamId, e.ReviewRound, e.SubmittedBy });
+            entity.Property(e => e.QuestionId).HasColumnName("question_id");
+            entity.Property(e => e.TeamId).HasColumnName("team_id");
+            entity.Property(e => e.ReviewRound).HasColumnName("review_round");
+            entity.Property(e => e.YnValue).HasColumnName("yn_value");
+            entity.Property(e => e.GradeValue).HasColumnName("grade_value").HasMaxLength(50);
+            entity.Property(e => e.SubmittedBy).HasColumnName("submitted_by");
+            entity.Property(e => e.SubmittedAt).HasColumnName("submitted_at").HasColumnType("datetime").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Question)
+                .WithMany(p => p.ReviewQuestionResults)
+                .HasForeignKey(d => d.QuestionId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ReviewQuestionResults_Questions");
+
+            entity.HasOne(d => d.Team)
+                .WithMany()
+                .HasForeignKey(d => d.TeamId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_ReviewQuestionResults_Teams");
+
+            entity.HasOne(d => d.Submitter)
+                .WithMany()
+                .HasForeignKey(d => d.SubmittedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ReviewQuestionResults_Users");
+        });
+
+        modelBuilder.Entity<ReviewPeriod>(entity =>
+        {
+            entity.ToTable("review_periods");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.SemesterId).HasColumnName("semester_id");
+            entity.Property(e => e.ReviewRound).HasColumnName("review_round");
+            entity.Property(e => e.StartDate).HasColumnName("start_date").HasColumnType("date");
+            entity.Property(e => e.EndDate).HasColumnName("end_date").HasColumnType("date");
+
+            entity.HasIndex(e => new { e.SemesterId, e.ReviewRound }, "UQ_Semester_Round").IsUnique();
+
+            entity.HasOne(d => d.Semester)
+                .WithMany()
+                .HasForeignKey(d => d.SemesterId)
+                .HasConstraintName("FK_ReviewPeriods_Semesters");
         });
 
         OnModelCreatingPartial(modelBuilder);

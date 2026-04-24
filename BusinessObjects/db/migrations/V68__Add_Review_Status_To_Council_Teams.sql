@@ -1,0 +1,7 @@
+ALTER TABLE review_council_teams 
+ADD COLUMN round1_status VARCHAR(20) DEFAULT 'Pending',
+ADD COLUMN round2_status VARCHAR(20) DEFAULT 'Pending',
+ADD COLUMN round3_status VARCHAR(20) DEFAULT 'Pending',
+ADD COLUMN round3_grade DECIMAL(4,2) DEFAULT NULL,
+ADD COLUMN is_override BOOLEAN DEFAULT FALSE,
+ADD COLUMN overall_comment TEXT DEFAULT NULL;
