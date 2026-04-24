@@ -28,7 +28,7 @@ namespace Repositories
             return _importDAO.GetWhitelistsForConflictCheckAsync(normalizedEmails, normalizedStudentCodes);
         }
 
-        public Task ReconcileSemesterAsync(int semesterId, List<WhitelistImportDTO> importedItems, int studentRoleId, DateTime now)
+        public Task<List<string>> ReconcileSemesterAsync(int semesterId, List<WhitelistImportDTO> importedItems, int studentRoleId, DateTime now)
         {
             return _importDAO.ReconcileSemesterAsync(semesterId, importedItems, studentRoleId, now);
         }
