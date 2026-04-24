@@ -366,10 +366,13 @@ namespace CapstoneProject_BE.Controllers
             }
             catch (Exception ex)
             {
+                var logger = HttpContext.RequestServices.GetRequiredService<ILogger<SemesterController>>();
+                logger.LogError(ex, "Whitelist import failed for semester {SemesterId}", id);
+
                 var message = ex.Message.Contains("file is not in Open XML format", StringComparison.OrdinalIgnoreCase)
                     || ex.Message.Contains("not a valid package", StringComparison.OrdinalIgnoreCase)
                     ? "Unsupported Excel format. Please save the file as .xlsx and try again."
-                    : "An error occurred while importing the whitelist. Please check the file format and try again.";
+                    : $"Import failed: {ex.Message}";
 
                 // Generic exception - log internally, return generic message
                 return StatusCode(
@@ -377,6 +380,7 @@ namespace CapstoneProject_BE.Controllers
                     new
                     {
                         message,
+                        detail = ex.InnerException?.Message
                     }
                 );
             }

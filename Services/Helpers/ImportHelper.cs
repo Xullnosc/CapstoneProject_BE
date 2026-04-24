@@ -42,16 +42,55 @@ namespace Services.Helpers
             var headerMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var headerAliasMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
+                // Email
                 [NormalizeHeaderKey(CampusConstants.WhitelistImportColumns.Email)] = CampusConstants.WhitelistImportColumns.Email,
                 [NormalizeHeaderKey("E-mail")] = CampusConstants.WhitelistImportColumns.Email,
+                [NormalizeHeaderKey("Thư điện tử")] = CampusConstants.WhitelistImportColumns.Email,
+                
+                // Student Code
                 [NormalizeHeaderKey(CampusConstants.WhitelistImportColumns.StudentCode)] = CampusConstants.WhitelistImportColumns.StudentCode,
                 [NormalizeHeaderKey("Student Code")] = CampusConstants.WhitelistImportColumns.StudentCode,
+                [NormalizeHeaderKey("MSSV")] = CampusConstants.WhitelistImportColumns.StudentCode,
+                [NormalizeHeaderKey("Mã sinh viên")] = CampusConstants.WhitelistImportColumns.StudentCode,
+                [NormalizeHeaderKey("Mã số sinh viên")] = CampusConstants.WhitelistImportColumns.StudentCode,
+                [NormalizeHeaderKey("Mã SV")] = CampusConstants.WhitelistImportColumns.StudentCode,
+                
+                // Full Name
                 [NormalizeHeaderKey(CampusConstants.WhitelistImportColumns.FullName)] = CampusConstants.WhitelistImportColumns.FullName,
                 [NormalizeHeaderKey("Full Name")] = CampusConstants.WhitelistImportColumns.FullName,
+                [NormalizeHeaderKey("Họ và tên")] = CampusConstants.WhitelistImportColumns.FullName,
+                [NormalizeHeaderKey("Họ tên")] = CampusConstants.WhitelistImportColumns.FullName,
             };
 
-            const int headerRow = 1;
-            const int dataStartRow = 2;
+            // Auto-detect header row: scan first 10 rows to find the one containing recognized headers
+            int headerRow = -1;
+            int maxScanRow = Math.Min(10, worksheet.Dimension.End.Row);
+            for (int candidateRow = 1; candidateRow <= maxScanRow; candidateRow++)
+            {
+                for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                {
+                    var cellText = worksheet.Cells[candidateRow, col].Text;
+                    if (string.IsNullOrWhiteSpace(cellText))
+                    {
+                        cellText = worksheet.Cells[candidateRow, col].Value?.ToString();
+                    }
+
+                    var normalizedKey = NormalizeHeaderKey(cellText);
+                    if (!string.IsNullOrWhiteSpace(normalizedKey) && headerAliasMap.ContainsKey(normalizedKey))
+                    {
+                        headerRow = candidateRow;
+                        break;
+                    }
+                }
+                if (headerRow > 0) break;
+            }
+
+            if (headerRow < 1)
+            {
+                throw new ArgumentException("Unable to detect header row. Ensure the file contains columns: Email, StudentCode, FullName.");
+            }
+
+            int dataStartRow = headerRow + 1;
 
             for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
             {

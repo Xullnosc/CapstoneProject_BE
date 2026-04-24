@@ -671,7 +671,7 @@ public partial class FctmsContext : DbContext
 
             entity.HasIndex(e => e.RoleId, "IX_Whitelist_RoleID");
 
-            entity.HasIndex(e => e.Email, "UQ__Whitelis__A9D10534BDF4FDF3").IsUnique();
+            entity.HasIndex(e => new { e.Email, e.SemesterId }, "UQ_Whitelist_Email_Semester").IsUnique();
 
             entity.Property(e => e.WhitelistId).HasColumnName("WhitelistID");
             entity

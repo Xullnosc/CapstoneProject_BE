@@ -122,6 +122,10 @@ namespace Services
             }
 
             await _whitelistRepository.AddAsync(newEntry);
+            
+            // Sync user account immediately so they can be invited to teams/receive notifications
+            await SyncUserFromWhitelistAsync(newEntry);
+
             await InvalidateCache(newEntry.SemesterId);
             return newEntry;
         }
@@ -146,7 +150,55 @@ namespace Services
             existing.SemesterId = semester.SemesterId;
 
             await _whitelistRepository.UpdateAsync(existing);
+
+            // Sync user account to keep name/code/status in sync
+            await SyncUserFromWhitelistAsync(existing);
+
             await InvalidateCache(existing.SemesterId);
+        }
+
+        private async Task SyncUserFromWhitelistAsync(Whitelist whitelist)
+        {
+            if (whitelist == null || string.IsNullOrWhiteSpace(whitelist.Email)) return;
+
+            var email = whitelist.Email.Trim().ToLower();
+            var user = await _userRepository.GetByEmailAsync(email);
+
+            bool isQualified = string.Equals(whitelist.Status, "Qualified", StringComparison.OrdinalIgnoreCase);
+
+            if (user == null)
+            {
+                user = new User
+                {
+                    Email = whitelist.Email,
+                    FullName = whitelist.FullName,
+                    StudentCode = whitelist.StudentCode,
+                    RoleId = whitelist.RoleId,
+                    CampusId = whitelist.CampusId,
+                    IsAuthorized = isQualified,
+                    CreatedAt = DateTime.UtcNow,
+                    Avatar = whitelist.Avatar ?? "N/A"
+                };
+                await _userRepository.AddAsync(user);
+            }
+            else
+            {
+                // Update basic info and authorization status
+                user.FullName = whitelist.FullName ?? user.FullName;
+                user.StudentCode = whitelist.StudentCode ?? user.StudentCode;
+                
+                // Only update role if it's currently a student or being set to something higher
+                // (Prevents downgrading HOD/Admin to Student via whitelist if they use same email)
+                if (user.RoleId == 3 || (whitelist.RoleId.HasValue && whitelist.RoleId != 3))
+                {
+                    user.RoleId = whitelist.RoleId ?? user.RoleId;
+                }
+
+                user.CampusId = whitelist.CampusId;
+                user.IsAuthorized = isQualified;
+                
+                await _userRepository.UpdateAsync(user);
+            }
         }
 
         public async Task DeleteWhitelistAsync(int id)
