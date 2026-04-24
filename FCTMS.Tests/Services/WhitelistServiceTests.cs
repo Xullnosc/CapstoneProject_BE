@@ -50,6 +50,7 @@ namespace FCTMS.Tests.Services
                 new Whitelist { WhitelistId = 2, Email = "s2@fpt.edu.vn", RoleId = roleId }
             };
             _mockWhitelistRepository.Setup(x => x.GetByRoleAsync(roleId)).ReturnsAsync(entries);
+            _mockUserRepository.Setup(x => x.GetUsersByEmailsAsync(It.IsAny<List<string>>())).ReturnsAsync(new List<User>());
 
             // Act
             var result = await _whitelistService.GetWhitelistByRoleAsync(roleId);

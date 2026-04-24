@@ -32,7 +32,33 @@ namespace Services
 
         public async Task<IEnumerable<Whitelist>> GetWhitelistByRoleAsync(int roleId)
         {
-            return await _whitelistRepository.GetByRoleAsync(roleId);
+            var whitelists = await _whitelistRepository.GetByRoleAsync(roleId);
+            var whitelistList = whitelists.ToList();
+
+            if (!whitelistList.Any()) return whitelistList;
+
+            var emails = whitelistList.Select(w => w.Email?.Trim().ToLowerInvariant()).Where(e => !string.IsNullOrEmpty(e)).Distinct().ToList();
+            var users = await _userRepository.GetUsersByEmailsAsync(emails!);
+            var avatarDict = users
+                .Where(u => !string.IsNullOrEmpty(u.Email))
+                .GroupBy(u => u.Email!.Trim().ToLowerInvariant())
+                .ToDictionary(g => g.Key, g => g.First().Avatar);
+
+            foreach (var w in whitelistList)
+            {
+                if (!string.IsNullOrEmpty(w.Email))
+                {
+                    string emailKey = w.Email.Trim().ToLowerInvariant();
+                    bool hasNoAvatar = string.IsNullOrWhiteSpace(w.Avatar) || w.Avatar == "N/A";
+
+                    if (hasNoAvatar && avatarDict.TryGetValue(emailKey, out var userAvatar) && !string.IsNullOrWhiteSpace(userAvatar))
+                    {
+                        w.Avatar = userAvatar;
+                    }
+                }
+            }
+
+            return whitelistList;
         }
 
         public async Task UpdateReviewerStatusAsync(int whitelistId, bool isReviewer)

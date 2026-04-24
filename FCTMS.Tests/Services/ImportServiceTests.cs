@@ -42,8 +42,25 @@ namespace FCTMS.Tests.Services
 
         private ImportService CreateService(FctmsContext context)
         {
+            var mockScopeFactory = new Mock<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>();
+            var mockScope = new Mock<Microsoft.Extensions.DependencyInjection.IServiceScope>();
+            var mockServiceProvider = new Mock<IServiceProvider>();
+            
+            mockServiceProvider.Setup(x => x.GetService(typeof(IEmailService))).Returns(_mockEmailService.Object);
+            mockServiceProvider.Setup(x => x.GetService(typeof(ILogger<ImportService>))).Returns(_mockLogger.Object);
+            
+            mockScope.Setup(x => x.ServiceProvider).Returns(mockServiceProvider.Object);
+            mockScopeFactory.Setup(x => x.CreateScope()).Returns(mockScope.Object);
+
             IImportRepository importRepository = new ImportRepository(new ImportDAO(context));
-            return new ImportService(importRepository, _mockSemesterRepository.Object, _mockLogger.Object, _mockRedisService.Object, _mockCampusContextService.Object, _mockEmailService.Object);
+            return new ImportService(
+                importRepository, 
+                _mockSemesterRepository.Object, 
+                _mockLogger.Object, 
+                _mockRedisService.Object, 
+                _mockCampusContextService.Object, 
+                _mockEmailService.Object,
+                mockScopeFactory.Object);
         }
 
         private static FctmsContext CreateContext()
