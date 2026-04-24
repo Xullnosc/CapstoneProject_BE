@@ -206,6 +206,17 @@ namespace Services
             var whitelist = await _whitelistRepository.GetByIdAsync(id);
             if (whitelist != null)
             {
+                // Deactivate the lecturer in the global pool if they exist
+                if (!string.IsNullOrEmpty(whitelist.Email))
+                {
+                    var lecturer = await _lecturerRepository.GetByEmailAsync(whitelist.Email);
+                    if (lecturer != null && lecturer.IsActive)
+                    {
+                        lecturer.IsActive = false;
+                        await _lecturerRepository.UpdateAsync(lecturer);
+                    }
+                }
+
                 // Delete user's credentials if they exist
                 var user = await _userRepository.GetByEmailAsync(whitelist.Email);
                 if (user != null)

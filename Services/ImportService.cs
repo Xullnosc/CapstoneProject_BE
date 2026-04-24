@@ -19,6 +19,7 @@ namespace Services
         private readonly IRedisService _redisService;
         private readonly ICampusContextService _campusContextService;
         private readonly IEmailService _emailService;
+        private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory _scopeFactory;
 
         public ImportService(
             IImportRepository importRepository,
@@ -26,7 +27,8 @@ namespace Services
             ILogger<ImportService> logger,
             IRedisService redisService,
             ICampusContextService campusContextService,
-            IEmailService emailService)
+            IEmailService emailService,
+            Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory)
         {
             _importRepository = importRepository;
             _semesterRepository = semesterRepository;
@@ -34,6 +36,7 @@ namespace Services
             _redisService = redisService;
             _campusContextService = campusContextService;
             _emailService = emailService;
+            _scopeFactory = scopeFactory;
         }
 
         public async Task<ImportResult<WhitelistImportDTO>> ImportWhitelistFromExcel(
@@ -140,57 +143,73 @@ namespace Services
                     }
                 }
 
-                // Send email notifications to students who are no longer qualified
-                if (unqualifiedEmailsToNotify.Any())
-                {
-                    var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
-                    var semesterName = semester?.SemesterName ?? "Current Semester";
-                    var currentYear = DateTime.Now.Year;
-                    var systemLink = "https://fctms.vercel.app/"; // Should ideally come from config
+                // Pre-fetch basic semester info to avoid needing repository in background thread
+                var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
+                var semesterName = semester?.SemesterName ?? "Current Semester";
+                var currentYear = DateTime.Now.Year;
+                var systemLink = "https://fctms.vercel.app/"; // Should ideally come from config
 
-                    foreach (var email in unqualifiedEmailsToNotify.Distinct())
+                var hasUnqualified = unqualifiedEmailsToNotify.Any();
+                var hasNewStudents = isFirstImport && items.Any();
+                
+                if (hasUnqualified || hasNewStudents)
+                {
+                    _ = Task.Run(async () =>
                     {
                         try
                         {
-                            var htmlMessage = EmailTemplateConstants.WhitelistUnqualifiedTemplate
-                                .Replace("{SemesterName}", semesterName)
-                                .Replace("{CurrentYear}", currentYear.ToString())
-                                .Replace("{SystemLink}", systemLink);
+                            using var scope = _scopeFactory.CreateScope();
+                            var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+                            var logger = scope.ServiceProvider.GetRequiredService<ILogger<ImportService>>();
 
-                            await _emailService.SendEmailAsync(email, $"[FCTMS] Thông báo điều kiện tham gia kỳ {semesterName}", htmlMessage);
+                            // Send email notifications to students who are no longer qualified
+                            if (hasUnqualified)
+                            {
+                                foreach (var email in unqualifiedEmailsToNotify.Distinct())
+                                {
+                                    try
+                                    {
+                                        var htmlMessage = EmailTemplateConstants.WhitelistUnqualifiedTemplate
+                                            .Replace("{SemesterName}", semesterName)
+                                            .Replace("{CurrentYear}", currentYear.ToString())
+                                            .Replace("{SystemLink}", systemLink);
+
+                                        await emailService.SendEmailAsync(email, $"[FCTMS] Qualification Notice for Semester {semesterName}", htmlMessage);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        logger.LogWarning(ex, "Failed to send unqualified notification email to {email}", email);
+                                    }
+                                }
+                            }
+
+                            // If it's the first import, send welcome/invitation emails to ALL imported students
+                            if (hasNewStudents)
+                            {
+                                foreach (var student in items)
+                                {
+                                    try
+                                    {
+                                        var htmlMessage = EmailTemplateConstants.WhitelistInvitationTemplate
+                                            .Replace("{StudentName}", student.FullName)
+                                            .Replace("{SemesterName}", semesterName)
+                                            .Replace("{CurrentYear}", currentYear.ToString())
+                                            .Replace("{SystemLink}", systemLink);
+
+                                        await emailService.SendEmailAsync(student.Email, $"[FCTMS] Welcome to Capstone Project Semester {semesterName}", htmlMessage);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        logger.LogWarning(ex, "Failed to send welcome email to {email}", student.Email);
+                                    }
+                                }
+                            }
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogWarning(ex, "Failed to send unqualified notification email to {email}", email);
+                            _logger.LogError(ex, "Background email sending task failed.");
                         }
-                    }
-                }
-
-                // If it's the first import, send welcome/invitation emails to ALL imported students
-                if (isFirstImport && items.Any())
-                {
-                    var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
-                    var semesterName = semester?.SemesterName ?? "Current Semester";
-                    var currentYear = DateTime.Now.Year;
-                    var systemLink = "https://fctms.vercel.app/";
-
-                    foreach (var student in items)
-                    {
-                        try
-                        {
-                            var htmlMessage = EmailTemplateConstants.WhitelistInvitationTemplate
-                                .Replace("{StudentName}", student.FullName)
-                                .Replace("{SemesterName}", semesterName)
-                                .Replace("{CurrentYear}", currentYear.ToString())
-                                .Replace("{SystemLink}", systemLink);
-
-                            await _emailService.SendEmailAsync(student.Email, $"[FCTMS] Chào mừng bạn đến với kỳ đồ án {semesterName}", htmlMessage);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to send welcome email to {email}", student.Email);
-                        }
-                    }
+                    });
                 }
 
                 _logger.LogInformation("Whitelist import completed successfully. File: {fileUrl}, TotalProcessed: {totalProcessed}, UploadedBy: {uploadedBy}", 

@@ -35,33 +35,33 @@ namespace Services
 </div>";
         public const string WhitelistUnqualifiedTemplate = @"
 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;'>
-    <div style='background-color: #ef4444; padding: 20px; text-align: center; color: white;'>
-        <h1 style='margin: 0; font-size: 24px;'>Thông Báo Điều Kiện Tham Gia</h1>
+    <div style='background-color: #f97316; padding: 20px; text-align: center; color: white;'>
+        <h1 style='margin: 0; font-size: 24px;'>Eligibility Notification</h1>
     </div>
     <div style='padding: 30px; background-color: #ffffff;'>
-        <p style='font-size: 16px; color: #333;'>Chào bạn,</p>
-        <p style='font-size: 16px; color: #555; line-height: 1.5;'>Hệ thống xin thông báo bạn hiện <strong>không đủ điều kiện</strong> tham gia làm đồ án tốt nghiệp trong kỳ học này (<strong>{SemesterName}</strong>).</p>
-        <p style='font-size: 16px; color: #555; line-height: 1.5;'>Nếu bạn tin rằng đây là một sự nhầm lẫn, vui lòng liên hệ với văn phòng đào tạo hoặc Chủ nhiệm bộ môn (HOD) để được hỗ trợ.</p>
+        <p style='font-size: 16px; color: #333;'>Hello,</p>
+        <p style='font-size: 16px; color: #555; line-height: 1.5;'>We would like to inform you that you are currently <strong>not eligible</strong> to participate in the Capstone Project for this semester (<strong>{SemesterName}</strong>).</p>
+        <p style='font-size: 16px; color: #555; line-height: 1.5;'>If you believe this is a mistake, please contact the Academic Office or your Head of Department (HOD) for assistance.</p>
         <div style='margin: 30px 0; text-align: center;'>
-            <a href='{SystemLink}' style='background-color: #ef4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;'>Truy cập hệ thống</a>
+            <a href='{SystemLink}' style='background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;'>Access System</a>
         </div>
-        <p style='font-size: 14px; color: #777;'>Trân trọng,<br>Đội ngũ FCTMS</p>
+        <p style='font-size: 14px; color: #777;'>Best regards,<br>FCTMS Team</p>
     </div>
     <div style='background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; color: #999;'>&copy; {CurrentYear} FCTMS. All rights reserved.</div>
 </div>";
         public const string WhitelistInvitationTemplate = @"
 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;'>
-    <div style='background-color: #22c55e; padding: 20px; text-align: center; color: white;'>
-        <h1 style='margin: 0; font-size: 24px;'>Chào Mừng Đến Với FCTMS</h1>
+    <div style='background-color: #f97316; padding: 20px; text-align: center; color: white;'>
+        <h1 style='margin: 0; font-size: 24px;'>Welcome to FCTMS</h1>
     </div>
     <div style='padding: 30px; background-color: #ffffff;'>
-        <p style='font-size: 16px; color: #333;'>Chào <strong>{StudentName}</strong>,</p>
-        <p style='font-size: 16px; color: #555; line-height: 1.5;'>Chúc mừng bạn đã đủ điều kiện thực hiện đồ án tốt nghiệp trong kỳ học <strong>{SemesterName}</strong>. Thông tin của bạn đã được thêm vào hệ thống Quản lý Đồ án Tốt nghiệp (FCTMS).</p>
-        <p style='font-size: 16px; color: #555; line-height: 1.5;'>Bạn có thể đăng nhập vào hệ thống ngay bây giờ bằng email trường để bắt đầu tìm kiếm nhóm hoặc đề tài.</p>
+        <p style='font-size: 16px; color: #333;'>Dear <strong>{StudentName}</strong>,</p>
+        <p style='font-size: 16px; color: #555; line-height: 1.5;'>Congratulations! You are eligible to undertake the Capstone Project for the semester <strong>{SemesterName}</strong>. Your information has been added to the FCTMS.</p>
+        <p style='font-size: 16px; color: #555; line-height: 1.5;'>You can now log into the system using your school email to start finding a team or a topic.</p>
         <div style='margin: 30px 0; text-align: center;'>
-            <a href='{SystemLink}' style='background-color: #22c55e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;'>Đăng nhập ngay</a>
+            <a href='{SystemLink}' style='background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;'>Log In Now</a>
         </div>
-        <p style='font-size: 14px; color: #777;'>Trân trọng,<br>Đội ngũ FCTMS</p>
+        <p style='font-size: 14px; color: #777;'>Best regards,<br>FCTMS Team</p>
     </div>
     <div style='background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; color: #999;'>&copy; {CurrentYear} FCTMS. All rights reserved.</div>
 </div>";
