@@ -18,19 +18,22 @@ namespace Services
         private readonly ILogger<ImportService> _logger;
         private readonly IRedisService _redisService;
         private readonly ICampusContextService _campusContextService;
+        private readonly IEmailService _emailService;
 
         public ImportService(
             IImportRepository importRepository,
             ISemesterRepository semesterRepository,
             ILogger<ImportService> logger,
             IRedisService redisService,
-            ICampusContextService campusContextService)
+            ICampusContextService campusContextService,
+            IEmailService emailService)
         {
             _importRepository = importRepository;
             _semesterRepository = semesterRepository;
             _logger = logger;
             _redisService = redisService;
             _campusContextService = campusContextService;
+            _emailService = emailService;
         }
 
         public async Task<ImportResult<WhitelistImportDTO>> ImportWhitelistFromExcel(
@@ -114,11 +117,19 @@ namespace Services
                     .ToList();
 
                 int totalProcessed = 0;
+                var existingBatches = await _importRepository.GetImportBatchesBySemesterAsync(semesterId);
+                bool isFirstImport = existingBatches == null || !existingBatches.Any();
+
+                var unqualifiedEmailsToNotify = new List<string>();
                 foreach (var semesterGroup in items.GroupBy(item => item.SemesterId!.Value))
                 {
                     try
                     {
-                        await _importRepository.ReconcileSemesterAsync(semesterGroup.Key, semesterGroup.ToList(), studentRoleId, now);
+                        var unqualified = await _importRepository.ReconcileSemesterAsync(semesterGroup.Key, semesterGroup.ToList(), studentRoleId, now);
+                        if (unqualified != null && unqualified.Any())
+                        {
+                            unqualifiedEmailsToNotify.AddRange(unqualified);
+                        }
                         totalProcessed += semesterGroup.Count();
                         _logger.LogInformation("Successfully reconciled {count} whitelist rows for semester {semesterId}", semesterGroup.Count(), semesterGroup.Key);
                     }
@@ -126,6 +137,59 @@ namespace Services
                     {
                         _logger.LogError(ex, "Failed to reconcile whitelist import for semester {semesterId}. Entire import was rolled back.", semesterGroup.Key);
                         throw;
+                    }
+                }
+
+                // Send email notifications to students who are no longer qualified
+                if (unqualifiedEmailsToNotify.Any())
+                {
+                    var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
+                    var semesterName = semester?.SemesterName ?? "Current Semester";
+                    var currentYear = DateTime.Now.Year;
+                    var systemLink = "https://fctms.vercel.app/"; // Should ideally come from config
+
+                    foreach (var email in unqualifiedEmailsToNotify.Distinct())
+                    {
+                        try
+                        {
+                            var htmlMessage = EmailTemplateConstants.WhitelistUnqualifiedTemplate
+                                .Replace("{SemesterName}", semesterName)
+                                .Replace("{CurrentYear}", currentYear.ToString())
+                                .Replace("{SystemLink}", systemLink);
+
+                            await _emailService.SendEmailAsync(email, $"[FCTMS] Thông báo điều kiện tham gia kỳ {semesterName}", htmlMessage);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to send unqualified notification email to {email}", email);
+                        }
+                    }
+                }
+
+                // If it's the first import, send welcome/invitation emails to ALL imported students
+                if (isFirstImport && items.Any())
+                {
+                    var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
+                    var semesterName = semester?.SemesterName ?? "Current Semester";
+                    var currentYear = DateTime.Now.Year;
+                    var systemLink = "https://fctms.vercel.app/";
+
+                    foreach (var student in items)
+                    {
+                        try
+                        {
+                            var htmlMessage = EmailTemplateConstants.WhitelistInvitationTemplate
+                                .Replace("{StudentName}", student.FullName)
+                                .Replace("{SemesterName}", semesterName)
+                                .Replace("{CurrentYear}", currentYear.ToString())
+                                .Replace("{SystemLink}", systemLink);
+
+                            await _emailService.SendEmailAsync(student.Email, $"[FCTMS] Chào mừng bạn đến với kỳ đồ án {semesterName}", htmlMessage);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to send welcome email to {email}", student.Email);
+                        }
                     }
                 }
 

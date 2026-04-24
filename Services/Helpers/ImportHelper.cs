@@ -50,10 +50,10 @@ namespace Services.Helpers
                 [NormalizeHeaderKey("Full Name")] = CampusConstants.WhitelistImportColumns.FullName,
             };
 
-            const int headerRow = 3;
-            const int dataStartRow = 4;
+            const int headerRow = 1;
+            const int dataStartRow = 2;
 
-            for (int col = 2; col <= worksheet.Dimension.End.Column; col++)
+            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
             {
                 var rawHeader = worksheet.Cells[headerRow, col].Text;
                 if (string.IsNullOrWhiteSpace(rawHeader))

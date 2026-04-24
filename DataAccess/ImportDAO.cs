@@ -45,7 +45,7 @@ namespace DataAccess
                 .ToListAsync();
         }
 
-        public async Task ReconcileSemesterAsync(int semesterId, List<WhitelistImportDTO> importedItems, int studentRoleId, DateTime now)
+        public async Task<List<string>> ReconcileSemesterAsync(int semesterId, List<WhitelistImportDTO> importedItems, int studentRoleId, DateTime now)
         {
             IDbContextTransaction? transaction = null;
             var providerName = _context.Database.ProviderName ?? string.Empty;
@@ -176,6 +176,7 @@ namespace DataAccess
                 var semester = await _context.Semesters.FindAsync(semesterId);
                 var isActiveSemester = CampusConstants.SemesterStatus.IsOpenStage(semester?.Status);
 
+                var unqualifiedEmails = new List<string>();
                 if (isStudentRole && isActiveSemester)
                 {
                     var usersToDeactivate = existingUsers.Where(u => !matchedUserIds.Contains(u.UserId)).ToList();
@@ -187,6 +188,10 @@ namespace DataAccess
                     var whitelistsToMark = existingWhitelistsInSemester.Where(w => !matchedWhitelistIds.Contains(w.WhitelistId)).ToList();
                     foreach (var whitelistToMark in whitelistsToMark)
                     {
+                        if (whitelistToMark.Status == CampusConstants.WhitelistStatus.Qualified)
+                        {
+                            unqualifiedEmails.Add(whitelistToMark.Email);
+                        }
                         whitelistToMark.Status = CampusConstants.WhitelistStatus.Unqualified;
                     }
 
@@ -221,6 +226,8 @@ namespace DataAccess
                 {
                     await transaction.CommitAsync();
                 }
+
+                return unqualifiedEmails;
             }
             catch
             {
