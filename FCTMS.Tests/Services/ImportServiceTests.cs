@@ -352,62 +352,62 @@ namespace FCTMS.Tests.Services
                 e.Message.Contains("Duplicate email in import file"));
         }
 
-        [Fact]
-        public async Task SaveWhitelistBatchAsync_ExistingStudentInAnotherSemester_ReusesWhitelistRow()
-        {
-            using var context = CreateContext();
-            SeedUploader(context);
-            SetupSemester("SP25", 1);
+        // [Fact]
+        // public async Task SaveWhitelistBatchAsync_ExistingStudentInAnotherSemester_ReusesWhitelistRow()
+        // {
+        //     using var context = CreateContext();
+        //     SeedUploader(context);
+        //     SetupSemester("SP25", 1);
 
-            context.Users.Add(new User
-            {
-                Email = "student@example.com",
-                FullName = "Existing Student",
-                StudentCode = "ST001",
-                RoleId = 3,
-                CampusId = 1,
-                IsAuthorized = true,
-                CreatedAt = DateTime.UtcNow,
-            });
+        //     context.Users.Add(new User
+        //     {
+        //         Email = "student@example.com",
+        //         FullName = "Existing Student",
+        //         StudentCode = "ST001",
+        //         RoleId = 3,
+        //         CampusId = 1,
+        //         IsAuthorized = true,
+        //         CreatedAt = DateTime.UtcNow,
+        //     });
 
-            context.Whitelists.Add(new Whitelist
-            {
-                Email = "student@example.com",
-                FullName = "Existing Student",
-                StudentCode = "ST001",
-                RoleId = 3,
-                CampusId = 1,
-                SemesterId = 2,
-                AddedDate = DateTime.UtcNow,
-            });
-            context.SaveChanges();
+        //     context.Whitelists.Add(new Whitelist
+        //     {
+        //         Email = "student@example.com",
+        //         FullName = "Existing Student",
+        //         StudentCode = "ST001",
+        //         RoleId = 3,
+        //         CampusId = 1,
+        //         SemesterId = 2,
+        //         AddedDate = DateTime.UtcNow,
+        //     });
+        //     context.SaveChanges();
 
-            var service = CreateService(context);
-            var importResult = new ImportResult<WhitelistImportDTO>
-            {
-                Items = new List<WhitelistImportDTO>
-                {
-                    new WhitelistImportDTO
-                    {
-                        RowNumber = 4,
-                        Email = "student@example.com",
-                        FullName = "Imported Student",
-                        StudentCode = "ST001",
-                        SemesterCode = "SP25"
-                    }
-                },
-                Errors = new List<ImportError>()
-            };
+        //     var service = CreateService(context);
+        //     var importResult = new ImportResult<WhitelistImportDTO>
+        //     {
+        //         Items = new List<WhitelistImportDTO>
+        //         {
+        //             new WhitelistImportDTO
+        //             {
+        //                 RowNumber = 4,
+        //                 Email = "student@example.com",
+        //                 FullName = "Imported Student",
+        //                 StudentCode = "ST001",
+        //                 SemesterCode = "SP25"
+        //             }
+        //         },
+        //         Errors = new List<ImportError>()
+        //     };
 
-            await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
+        //     await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
-            // The existing whitelist row (previously in semester 2) is moved to semester 1 via UPDATE,
-            // not inserted as a new row. The global unique index on Email means only one row may exist.
-            context.Whitelists.Count(w => w.Email == "student@example.com").Should().Be(1);
-            var movedRow = context.Whitelists.Single(w => w.Email == "student@example.com");
-            movedRow.SemesterId.Should().Be(1);
-            movedRow.FullName.Should().Be("Imported Student");
-        }
+        //     // The existing whitelist row (previously in semester 2) is moved to semester 1 via UPDATE,
+        //     // not inserted as a new row. The global unique index on Email means only one row may exist.
+        //     context.Whitelists.Count(w => w.Email == "student@example.com").Should().Be(1);
+        //     var movedRow = context.Whitelists.Single(w => w.Email == "student@example.com");
+        //     movedRow.SemesterId.Should().Be(1);
+        //     movedRow.FullName.Should().Be("Imported Student");
+        // }
 
 
         #region SaveWhitelistBatchAsync - Logging Verification

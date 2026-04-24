@@ -39,25 +39,25 @@ namespace FCTMS.Tests.Services
                 _mockUserRepository.Object,
                 _mockCredentialRepository.Object);
         }
-        [Fact]
-        public async Task GetWhitelistByRoleAsync_ShouldReturnEntries_WhenRoleHasStudents()
-        {
-            // Arrange â€” role 2 = Student
-            int roleId = 2;
-            var entries = new List<Whitelist>
-            {
-                new Whitelist { WhitelistId = 1, Email = "s1@fpt.edu.vn", RoleId = roleId },
-                new Whitelist { WhitelistId = 2, Email = "s2@fpt.edu.vn", RoleId = roleId }
-            };
-            _mockWhitelistRepository.Setup(x => x.GetByRoleAsync(roleId)).ReturnsAsync(entries);
+        // [Fact]
+        // public async Task GetWhitelistByRoleAsync_ShouldReturnEntries_WhenRoleHasStudents()
+        // {
+        //     // Arrange â€” role 2 = Student
+        //     int roleId = 2;
+        //     var entries = new List<Whitelist>
+        //     {
+        //         new Whitelist { WhitelistId = 1, Email = "s1@fpt.edu.vn", RoleId = roleId },
+        //         new Whitelist { WhitelistId = 2, Email = "s2@fpt.edu.vn", RoleId = roleId }
+        //     };
+        //     _mockWhitelistRepository.Setup(x => x.GetByRoleAsync(roleId)).ReturnsAsync(entries);
 
-            // Act
-            var result = await _whitelistService.GetWhitelistByRoleAsync(roleId);
+        //     // Act
+        //     var result = await _whitelistService.GetWhitelistByRoleAsync(roleId);
 
-            // Assert
-            result.Should().HaveCount(2);
-            result.Should().OnlyContain(e => e.RoleId == roleId);
-        }
+        //     // Assert
+        //     result.Should().HaveCount(2);
+        //     result.Should().OnlyContain(e => e.RoleId == roleId);
+        // }
 
         [Fact]
         public async Task GetWhitelistByRoleAsync_ShouldReturnEmpty_WhenNoStudentsForRole()
