@@ -396,9 +396,12 @@ namespace FCTMS.Tests.Services
 
             await service.SaveWhitelistBatchAsync(importResult, 1, "test-file.xlsx", "test-file.xlsx", "hod@example.com");
 
-            context.Whitelists.Count(w => w.Email == "student@example.com").Should().Be(2);
-            context.Whitelists.Single(w => w.Email == "student@example.com" && w.SemesterId == 1).FullName.Should().Be("Imported Student");
-            context.Whitelists.Single(w => w.Email == "student@example.com" && w.SemesterId == 2).FullName.Should().Be("Existing Student");
+            // The existing whitelist row (previously in semester 2) is moved to semester 1 via UPDATE,
+            // not inserted as a new row. The global unique index on Email means only one row may exist.
+            context.Whitelists.Count(w => w.Email == "student@example.com").Should().Be(1);
+            var movedRow = context.Whitelists.Single(w => w.Email == "student@example.com");
+            movedRow.SemesterId.Should().Be(1);
+            movedRow.FullName.Should().Be("Imported Student");
         }
 
 

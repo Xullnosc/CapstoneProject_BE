@@ -74,18 +74,24 @@ namespace DataAccess
                     .Where(w => w.SemesterId == semesterId && w.RoleId == studentRoleId)
                     .ToListAsync();
 
-                // Only match whitelists that belong to the TARGET semester.
-                // Records from ended/other semesters must NOT be updated — a new row is always
-                // created for the current import semester instead.
-                var existingWhitelists = existingWhitelistsInSemester;
-
-                // We still need cross-semester matching emails/codes to load the User rows.
+                // Load whitelist rows from OTHER semesters that match the imported emails/codes.
+                // These are loaded as tracked (no AsNoTracking) so that when the same student is
+                // imported into a new semester, EF can UPDATE their existing row (reassigning SemesterId)
+                // rather than attempting an INSERT that would violate the global unique-email index
+                // (UQ__Whitelis__A9D10534BDF4FDF3) on the Whitelist table.
                 var crossSemesterMatchingWhitelists = await _context.Whitelists
                     .Where(w => w.RoleId == studentRoleId &&
+                                w.SemesterId != semesterId &&   // already in existingWhitelistsInSemester
                                 (importedEmails.Contains(w.Email.ToLower()) ||
                                  (w.StudentCode != null && importedStudentCodes.Contains(w.StudentCode.ToLower()))))
-                    .AsNoTracking()
                     .ToListAsync();
+
+                // Match against both current-semester and cross-semester entries.
+                // Current-semester entries are checked first (FindMatchingWhitelist order).
+                // A cross-semester match will have its SemesterId updated to the target semester.
+                var existingWhitelists = existingWhitelistsInSemester
+                    .Concat(crossSemesterMatchingWhitelists)
+                    .ToList();
 
                 var candidateEmails = importedEmails
                     .Concat(crossSemesterMatchingWhitelists.Select(w => NormalizeEmail(w.Email)))
