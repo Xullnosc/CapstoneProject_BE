@@ -1,129 +1,126 @@
-# FCTMS Backend - .NET Core System
+# FCTMS Backend (.NET 8)
 
-## Overview
-This is the backend source code for the FCTMS (FPT Capstone Topic Management System) project. Built with **.NET 8.0**, this system follows an **N-Tier architecture** to ensure scalability, maintainability, and clear separation of concerns.
+Backend API for the FCTMS (FPT Capstone Topic Management System) project.
 
-## System Requirements
-- **SDK**: [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- **Database**: [MySQL Server](https://dev.mysql.com/downloads/installer/) (v8.0.44)
-- **Migration Tool**: [Flyway Command-line Tool](https://drive.google.com/file/d/1u8jEoIwLmluaFFnbGWtMLWQ9dMAqJ6dZ/view?usp=sharing) (Version **11.13.2**)
-- **IDE**: Visual Studio 2022 or VS Code
+## Tech Stack
+- .NET 8 (ASP.NET Core Web API)
+- MySQL
+- Redis (used by several runtime services, including AI features)
+- Flyway (database migrations)
 
----
+## Solution Layout
+- `CapstoneProject_BE/`: API host (controllers, startup/configuration)
+- `Services/`: business logic
+- `Repositories/`: repository layer
+- `DataAccess/`: DAO and persistence access
+- `BusinessObjects/`: entities, DTOs, shared models
+- `FCTMS.Tests/`: test project
+- `powershell/`: migration and environment helper scripts
 
-## Getting Started
+## Prerequisites
+- .NET SDK 8.0+
+- MySQL 8+
+- Redis 7+
+- Flyway CLI (if you run migrations locally)
 
-### 1. Environment Setup
-Clone the repository and navigate to the backend root directory:
-`..\CapstoneProject_BE`
+## Local Setup
 
-#### Step 1.1: Install Flyway Binary to Environment Variables
-1. Download Flyway version **11.13.2**.
-2. Extract the downloaded folder to a permanent location (e.g., `C:\flyway-11.13.2`).
-3. **Add to PATH (Windows)**:
-   - Press `Win + S` and search for **"Edit the system environment variables"**.
-   - **Environment Variables...** will be displayed.
-   - Under **User variables**, find and select the **Path** variable, then click **Edit...**.
-   - Click **New** and paste the path to the Flyway folder (e.g., `C:\flyway-11.13.2`).
-   - Click **OK** on all windows to save.
-4. Verify by opening a **new** PowerShell window and running:
-   ```powershell
-   flyway -v
-   ```
+### 1. Create local development config
+Create `CapstoneProject_BE/appsettings.Development.json`.
 
-#### Step 1.2: Configure Connection Strings & Environment
-> [!IMPORTANT]
-> The `appsettings.Development.json` file is **git-ignored** for security and must be created manually.
+Use this template and replace values with your local credentials/secrets:
 
-1. Navigate to: `..\CapstoneProject_BE\CapstoneProject_BE\`
-2. Create a new file named **`appsettings.Development.json`**.
-3. Go to the **Discord** server, find the thread **"Flyway file"**, and **copy the content** provided.
-4. **Template Reference**: Your file should look like this (fill in your local credentials):
-   ```json
-   {
-     "ConnectionStrings": {
-       "capstoneDb": "Server=localhost;Database=fctms;User=YourUserName;Password=YourPassword;AutoEnlist=false"
-     }
-   }
-   ```
-5. Open `..\CapstoneProject_BE\powershell\environment-variables.ps1` and ensure the paths match your local environment.
-
----
-
-### 2. Database & Migrations
-We use Flyway to manage database schema versions.
-
-1. **Pre-requisite**: Open your MySQL client and create an empty database named **`fctms`**:
-   ```sql
-   CREATE DATABASE fctms;
-   ```
-2. Open PowerShell as Administrator.
-3. Navigate to the `powershell` directory:
-   `..\CapstoneProject_BE\powershell`
-4. Run the migration script:
-   ```powershell
-   ./run-flyway.ps1
-   ```
-   *This script applies all pending migrations to your MySQL database.*
-
----
-
-### 3. EF Core Scaffolding (MySQL)
-To sync your C# Models with the MySQL database schema, run the scaffold command directly.
-
-1. Ensure your database is up-to-date (Step 2).
-2. Open PowerShell and navigate to the **BusinessObjects** project directory:
-   `..\CapstoneProject_BE\BusinessObjects`
-3. **Restore Packages** (Critical: must be done before scaffolding or building):
-   ```powershell
-   dotnet restore
-   ```
-4. Run the following command (replace `User` and `Password` with your credentials):
-   ```powershell
-   dotnet ef dbcontext scaffold "Server=localhost;Database=fctms;UID=Enter_Your_User;PWD=Enter_Your_Password;AutoEnlist=false" Pomelo.EntityFrameworkCore.MySql --output-dir Models --no-onconfiguring
-   ```
-   *This command regenerates the entity models in the `Models` folder within `BusinessObjects`.*
-
----
-
-### 4. Running the Application
-From the project root directory `..\CapstoneProject_BE`:
-```powershell
-dotnet restore
-dotnet build
-dotnet run --project CapstoneProject_BE
-```
-- **API URL**: `http://localhost:7046`
-- **Swagger UI**: `http://localhost:7046/swagger/index.html`
-
----
-
-## Project Structure
-| Layer | Path | Description |
-|-------|------|-------------|
-| **API** | `CapstoneProject_BE/` | Web API Layer (Controllers, Config) |
-| **Services** | `Services/` | Business Logic Layer |
-| **Repositories** | `Repositories/` | Data Access Abstraction |
-| **DataAccess** | `DataAccess/` | EF Core DbContext |
-| **BusinessObjects** | `BusinessObjects/` | POCO Entities & DTOs |
-| **Automation** | `powershell/` | Setup & Migration Scripts |
-
----
-
-## Testing & Deployment
-
-### Deployment
-Dockerfile location: `..\CapstoneProject_BE\Dockerfile`
-```powershell
-docker build -t fctms-backend .
+```json
+{
+  "ConnectionStrings": {
+    "capstoneDb": "Server=localhost;Database=fctms;User=YOUR_USER;Password=YOUR_PASSWORD;AutoEnlist=false"
+  },
+  "Redis": {
+    "Connection": "localhost:6379"
+  },
+  "Jwt": {
+    "Key": "YourSuperSecretKeyForJWTTokenGenerationThatIsAtLeast32CharactersLong",
+    "Issuer": "FCTMSBackend",
+    "Audience": "FCTMSFrontend"
+  },
+  "AllowedOrigins": "http://localhost:5173"
+}
 ```
 
----
+Notes:
+- `Jwt:Key` is required at startup.
+- `ConnectionStrings:capstoneDb` is required by EF Core `DbContext` registration.
 
-## Expected Results
-1. **Database**: Tables created in MySQL `fctms` schema.
-2. **Models**: C# classes generated in `BusinessObjects/Models`.
-3. **Execution**: API running and responding via Swagger UI.
+### 2. Prepare database
+Create database:
+
+```sql
+CREATE DATABASE fctms;
+```
+
+Run Flyway migrations from the backend root:
+
+```powershell
+cd powershell
+./run-flyway.ps1
+```
+
+If needed, update local paths/variables in `powershell/environment-variables.ps1`.
+
+### 3. Run backend API
+From backend root (`Capstone_BE/`):
+
+```powershell
+dotnet restore capstone_be.sln
+dotnet build capstone_be.sln
+dotnet run --project CapstoneProject_BE/capstone_be.csproj --launch-profile http
+```
+
+Default local URL:
+- API: `http://localhost:8080`
+- Swagger: `http://localhost:8080/swagger`
+
+## Tests
+Run all tests:
+
+```powershell
+dotnet test FCTMS.Tests/FCTMS.Tests.csproj
+```
+
+## Docker (Backend + Redis)
+From backend root:
+
+```powershell
+docker compose up --build
+```
+
+Compose file:
+- `docker-compose.yml`
+
+Dockerfile:
+- `Dockerfile`
+
+## AI Module Notes
+AI pipeline documentation is available in:
+- `AI_WORKFLOW.md`
+
+## Troubleshooting
+
+### `dotnet run` exits with code 1
+Check these first:
+1. `CapstoneProject_BE/appsettings.Development.json` exists.
+2. `Jwt:Key`, `Jwt:Issuer`, and `Jwt:Audience` are present.
+3. `ConnectionStrings:capstoneDb` is valid.
+4. Redis is reachable at `Redis:Connection`.
+
+Quick Redis start (Docker):
+
+```powershell
+docker run --name fctms-redis -p 6379:6379 -d redis:7
+```
+
+### Flyway command not found
+Install Flyway CLI and ensure it is in `PATH`, then reopen terminal.
 
 ---
-*Developed for FCTMS Capstone Project.*
+Developed for the FCTMS Capstone project.
