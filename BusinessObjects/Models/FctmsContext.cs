@@ -671,6 +671,9 @@ public partial class FctmsContext : DbContext
 
             entity.HasIndex(e => e.RoleId, "IX_Whitelist_RoleID");
 
+            // Composite unique: one whitelist entry per (Email, Semester).
+            // SemesterId is nullable — global lecturer entries use SemesterId = NULL and
+            // MySQL treats NULL as DISTINCT, so application-layer guards protect those rows.
             entity.HasIndex(e => new { e.Email, e.SemesterId }, "UQ_Whitelist_Email_Semester").IsUnique();
 
             entity.Property(e => e.WhitelistId).HasColumnName("WhitelistID");

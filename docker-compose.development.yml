@@ -1,0 +1,100 @@
+services:
+  mysql:
+    image: mysql:8.0
+    command: ["--lower_case_table_names=1"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD_required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE_required}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD_required}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  flyway:
+    image: redgate/flyway:11-alpine
+    command:
+      - -url=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:?MYSQL_DATABASE_required}?useSSL=false&allowPublicKeyRetrieval=true
+      - -user=root
+      - -password=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD_required}
+      - -connectRetries=60
+      - -connectRetriesInterval=2
+      - -locations=filesystem:/flyway/sql
+      - -baselineOnMigrate=true
+      - migrate
+    volumes:
+      - ./BusinessObjects/db/migrations:/flyway/sql:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: capstone_be:local
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__capstoneDb: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:?MYSQL_DATABASE_required};User=root;Password=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD_required};SslMode=None;AllowPublicKeyRetrieval=True;
+      Redis__Connection: redis:6379
+      ASPNETCORE_ENVIRONMENT: Development
+      # Keep default environment unless you want Development mounted
+      # ASPNETCORE_ENVIRONMENT: Production
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    volumes:
+      - ./CapstoneProject_BE/appsettings.Development.json:/app/appsettings.Development.json:ro
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8080/api
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ../Capstone_FE:/app
+      - frontend-node-modules:/app/node_modules
+
+volumes:
+  frontend-node-modules:
+  mysql-data:
+  redis-data:
+
+# Notes:
+# - This compose file is for local development.
+# - No secret values or credential fallbacks are hardcoded here; provide secrets via environment variables or an untracked .env file.
+# - App secrets are read from CapstoneProject_BE/appsettings.Development.json (mounted read-only into the container).
+# - MySQL is kept internal to Docker to avoid conflicts with a local MySQL already running on port 3306.
+# - MySQL runs with lower_case_table_names=1 in development to support legacy mixed-case migration scripts.
+# - Frontend runs on http://localhost:5173 and targets the backend at http://localhost:8080/api.
+# - Start everything: docker compose -f docker-compose.development.yml --env-file .env up --build

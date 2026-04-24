@@ -489,6 +489,154 @@ namespace FCTMS.Tests.Services
             await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*already in team*");
         }
 
+        [Fact]
+        public async Task ForceCreateTeamAsync_ShouldAutoCreateUser_WhenWhitelistedStudentHasNoUserRecord()
+        {
+            // Arrange
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP26" };
+            var whitelistStudent = new Whitelist
+            {
+                Email = "newstudent@fpt.edu.vn",
+                FullName = "New Student",
+                RoleId = 3,
+                Role = new Role { RoleName = "Student" },
+                CampusId = 1,
+                StudentCode = "SE999999"
+            };
+
+            var dto = new ForceCreateTeamDTO
+            {
+                TeamName = "New Team",
+                SemesterId = 1,
+                LeaderEmail = "newstudent@fpt.edu.vn",
+                MemberEmails = new List<string> { "newstudent@fpt.edu.vn" }
+            };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(1)).ReturnsAsync(semester);
+            _mockUserRepository.Setup(r => r.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
+                .ReturnsAsync(new List<User>());
+            _mockWhitelistRepository.Setup(r => r.GetBySemesterIdAsync(1))
+                .ReturnsAsync(new List<Whitelist> { whitelistStudent });
+            _mockUserRepository.Setup(r => r.AddAsync(It.IsAny<User>()))
+                .ReturnsAsync((User u) =>
+                {
+                    u.UserId = 1234;
+                    u.Role = new Role { RoleName = "Student" };
+                    return u;
+                });
+            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(1234, 1)).ReturnsAsync((Team?)null);
+            _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1)).ReturnsAsync(new List<string>());
+            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) =>
+            {
+                t.TeamId = 1;
+                return t;
+            });
+
+            // Act
+            var result = await _teamService.ForceCreateTeamAsync(hodUserId, dto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.TeamName.Should().Be("New Team");
+            result.MemberCount.Should().Be(1);
+            _mockUserRepository.Verify(r => r.AddAsync(It.Is<User>(u => u.Email == "newstudent@fpt.edu.vn")), Times.Once);
+            _mockTeamRepository.Verify(r => r.CreateAsync(It.Is<Team>(t => t.LeaderId == 1234)), Times.Once);
+        }
+
+        [Fact]
+        public async Task ForceCreateTeamAsync_ShouldHandleTrimmedLeaderEmail()
+        {
+            // Arrange
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP26" };
+            var student = new User { UserId = 100, Email = "s1@fpt.edu.vn", FullName = "Student 1", Role = new Role { RoleName = "Student" } };
+
+            var dto = new ForceCreateTeamDTO
+            {
+                TeamName = "Trim Team",
+                SemesterId = 1,
+                LeaderEmail = "  s1@fpt.edu.vn  ",
+                MemberEmails = new List<string> { "s1@fpt.edu.vn" }
+            };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(1)).ReturnsAsync(semester);
+            _mockUserRepository.Setup(r => r.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
+                .ReturnsAsync(new List<User> { student });
+            _mockWhitelistRepository.Setup(r => r.GetBySemesterIdAsync(1))
+                .ReturnsAsync(new List<Whitelist>
+                {
+                    new Whitelist { Email = "s1@fpt.edu.vn", Role = new Role { RoleName = "Student" }, CampusId = 1 }
+                });
+            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(100, 1)).ReturnsAsync((Team?)null);
+            _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1)).ReturnsAsync(new List<string>());
+            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) =>
+            {
+                t.TeamId = 10;
+                return t;
+            });
+
+            // Act
+            var result = await _teamService.ForceCreateTeamAsync(hodUserId, dto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.TeamId.Should().Be(10);
+            _mockTeamRepository.Verify(r => r.CreateAsync(It.Is<Team>(t => t.LeaderId == 100)), Times.Once);
+        }
+
+        [Fact]
+        public async Task ForceCreateTeamAsync_ShouldFallbackToExistingUser_WhenConcurrentCreateOccurs()
+        {
+            // Arrange
+            int hodUserId = 10;
+            var hodUser = new User { UserId = hodUserId, Role = new Role { RoleName = "HOD" } };
+            var semester = new Semester { SemesterId = 1, SemesterCode = "SP26" };
+            var existingUser = new User { UserId = 200, Email = "race@fpt.edu.vn", FullName = "Race Student", Role = new Role { RoleName = "Student" } };
+
+            var dto = new ForceCreateTeamDTO
+            {
+                TeamName = "Race Team",
+                SemesterId = 1,
+                LeaderEmail = "race@fpt.edu.vn",
+                MemberEmails = new List<string> { "race@fpt.edu.vn" }
+            };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(hodUserId)).ReturnsAsync(hodUser);
+            _mockSemesterRepository.Setup(r => r.GetSemesterByIdAsync(1)).ReturnsAsync(semester);
+            _mockUserRepository.Setup(r => r.GetUsersByEmailsAsync(It.IsAny<List<string>>()))
+                .ReturnsAsync(new List<User>());
+            _mockWhitelistRepository.Setup(r => r.GetBySemesterIdAsync(1))
+                .ReturnsAsync(new List<Whitelist>
+                {
+                    new Whitelist { Email = "race@fpt.edu.vn", FullName = "Race Student", RoleId = 3, CampusId = 1, Role = new Role { RoleName = "Student" } }
+                });
+            _mockUserRepository.Setup(r => r.AddAsync(It.IsAny<User>()))
+                .ThrowsAsync(new Exception("Duplicate key"));
+            _mockUserRepository.Setup(r => r.GetByEmailAsync("race@fpt.edu.vn"))
+                .ReturnsAsync(existingUser);
+            _mockTeamRepository.Setup(r => r.GetTeamByStudentIdAsync(200, 1)).ReturnsAsync((Team?)null);
+            _mockTeamRepository.Setup(r => r.GetTeamCodesBySemesterAsync(1)).ReturnsAsync(new List<string>());
+            _mockTeamRepository.Setup(r => r.CreateAsync(It.IsAny<Team>())).ReturnsAsync((Team t) =>
+            {
+                t.TeamId = 22;
+                return t;
+            });
+
+            // Act
+            var result = await _teamService.ForceCreateTeamAsync(hodUserId, dto);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.TeamId.Should().Be(22);
+            _mockUserRepository.Verify(r => r.GetByEmailAsync("race@fpt.edu.vn"), Times.Once);
+            _mockTeamRepository.Verify(r => r.CreateAsync(It.Is<Team>(t => t.LeaderId == 200)), Times.Once);
+        }
+
         #endregion
     }
 }

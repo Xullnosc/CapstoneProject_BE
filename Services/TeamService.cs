@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Transactions;
 using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
@@ -545,14 +546,17 @@ namespace Services
             if (hodUser == null || hodUser.Role?.RoleName != CampusConstants.Roles.HOD)
                 throw new UnauthorizedAccessException("Only Head of Department can force-create teams.");
 
+            if (dto.MemberEmails == null || !dto.MemberEmails.Any())
+                throw new ArgumentException("Members list cannot be empty.");
+
+            var normalizedLeaderEmail = dto.LeaderEmail?.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedLeaderEmail))
+                throw new ArgumentException("Leader email is required.");
+
             // 2. Validate Semester
             var semester = await _semesterRepository.GetSemesterByIdAsync(dto.SemesterId);
             if (semester == null)
                 throw new KeyNotFoundException($"Semester {dto.SemesterId} not found.");
-
-            // 3. Validate LeaderEmail is in MemberEmails
-            if (!dto.MemberEmails.Contains(dto.LeaderEmail))
-                throw new ArgumentException("Leader must be included in the members list.");
 
             // 4. Resolve emails to users and validate
             var uniqueEmails = dto.MemberEmails
@@ -561,82 +565,124 @@ namespace Services
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            var users = await _userRepository.GetUsersByEmailsAsync(uniqueEmails);
-            
+            // 3. Validate LeaderEmail is in MemberEmails
+            if (!uniqueEmails.Contains(normalizedLeaderEmail, StringComparer.OrdinalIgnoreCase))
+                throw new ArgumentException("Leader must be included in the members list.");
+
             var semesterWhitelists = await _whitelistRepository.GetBySemesterIdAsync(dto.SemesterId);
-            var whitelistedStudentEmails = new HashSet<string>(
-                semesterWhitelists
-                    .Where(w => !string.IsNullOrEmpty(w.Email) && w.Role?.RoleName == CampusConstants.Roles.Student)
-                    .Select(w => w.Email.ToLower().Trim()),
-                StringComparer.OrdinalIgnoreCase
-            );
+            var whitelistedStudentsByEmail = semesterWhitelists
+                .Where(w => !string.IsNullOrWhiteSpace(w.Email) && w.Role?.RoleName == CampusConstants.Roles.Student)
+                .GroupBy(w => w.Email.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-            foreach (var email in uniqueEmails)
-            {
-                var user = users.FirstOrDefault(u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
-                if (user == null)
-                    throw new ArgumentException($"User with email '{email}' not found.");
-                
-                // Use Whitelist as source of truth for Role in this semester
-                if (!whitelistedStudentEmails.Contains(email))
-                {
-                    throw new ArgumentException($"User {user.FullName ?? user.Email} is not authorized as a student for the semester '{semester.SemesterCode}'. Please check the Whitelist.");
-                }
+            var usersByEmail = (await _userRepository.GetUsersByEmailsAsync(uniqueEmails))
+                .Where(u => !string.IsNullOrWhiteSpace(u.Email))
+                .GroupBy(u => u.Email.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-                var existingTeam = await _teamRepository.GetTeamByStudentIdAsync(user.UserId, dto.SemesterId);
-                if (existingTeam != null)
-                    throw new InvalidOperationException($"Student {user.FullName ?? user.Email} is already in team '{existingTeam.TeamName}'.");
-            }
-
-            // 5. Find leader user
-            var leader = users.First(u => string.Equals(u.Email, dto.LeaderEmail, StringComparison.OrdinalIgnoreCase));
-
-            // 6. Generate TeamCode
-            string teamCode = await GenerateTeamCodeAsync(dto.SemesterId, semester.SemesterCode);
-
-            // 7. Validate member count and set status
-            if (uniqueEmails.Count > 5)
-                throw new ArgumentException("A team can have at most 5 members.");
-
-            bool isSpecial = uniqueEmails.Count < 4;
-            // Force-created teams are typically Qualified if they are special or meet min count
-            string status = CampusConstants.TeamStatus.Active; 
-
-            var campusId = _campusContextService.GetCurrentCampusId() 
+            var campusId = _campusContextService.GetCurrentCampusId()
                 ?? throw new InvalidOperationException("Yêu cầu Campus Context hợp lệ. HOD hãy chọn Campus cụ thể.");
 
-            // 8. Create Team
-            var team = new Team
-            {
-                CampusId = campusId,
-                TeamCode = teamCode,
-                TeamName = dto.TeamName,
-                Description = dto.Description ?? "Team created by HOD.",
-                TeamAvatar = "https://ui-avatars.com/api/?name=" + Uri.EscapeDataString(dto.TeamName) + "&background=random&color=fff",
-                SemesterId = dto.SemesterId,
-                LeaderId = leader.UserId,
-                Status = status,
-                IsSpecial = isSpecial,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
+            Team createdTeam;
+            List<User> resolvedUsers;
 
-            // 9. Add all members
-            foreach (var user in users)
+            using (var tx = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
             {
-                team.Teammembers.Add(new Teammember
+                foreach (var email in uniqueEmails)
                 {
-                    StudentId = user.UserId,
-                    Role = user.UserId == leader.UserId ? CampusConstants.TeamRole.Leader : CampusConstants.TeamRole.Member,
-                    JoinedAt = DateTime.UtcNow
-                });
-            }
+                    if (!whitelistedStudentsByEmail.TryGetValue(email, out var whitelistStudent))
+                    {
+                        throw new ArgumentException($"User with email '{email}' is not authorized as a student for the semester '{semester.SemesterCode}'. Please check the Whitelist.");
+                    }
 
-            var createdTeam = await _teamRepository.CreateAsync(team);
+                    if (!usersByEmail.TryGetValue(email, out var user))
+                    {
+                        // Student can be in whitelist before first login. Create a user record so team membership can reference UserId.
+                        try
+                        {
+                            user = await _userRepository.AddAsync(new User
+                            {
+                                Email = whitelistStudent.Email,
+                                FullName = whitelistStudent.FullName,
+                                Avatar = whitelistStudent.Avatar,
+                                RoleId = whitelistStudent.RoleId,
+                                StudentCode = whitelistStudent.StudentCode,
+                                CampusId = whitelistStudent.CampusId,
+                                IsAuthorized = true,
+                                CreatedAt = DateTime.UtcNow
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            // Handle concurrent requests creating the same user by reloading from DB.
+                            user = await _userRepository.GetByEmailAsync(whitelistStudent.Email.Trim());
+                            if (user == null)
+                            {
+                                throw new InvalidOperationException($"Failed to prepare user '{email}' for force-create team.", ex);
+                            }
+                        }
+
+                        usersByEmail[email] = user;
+                    }
+
+                    var existingTeam = await _teamRepository.GetTeamByStudentIdAsync(user.UserId, dto.SemesterId);
+                    if (existingTeam != null)
+                        throw new InvalidOperationException($"Student {user.FullName ?? user.Email} is already in team '{existingTeam.TeamName}'.");
+                }
+
+                resolvedUsers = uniqueEmails
+                    .Select(email => usersByEmail[email])
+                    .ToList();
+
+                // 5. Find leader user
+                var leader = resolvedUsers.First(u => string.Equals(u.Email, normalizedLeaderEmail, StringComparison.OrdinalIgnoreCase));
+
+                // 6. Generate TeamCode
+                string teamCode = await GenerateTeamCodeAsync(dto.SemesterId, semester.SemesterCode);
+
+                // 7. Validate member count and set status
+                if (uniqueEmails.Count > 5)
+                    throw new ArgumentException("A team can have at most 5 members.");
+
+                bool isSpecial = uniqueEmails.Count < 4;
+                // Force-created teams are typically Qualified if they are special or meet min count
+                string status = CampusConstants.TeamStatus.Active;
+
+                // 8. Create Team
+                var team = new Team
+                {
+                    CampusId = campusId,
+                    TeamCode = teamCode,
+                    TeamName = dto.TeamName,
+                    Description = dto.Description ?? "Team created by HOD.",
+                    TeamAvatar = "https://ui-avatars.com/api/?name=" + Uri.EscapeDataString(dto.TeamName) + "&background=random&color=fff",
+                    SemesterId = dto.SemesterId,
+                    LeaderId = leader.UserId,
+                    Status = status,
+                    IsSpecial = isSpecial,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                // 9. Add all members
+                foreach (var user in resolvedUsers)
+                {
+                    team.Teammembers.Add(new Teammember
+                    {
+                        StudentId = user.UserId,
+                        Role = user.UserId == leader.UserId ? CampusConstants.TeamRole.Leader : CampusConstants.TeamRole.Member,
+                        JoinedAt = DateTime.UtcNow
+                    });
+                }
+
+                createdTeam = await _teamRepository.CreateAsync(team);
+
+                tx.Complete();
+            }
             await _semesterService.InvalidateSemesterCacheAsync(dto.SemesterId);
 
             // Notify all members
-            var memberIds = users.Select(u => u.UserId).ToList();
+            var memberIds = resolvedUsers.Select(u => u.UserId).ToList();
             await _notificationService.CreateBulkNotificationsAsync(
                 memberIds,
                 NotificationType.TeamInvitation.ToString(),
