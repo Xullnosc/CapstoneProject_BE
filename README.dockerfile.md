@@ -66,25 +66,25 @@ Optional improvements
 - Pin specific SDK/runtime patch versions if reproducible builds are required (e.g., `8.0.8` instead of `8.0`).
 - Add labels with image metadata (maintainer, version).
 
-If you'd like, I can add a `docker-compose.yml` for local development, a `healthcheck`, or update CI build steps to build/push this image.
+If you'd like, I can add a `docker-compose.development.yml` for local development, a `healthcheck`, or update CI build steps to build/push this image.
 
 Docker Compose
 
-- A sample `docker-compose.yml` is included at the repository root. It builds the image from the `Dockerfile`, maps host port `8080` to container port `8080`, and passes common JWT env vars as placeholders.
+- A sample `docker-compose.development.yml` is included at the repository root for local development. It builds the image from the `Dockerfile`, maps host port `8080` to container port `8080`, and expects secrets from environment variables or an untracked `.env` file.
 
 - Usage (from repository root):
 
 ```powershell
-docker compose up --build
+docker compose -f docker-compose.development.yml --env-file .env up --build
 ```
 
 - To run in background:
 
 ```powershell
-docker compose up -d --build
+docker compose -f docker-compose.development.yml --env-file .env up -d --build
 ```
 
-- Override environment variables by creating a `.env` file with `JWT_KEY`, `JWT_ISSUER`, and `JWT_AUDIENCE`, or set them in your shell before running compose.
+- Provide required environment variables in an untracked `.env` file (for example `MYSQL_ROOT_PASSWORD`), or set them in your shell before running compose.
 
 - If you need HTTPS inside the container, mount a `.pfx` into `/https/aspnetapp.pfx` and set `ASPNETCORE_Kestrel__Certificates__Default__Password` (do not bake secrets in the image).
 
