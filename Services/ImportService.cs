@@ -7,6 +7,7 @@ using BusinessObjects.Models;
 using Microsoft.Extensions.Logging;
 using Repositories;
 using Services.Helpers;
+using Microsoft.Extensions.DependencyInjection;
 using BusinessObjects.Interfaces;
 
 namespace Services
@@ -18,19 +19,25 @@ namespace Services
         private readonly ILogger<ImportService> _logger;
         private readonly IRedisService _redisService;
         private readonly ICampusContextService _campusContextService;
+        private readonly IEmailService _emailService;
+        private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory _scopeFactory;
 
         public ImportService(
             IImportRepository importRepository,
             ISemesterRepository semesterRepository,
             ILogger<ImportService> logger,
             IRedisService redisService,
-            ICampusContextService campusContextService)
+            ICampusContextService campusContextService,
+            IEmailService emailService,
+            Microsoft.Extensions.DependencyInjection.IServiceScopeFactory scopeFactory)
         {
             _importRepository = importRepository;
             _semesterRepository = semesterRepository;
             _logger = logger;
             _redisService = redisService;
             _campusContextService = campusContextService;
+            _emailService = emailService;
+            _scopeFactory = scopeFactory;
         }
 
         public async Task<ImportResult<WhitelistImportDTO>> ImportWhitelistFromExcel(
@@ -99,7 +106,7 @@ namespace Services
                 return;
             }
 
-            _logger.LogInformation("Starting whitelist import. File: {fileUrl}, UploadedBy: {uploadedBy}, ItemCount: {itemCount}", 
+            _logger.LogInformation("Starting whitelist import. File: {fileUrl}, UploadedBy: {uploadedBy}, ItemCount: {itemCount}",
                 fileUrl, uploaderEmail, items.Count);
 
             try
@@ -114,11 +121,19 @@ namespace Services
                     .ToList();
 
                 int totalProcessed = 0;
+                var existingBatches = await _importRepository.GetImportBatchesBySemesterAsync(semesterId);
+                bool isFirstImport = existingBatches == null || !existingBatches.Any();
+
+                var unqualifiedEmailsToNotify = new List<string>();
                 foreach (var semesterGroup in items.GroupBy(item => item.SemesterId!.Value))
                 {
                     try
                     {
-                        await _importRepository.ReconcileSemesterAsync(semesterGroup.Key, semesterGroup.ToList(), studentRoleId, now);
+                        var unqualified = await _importRepository.ReconcileSemesterAsync(semesterGroup.Key, semesterGroup.ToList(), studentRoleId, now);
+                        if (unqualified != null && unqualified.Any())
+                        {
+                            unqualifiedEmailsToNotify.AddRange(unqualified);
+                        }
                         totalProcessed += semesterGroup.Count();
                         _logger.LogInformation("Successfully reconciled {count} whitelist rows for semester {semesterId}", semesterGroup.Count(), semesterGroup.Key);
                     }
@@ -128,8 +143,76 @@ namespace Services
                         throw;
                     }
                 }
+                // Pre-fetch basic semester info to avoid needing repository in background thread
+                var semester = await _semesterRepository.GetSemesterByIdAsync(semesterId);
+                var semesterName = semester?.SemesterName ?? "Current Semester";
+                var currentYear = DateTime.Now.Year;
+                var systemLink = "https://fctms.vercel.app/"; // Should ideally come from config
 
-                _logger.LogInformation("Whitelist import completed successfully. File: {fileUrl}, TotalProcessed: {totalProcessed}, UploadedBy: {uploadedBy}", 
+                var hasUnqualified = unqualifiedEmailsToNotify.Any();
+                var hasNewStudents = isFirstImport && items.Any();
+                
+                if (hasUnqualified || hasNewStudents)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            using var scope = _scopeFactory.CreateScope();
+                            var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+                            var logger = scope.ServiceProvider.GetRequiredService<ILogger<ImportService>>();
+
+                            // Send email notifications to students who are no longer qualified
+                            if (hasUnqualified)
+                            {
+                                foreach (var email in unqualifiedEmailsToNotify.Distinct())
+                                {
+                                    try
+                                    {
+                                        var htmlMessage = EmailTemplateConstants.WhitelistUnqualifiedTemplate
+                                            .Replace("{SemesterName}", semesterName)
+                                            .Replace("{CurrentYear}", currentYear.ToString())
+                                            .Replace("{SystemLink}", systemLink);
+
+                                        await emailService.SendEmailAsync(email, $"[FCTMS] Qualification Notice for Semester {semesterName}", htmlMessage);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        logger.LogWarning(ex, "Failed to send unqualified notification email to {email}", email);
+                                    }
+                                }
+                            }
+
+                            // If it's the first import, send welcome/invitation emails to ALL imported students
+                            if (hasNewStudents)
+                            {
+                                foreach (var student in items)
+                                {
+                                    try
+                                    {
+                                        var htmlMessage = EmailTemplateConstants.WhitelistInvitationTemplate
+                                            .Replace("{StudentName}", student.FullName)
+                                            .Replace("{SemesterName}", semesterName)
+                                            .Replace("{CurrentYear}", currentYear.ToString())
+                                            .Replace("{SystemLink}", systemLink);
+
+                                        await emailService.SendEmailAsync(student.Email, $"[FCTMS] Welcome to Capstone Project Semester {semesterName}", htmlMessage);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        logger.LogWarning(ex, "Failed to send welcome email to {email}", student.Email);
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Background email sending task failed.");
+                        }
+                    });
+                }
+
+                _logger.LogInformation("Whitelist import completed successfully. File: {fileUrl}, TotalProcessed: {totalProcessed}, UploadedBy: {uploadedBy}",
                     fileUrl, totalProcessed, uploaderEmail);
 
                 // Save Import Batch Record
@@ -149,7 +232,7 @@ namespace Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Whitelist import failed. File: {fileUrl}, UploadedBy: {uploadedBy}", 
+                _logger.LogError(ex, "Whitelist import failed. File: {fileUrl}, UploadedBy: {uploadedBy}",
                     fileUrl, uploaderEmail);
                 throw;
             }

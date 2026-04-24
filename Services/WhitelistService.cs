@@ -15,9 +15,9 @@ namespace Services
         private readonly ISystemUserCredentialRepository _credentialRepository;
 
         public WhitelistService(
-            IWhitelistRepository whitelistRepository, 
+            IWhitelistRepository whitelistRepository,
             ISemesterRepository semesterRepository,
-            IRedisService redisService, 
+            IRedisService redisService,
             ILecturerRepository lecturerRepository,
             IUserRepository userRepository,
             ISystemUserCredentialRepository credentialRepository)
@@ -32,7 +32,33 @@ namespace Services
 
         public async Task<IEnumerable<Whitelist>> GetWhitelistByRoleAsync(int roleId)
         {
-            return await _whitelistRepository.GetByRoleAsync(roleId);
+            var whitelists = await _whitelistRepository.GetByRoleAsync(roleId);
+            var whitelistList = whitelists.ToList();
+
+            if (!whitelistList.Any()) return whitelistList;
+
+            var emails = whitelistList.Select(w => w.Email?.Trim().ToLowerInvariant()).Where(e => !string.IsNullOrEmpty(e)).Distinct().ToList();
+            var users = await _userRepository.GetUsersByEmailsAsync(emails!);
+            var avatarDict = users
+                .Where(u => !string.IsNullOrEmpty(u.Email))
+                .GroupBy(u => u.Email!.Trim().ToLowerInvariant())
+                .ToDictionary(g => g.Key, g => g.First().Avatar);
+
+            foreach (var w in whitelistList)
+            {
+                if (!string.IsNullOrEmpty(w.Email))
+                {
+                    string emailKey = w.Email.Trim().ToLowerInvariant();
+                    bool hasNoAvatar = string.IsNullOrWhiteSpace(w.Avatar) || w.Avatar == "N/A";
+
+                    if (hasNoAvatar && avatarDict.TryGetValue(emailKey, out var userAvatar) && !string.IsNullOrWhiteSpace(userAvatar))
+                    {
+                        w.Avatar = userAvatar;
+                    }
+                }
+            }
+
+            return whitelistList;
         }
 
         public async Task UpdateReviewerStatusAsync(int whitelistId, bool isReviewer)
@@ -72,7 +98,7 @@ namespace Services
         {
             var semester = await GetRequiredSemesterAsync(whitelist.SemesterId);
             var normalizedEmail = whitelist.Email.Trim();
-            
+
             // 1. Check if an entry already exists specifically in the target semester
             var existingInSemester = await _whitelistRepository.GetByEmailAndSemesterAsync(normalizedEmail, semester.SemesterId);
 
@@ -84,7 +110,7 @@ namespace Services
                 existingInSemester.StudentCode = whitelist.StudentCode;
                 existingInSemester.RoleId = whitelist.RoleId;
                 existingInSemester.Avatar = whitelist.Avatar;
-                
+
                 // If status is provided, use it; otherwise, if it's a student (Role 3), default to Qualified
                 existingInSemester.Status = whitelist.Status ?? (existingInSemester.RoleId == 3 ? "Qualified" : existingInSemester.Status);
                 existingInSemester.CampusId = semester.CampusId;
@@ -97,7 +123,7 @@ namespace Services
             // 2. Not found in specific semester -> Create a NEW entry
             // But first, check if they exist in ANY previous semester to determine qualification/basic info
             var historicalEntry = await _whitelistRepository.GetByEmailAsync(normalizedEmail);
-            
+
             var newEntry = new Whitelist
             {
                 Email = normalizedEmail,
@@ -122,6 +148,7 @@ namespace Services
             }
 
             await _whitelistRepository.AddAsync(newEntry);
+            await SyncUserFromWhitelistAsync(newEntry);
             await InvalidateCache(newEntry.SemesterId);
             return newEntry;
         }
@@ -146,14 +173,66 @@ namespace Services
             existing.SemesterId = semester.SemesterId;
 
             await _whitelistRepository.UpdateAsync(existing);
+            await SyncUserFromWhitelistAsync(existing);
             await InvalidateCache(existing.SemesterId);
         }
+        private async Task SyncUserFromWhitelistAsync(Whitelist whitelist)
+        {
+            if (whitelist == null || string.IsNullOrWhiteSpace(whitelist.Email)) return;
 
+            var email = whitelist.Email.Trim().ToLower();
+            var user = await _userRepository.GetByEmailAsync(email);
+
+            bool isQualified = string.Equals(whitelist.Status, "Qualified", StringComparison.OrdinalIgnoreCase);
+
+            if (user == null)
+            {
+                user = new User
+                {
+                    Email = whitelist.Email,
+                    FullName = whitelist.FullName,
+                    StudentCode = whitelist.StudentCode,
+                    RoleId = whitelist.RoleId,
+                    CampusId = whitelist.CampusId,
+                    IsAuthorized = isQualified,
+                    CreatedAt = DateTime.UtcNow,
+                    Avatar = whitelist.Avatar ?? "N/A"
+                };
+                await _userRepository.AddAsync(user);
+            }
+            else
+            {
+                // Update basic info and authorization status
+                user.FullName = whitelist.FullName ?? user.FullName;
+                user.StudentCode = whitelist.StudentCode ?? user.StudentCode;
+
+                // Only update role if it's currently a student or being set to something higher
+                // (Prevents downgrading HOD/Admin to Student via whitelist if they use same email)
+                if (user.RoleId == 3 || (whitelist.RoleId.HasValue && whitelist.RoleId != 3))
+                {
+                    user.RoleId = whitelist.RoleId ?? user.RoleId;
+                }
+
+                user.CampusId = whitelist.CampusId;
+                user.IsAuthorized = isQualified;
+
+                await _userRepository.UpdateAsync(user);
+            }
+        }
         public async Task DeleteWhitelistAsync(int id)
         {
             var whitelist = await _whitelistRepository.GetByIdAsync(id);
             if (whitelist != null)
             {
+                if (!string.IsNullOrEmpty(whitelist.Email))
+                {
+                    var lecturer = await _lecturerRepository.GetByEmailAsync(whitelist.Email);
+                    if (lecturer != null && lecturer.IsActive)
+                    {
+                        lecturer.IsActive = false;
+                        await _lecturerRepository.UpdateAsync(lecturer);
+                    }
+                }
                 // Delete user's credentials if they exist
                 var user = await _userRepository.GetByEmailAsync(whitelist.Email);
                 if (user != null)
