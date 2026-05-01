@@ -79,6 +79,6 @@ jobs:
       - name: Deploy to Azure Container App
         run: |
           az containerapp update \
-            --name fctmscapstone \
+            --name ${{ secrets.CONTAINER_APP }} \
             --resource-group capstoneResourceGroupNew \
             --image docker.io/${{ secrets.DOCKER_USERNAME }}/capstone_be:2.0
