@@ -205,7 +205,7 @@ namespace DataAccess
 
                         foreach (var userToDeactivate in usersToDeactivate)
                         {
-                            await DeactivateStudentUserAsync(userToDeactivate, studentRoleId);
+                            await DeactivateStudentUserAsync(userToDeactivate, studentRoleId, semesterId);
                         }
                     }
 
@@ -259,11 +259,11 @@ namespace DataAccess
             }
         }
 
-        private async Task DeactivateStudentUserAsync(User user, int studentRoleId)
+        private async Task DeactivateStudentUserAsync(User user, int studentRoleId, int semesterId)
         {
             var relatedTeams = await _context.Teams
                 .Include(t => t.Teammembers)
-                .Where(t => t.LeaderId == user.UserId || t.Teammembers.Any(m => m.StudentId == user.UserId))
+                .Where(t => t.SemesterId == semesterId && (t.LeaderId == user.UserId || t.Teammembers.Any(m => m.StudentId == user.UserId)))
                 .ToListAsync();
 
             foreach (var team in relatedTeams)
