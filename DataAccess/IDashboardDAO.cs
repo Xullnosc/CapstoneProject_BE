@@ -8,5 +8,8 @@ namespace DataAccess
         Task<DashboardStatsDTO> GetDashboardStatsAsync();
 
         Task<LecturerDashboardStatsDTO> GetLecturerDashboardStatsAsync(int userId, bool includeReviewerSection);
+
+        /// <summary>Aggregated cross-campus stats for the Admin dashboard (roles, statuses, trends).</summary>
+        Task<AdminDashboardStatsDTO> GetAdminDashboardStatsAsync();
     }
 }
