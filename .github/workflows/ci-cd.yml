@@ -6,6 +6,11 @@ on:
   push:
     branches: ["master"]
 
+env:
+  IMAGE_NAME: capstone_be
+  CONTAINER_APP: fctmscontainerapp
+  RESOURCE_GROUP: fctms_resourcegroup
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -50,6 +55,7 @@ jobs:
           dotnet test FCTMS.Tests/FCTMS.Tests.csproj \
             --configuration Release \
             --verbosity normal
+
   deploy-test:
     needs: build-test
     runs-on: ubuntu-latest
@@ -67,18 +73,69 @@ jobs:
 
       - name: Build & Push Image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/capstone_be:2.0 .
-          docker push ${{ secrets.DOCKER_USERNAME }}/capstone_be:2.0
+          IMAGE="${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}"
+          SHA_TAG="${IMAGE}:${{ github.sha }}"
+          LATEST_TAG="${IMAGE}:latest"
+
+          docker build \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            -t "${SHA_TAG}" \
+            -t "${LATEST_TAG}" \
+            .
+
+          docker push "${SHA_TAG}"
+          docker push "${LATEST_TAG}"
 
       # ---- Azure ----
       - name: Azure Login
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Container App
         run: |
           az containerapp update \
-            --name fctmscontainerapp \
-            --resource-group fctms_resourcegroup \
-            --image docker.io/${{ secrets.DOCKER_USERNAME }}/capstone_be:2.0
+            --name ${{ env.CONTAINER_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image docker.io/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Verify deployment
+        run: |
+          echo "=== Waiting for new revision to become active ==="
+          for i in $(seq 1 30); do
+            ACTIVE_IMAGE=$(az containerapp show \
+              --name ${{ env.CONTAINER_APP }} \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --query "properties.template.containers[0].image" \
+              --output tsv)
+
+            echo "Attempt ${i}/30 — Active image: ${ACTIVE_IMAGE}"
+
+            if echo "${ACTIVE_IMAGE}" | grep -q "${{ github.sha }}"; then
+              echo "Deployment verified — running image matches commit SHA."
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "::error::Deployment verification timed out. Expected SHA ${{ github.sha }} but got ${ACTIVE_IMAGE}"
+          exit 1
+
+      - name: Show revision details on failure
+        if: failure()
+        run: |
+          echo "=== Active Revisions ==="
+          az containerapp revision list \
+            --name ${{ env.CONTAINER_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --output table
+
+          echo ""
+          echo "=== Container App Logs (last 50 lines) ==="
+          az containerapp logs show \
+            --name ${{ env.CONTAINER_APP }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --type system \
+            --tail 50 || echo "Could not fetch logs"
