@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using BusinessObjects;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
 using OfficeOpenXml;
@@ -21,16 +22,19 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
     private readonly ILecturerRepository _lecturerRepository;
     private readonly IThesisRepository _thesisRepository;
     private readonly IChecklistRepository _checklistRepository;
+    private readonly IWhitelistRepository _whitelistRepository;
 
     public ThesisEvaluationExportService(
         ILecturerRepository lecturerRepository,
         IThesisRepository thesisRepository,
-        IChecklistRepository checklistRepository
+        IChecklistRepository checklistRepository,
+        IWhitelistRepository whitelistRepository
     )
     {
         _lecturerRepository = lecturerRepository;
         _thesisRepository = thesisRepository;
         _checklistRepository = checklistRepository;
+        _whitelistRepository = whitelistRepository;
     }
 
     public async Task<byte[]> GenerateWorkbookAsync(
@@ -56,13 +60,25 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
             : allTheses;
         var checklists = await _checklistRepository.GetAllAsync();
 
+        var whitelistEntries = request.SemesterId.HasValue
+            ? await _whitelistRepository.GetBySemesterIdAsync(request.SemesterId.Value)
+            : new List<Whitelist>();
+        var whitelistStatusByEmail = whitelistEntries
+            .Where(w => !string.IsNullOrWhiteSpace(w.Email))
+            .GroupBy(w => w.Email.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.First().Status,
+                StringComparer.OrdinalIgnoreCase
+            );
+
         using var package = new ExcelPackage();
         var summaryWorksheet = package.Workbook.Worksheets.Add(SummarySheetName);
         var thesisInfoWorksheet = package.Workbook.Worksheets.Add(ThesisInfoSheetName);
 
         WriteSummaryHeaders(summaryWorksheet);
         WriteSummaryRows(summaryWorksheet, reviewerEmails);
-        WriteThesisInfoSheet(thesisInfoWorksheet, theses);
+        WriteThesisInfoSheet(thesisInfoWorksheet, theses, whitelistStatusByEmail);
 
         var thesisList = theses.ToList();
         foreach (var reviewer in reviewerList)
@@ -151,7 +167,11 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         return reviewerKeys;
     }
 
-    private static void WriteThesisInfoSheet(ExcelWorksheet worksheet, IEnumerable<Thesis> theses)
+    private static void WriteThesisInfoSheet(
+        ExcelWorksheet worksheet,
+        IEnumerable<Thesis> theses,
+        IReadOnlyDictionary<string, string?> whitelistStatusByEmail
+    )
     {
         var allTheses = theses.ToList();
 
@@ -165,7 +185,6 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
         WriteThesisInfoHeaders(worksheet, maxRound);
 
         var currentRow = 2;
-        var globalStudentIndex = 0;
 
         foreach (var thesis in allTheses)
         {
@@ -192,10 +211,10 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
                     worksheet.Cells[currentRow, 4].Value = student.FullName;
                     worksheet.Cells[currentRow, 5].Value = student.AccountDetail?.Major;
 
-                    var qualification =
-                        globalStudentIndex % 10 >= 7
-                            ? "Không đủ điều kiện"
-                            : "Đủ điều kiện";
+                    whitelistStatusByEmail.TryGetValue(student.Email, out var whitelistStatus);
+                    var qualification = string.Equals(whitelistStatus, CampusConstants.WhitelistStatus.Qualified, StringComparison.OrdinalIgnoreCase)
+                        ? "Đủ điều kiện"
+                        : "Không đủ điều kiện";
                     worksheet.Cells[currentRow, 12].Value = qualification;
                     if (qualification == "Không đủ điều kiện")
                     {
@@ -207,7 +226,6 @@ public class ThesisEvaluationExportService : IThesisEvaluationExportService
                     }
 
                     currentRow++;
-                    globalStudentIndex++;
                 }
             }
 

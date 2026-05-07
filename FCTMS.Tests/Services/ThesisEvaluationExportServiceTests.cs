@@ -13,6 +13,7 @@ public class ThesisEvaluationExportServiceTests
     private readonly Mock<ILecturerRepository> _lecturerRepository = new();
     private readonly Mock<IThesisRepository> _thesisRepository = new();
     private readonly Mock<IChecklistRepository> _checklistRepository = new();
+    private readonly Mock<IWhitelistRepository> _whitelistRepository = new();
 
     [Fact]
     public async Task GenerateWorkbookAsync_WritesSummarySheetHeadersAndFormulas()
@@ -33,7 +34,8 @@ public class ThesisEvaluationExportServiceTests
         var service = new ThesisEvaluationExportService(
             _lecturerRepository.Object,
             _thesisRepository.Object,
-            _checklistRepository.Object
+            _checklistRepository.Object,
+            _whitelistRepository.Object
         );
 
         var workbookBytes = await service.GenerateWorkbookAsync(
@@ -94,7 +96,8 @@ public class ThesisEvaluationExportServiceTests
         var service = new ThesisEvaluationExportService(
             _lecturerRepository.Object,
             _thesisRepository.Object,
-            _checklistRepository.Object
+            _checklistRepository.Object,
+            _whitelistRepository.Object
         );
 
         var workbookBytes = await service.GenerateWorkbookAsync(
@@ -169,7 +172,8 @@ public class ThesisEvaluationExportServiceTests
         var service = new ThesisEvaluationExportService(
             _lecturerRepository.Object,
             _thesisRepository.Object,
-            _checklistRepository.Object
+            _checklistRepository.Object,
+            _whitelistRepository.Object
         );
 
         var workbookBytes = await service.GenerateWorkbookAsync(
