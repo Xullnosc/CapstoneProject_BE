@@ -25,7 +25,13 @@ namespace Services
 
         private const int PreviousSemesterCount = 2;
         private const double SuspiciousThreshold = 0.40;
-        private const double ReportThreshold = 0.15;
+        // Final filter — a candidate thesis only appears in the result list if its best
+        // chunk pair scores at or above this threshold.
+        private const double ReportThreshold = 0.7;
+        // Lower bound used while collecting scores into the accumulator. Must be lower than
+        // ReportThreshold so AverageTopChunkSimilarity averages a realistic distribution
+        // of scores, not just the handful that already cleared the report threshold.
+        private const double ScoringMinScore = 0.10;
         private const int PreFilterTopK = 60;
         private const int TopKSimilarPerChunk = 5;
         private const int MaxExtractedChars = 30_000;
@@ -225,7 +231,7 @@ namespace Services
                     model,
                     k: TopKSimilarPerChunk,
                     candidateDocumentIds: selectedChunkIds,
-                    minScore: ReportThreshold);
+                    minScore: ScoringMinScore);
 
                 foreach (var match in topSimilar)
                 {
@@ -319,7 +325,7 @@ namespace Services
                 thesisId,
                 source.Title,
                 previousSemesters.Count,
-                candidates.Count,
+                matches.Count,
                 isSuspicious,
                 matches,
                 aiEnriched);
