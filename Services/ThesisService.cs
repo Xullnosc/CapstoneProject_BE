@@ -112,9 +112,7 @@ namespace Services
             
             if (isHodActingForOther)
             {
-                var author = await _userRepository.GetByIdAsync(req.AuthorId!.Value);
-                if (author == null) throw new Exception("Author user not found.");
-                targetUser = author;
+                targetUser = await ResolveTargetUserAsync(req.AuthorId!.Value);
             }
 
             Team? team = null;
@@ -129,7 +127,8 @@ namespace Services
             // Skip multiple-check for HOD-submitted topics or if target is Lecturer/HOD/Admin
             bool isTargetStaff = targetUser.Role?.RoleName == CampusConstants.Roles.Lecturer || 
                                  targetUser.Role?.RoleName == CampusConstants.Roles.HOD || 
-                                 targetUser.Role?.RoleName == CampusConstants.Roles.Admin;
+                                 targetUser.Role?.RoleName == CampusConstants.Roles.Admin ||
+                                 targetUser.RoleId == 1 || targetUser.RoleId == 2;
             
             if (hasActiveThesis && !isTargetStaff)
             {
@@ -318,6 +317,63 @@ namespace Services
         public async Task<IEnumerable<string>> SearchEnterprisesAsync(string query)
         {
             return await _registeredEnterpriseRepository.SearchNamesAsync(query);
+        }
+
+        private async Task<User> ResolveTargetUserAsync(int authorId)
+        {
+            User? author = null;
+            if (authorId < 0)
+            {
+                // Resolve from Shell Account (Negative ID logic from UserService)
+                string? emailToFind = null;
+
+                if (authorId > -1000000)
+                {
+                    // Case 1: From Global Lecturer Pool
+                    var lecturer = await _lecturerRepository.GetByIdAsync(-authorId);
+                    emailToFind = lecturer?.Email;
+                }
+                else
+                {
+                    // Case 2: From Whitelist
+                    var whitelist = await _whitelistRepository.GetByIdAsync(-authorId - 1000000);
+                    emailToFind = whitelist?.Email;
+                }
+
+                if (emailToFind != null)
+                {
+                    author = await _userRepository.GetByEmailAsync(emailToFind);
+                    if (author == null)
+                    {
+                        // Create Shell Account (Reusing logic from MentorInvitationService)
+                        var globalLecturer = await _lecturerRepository.GetByEmailAsync(emailToFind);
+                        var whitelistEntry = await _whitelistRepository.GetByEmailAsync(emailToFind);
+
+                        author = new User
+                        {
+                            Email = emailToFind,
+                            FullName = globalLecturer?.FullName ?? whitelistEntry?.FullName ?? "Lecturer",
+                            Avatar = globalLecturer?.Avatar ?? whitelistEntry?.Avatar ?? "",
+                            RoleId = 2, // Lecturer Role ID
+                            CampusId = globalLecturer?.CampusId ?? whitelistEntry?.CampusId,
+                            IsAuthorized = true,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        author = await _userRepository.AddAsync(author);
+                    }
+                }
+            }
+            else
+            {
+                author = await _userRepository.GetByIdAsync(authorId);
+            }
+
+            if (author == null)
+            {
+                throw new Exception("Author user not found in system, pool, or whitelist.");
+            }
+
+            return author;
         }
 
         #endregion
