@@ -30,6 +30,6 @@ namespace Repositories
         Task<IEnumerable<Thesis>> GetThesesByTeamIdAsync(int teamId);
 
         // Duplication pipeline
-        Task<IEnumerable<Thesis>> GetThesesBySemesterIdsAsync(IEnumerable<int> semesterIds);
+        Task<IEnumerable<Thesis>> GetThesesBySemesterIdsAsync(IEnumerable<int> semesterIds, IEnumerable<string>? statuses = null);
     }
 }
