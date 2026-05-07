@@ -183,12 +183,6 @@ namespace DataAccess
                 var unqualifiedEmails = new List<string>();
                 if (isStudentRole && isActiveSemester)
                 {
-                    var usersToDeactivate = existingUsers.Where(u => !matchedUserIds.Contains(u.UserId)).ToList();
-                    foreach (var userToDeactivate in usersToDeactivate)
-                    {
-                        await DeactivateStudentUserAsync(userToDeactivate, studentRoleId);
-                    }
-
                     var whitelistsToMark = existingWhitelistsInSemester.Where(w => !matchedWhitelistIds.Contains(w.WhitelistId)).ToList();
                     foreach (var whitelistToMark in whitelistsToMark)
                     {
@@ -197,6 +191,22 @@ namespace DataAccess
                             unqualifiedEmails.Add(whitelistToMark.Email);
                         }
                         whitelistToMark.Status = CampusConstants.WhitelistStatus.Unqualified;
+                    }
+
+                    // --- [FIX] Deactivation Logic ---
+                    // Previously, this only checked existingUsers which was limited to candidate emails.
+                    // Now we explicitly find all Users whose whitelist entry just became Unqualified.
+                    if (unqualifiedEmails.Any())
+                    {
+                        var emailsToMatch = unqualifiedEmails.Select(e => e.ToLower()).ToList();
+                        var usersToDeactivate = await _context.Users
+                            .Where(u => u.RoleId == studentRoleId && emailsToMatch.Contains(u.Email.ToLower()))
+                            .ToListAsync();
+
+                        foreach (var userToDeactivate in usersToDeactivate)
+                        {
+                            await DeactivateStudentUserAsync(userToDeactivate, studentRoleId, semesterId);
+                        }
                     }
 
                     // --- Final synchronization pass for team statuses ---
@@ -249,11 +259,11 @@ namespace DataAccess
             }
         }
 
-        private async Task DeactivateStudentUserAsync(User user, int studentRoleId)
+        private async Task DeactivateStudentUserAsync(User user, int studentRoleId, int semesterId)
         {
             var relatedTeams = await _context.Teams
                 .Include(t => t.Teammembers)
-                .Where(t => t.LeaderId == user.UserId || t.Teammembers.Any(m => m.StudentId == user.UserId))
+                .Where(t => t.SemesterId == semesterId && (t.LeaderId == user.UserId || t.Teammembers.Any(m => m.StudentId == user.UserId)))
                 .ToListAsync();
 
             foreach (var team in relatedTeams)
