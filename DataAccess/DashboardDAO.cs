@@ -397,6 +397,85 @@ namespace DataAccess
             };
         }
 
+        /// <summary>
+        /// Builds the full Admin dashboard payload in a single call.
+        /// Admin tokens have no campus_id claim, so EF global query filters let all campus data through.
+        /// </summary>
+        public async Task<AdminDashboardStatsDTO> GetAdminDashboardStatsAsync()
+        {
+            var summary = await GetDashboardStatsAsync();
+
+            // ── Users grouped by role (for pie/doughnut chart) ──
+            var usersByRole = await (
+                from u in _context.Users.AsNoTracking()
+                join r in _context.Roles.AsNoTracking() on u.RoleId equals r.RoleId
+                group u by r.RoleName into g
+                select new RoleDistributionDTO
+                {
+                    Role = g.Key ?? "Unknown",
+                    Count = g.Count()
+                }
+            ).OrderByDescending(x => x.Count).ToListAsync();
+
+            // ── Theses grouped by workflow status (for doughnut chart + progress bars) ──
+            var thesesByStatus = await _context.Theses.AsNoTracking()
+                .GroupBy(t => t.Status ?? "Unknown")
+                .Select(g => new ThesisStatusCountDTO { Status = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ToListAsync();
+
+            // ── Teams & theses per semester (last 8, for grouped bar chart) ──
+            // Fetched newest-first via Take(8), then reversed to chronological order for the chart x-axis.
+            var teamsBySemester = await (
+                from s in _context.Semesters.AsNoTracking()
+                orderby s.StartDate descending
+                select new SemesterTeamCountDTO
+                {
+                    SemesterCode = s.SemesterCode,
+                    TeamCount = _context.Teams.Count(t => t.SemesterId == s.SemesterId),
+                    ThesisCount = _context.Theses.Count(t => t.SemesterId == s.SemesterId)
+                }
+            ).Take(8).ToListAsync();
+            teamsBySemester.Reverse();
+
+            // ── Monthly login activity (last 6 months, for line/area chart) ──
+            // Step 1: GROUP BY on the DB side with raw year/month integers.
+            // Step 2: Format "YYYY-MM" string in C# — avoids MySQL syntax issues
+            //         with string concatenation that Pomelo/EF Core can't translate.
+            var sixMonthsAgo = DateTime.UtcNow.AddMonths(-6);
+            var rawLogins = await _context.AccessLogs.AsNoTracking()
+                .Where(a => a.Action == "Login" && a.IsSuccess && a.CreatedAt >= sixMonthsAgo)
+                .GroupBy(a => new { a.CreatedAt.Year, a.CreatedAt.Month })
+                .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
+                .ToListAsync();
+
+            var monthlyLogins = rawLogins
+                .Select(g => new MonthlyActivityDTO
+                {
+                    Month = $"{g.Year}-{g.Month:D2}",
+                    LoginCount = g.Count
+                })
+                .OrderBy(x => x.Month)
+                .ToList();
+
+            // ── Teams grouped by status (for horizontal bar chart) ──
+            var teamsByStatus = await _context.Teams.AsNoTracking()
+                .GroupBy(t => t.Status ?? "Unknown")
+                .Select(g => new TeamStatusCountDTO { Status = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ToListAsync();
+
+            return new AdminDashboardStatsDTO
+            {
+                Summary = summary,
+                UsersByRole = usersByRole,
+                ThesesByStatus = thesesByStatus,
+                TeamsBySemester = teamsBySemester,
+                MonthlyLogins = monthlyLogins,
+                TeamsByStatus = teamsByStatus
+            };
+        }
+
         private async Task<Semester?> ResolveCurrentSemesterAsync()
         {
             var activeSemester = await _context

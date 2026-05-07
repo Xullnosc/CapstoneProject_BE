@@ -34,6 +34,26 @@ namespace CapstoneProject_BE.Controllers
             }
         }
 
+        /// <summary>
+        /// Returns aggregated system-wide statistics for the Admin dashboard.
+        /// Includes user/role distribution, thesis statuses, semester comparisons,
+        /// login trends (6 months), and team statuses across all campuses.
+        /// </summary>
+        [HttpGet("admin-stats")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<AdminDashboardStatsDTO>> GetAdminDashboardStats()
+        {
+            try
+            {
+                var stats = await _dashboardService.GetAdminDashboardStatsAsync();
+                return Ok(stats);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error retrieving admin dashboard statistics.", details = ex.Message });
+            }
+        }
+
         [HttpGet("lecturer-stats")]
         [Authorize(Roles = "Lecturer,HOD")]
         public async Task<ActionResult<LecturerDashboardStatsDTO>> GetLecturerDashboardStats()
