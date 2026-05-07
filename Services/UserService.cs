@@ -85,6 +85,9 @@ namespace Services
                 // Ensure user has Student role
                 if (w.Role?.RoleName != CampusConstants.Roles.Student && w.RoleId != 3) continue;
 
+                // Only include Qualified students
+                if (!string.Equals(w.Status, CampusConstants.WhitelistStatus.Qualified, System.StringComparison.OrdinalIgnoreCase)) continue;
+
                 var dto = new UserInfoDTO
                 {
                     UserId = existingUser?.UserId ?? -w.WhitelistId, // Use negative id for unique UI key if not logged in
