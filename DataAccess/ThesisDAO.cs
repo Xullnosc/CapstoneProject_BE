@@ -291,15 +291,18 @@ namespace DataAccess
                 .ToListAsync();
         }
 
-        public async Task<IEnumerable<Thesis>> GetThesesBySemesterIdsAsync(IEnumerable<int> semesterIds)
+        public async Task<IEnumerable<Thesis>> GetThesesBySemesterIdsAsync(IEnumerable<int> semesterIds, IEnumerable<string>? statuses = null)
         {
             var ids = semesterIds.ToList();
-            return await _context.Theses
+            var statusList = statuses?.ToList();
+            var query = _context.Theses
                 .AsNoTracking()
-                .Where(t => t.SemesterId.HasValue
-                    && ids.Contains(t.SemesterId.Value)
-                    && t.Status == "Published")
-                .ToListAsync();
+                .Where(t => t.SemesterId.HasValue && ids.Contains(t.SemesterId.Value));
+
+            if (statusList != null && statusList.Count > 0)
+                query = query.Where(t => statusList.Contains(t.Status));
+
+            return await query.ToListAsync();
         }
     }
 }

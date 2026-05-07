@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using BusinessObjects;
 using BusinessObjects.AI.Models;
 using BusinessObjects.DTOs;
 using BusinessObjects.Models;
@@ -109,8 +110,31 @@ namespace Services
             }
 
             // 4. Load candidate theses (exclude source itself)
-            var candidates = (await _thesisRepository.GetThesesBySemesterIdsAsync(semesterIds))
+            //    Current semester: Published + Registered
+            //    Previous semesters: Registered only
+            var previousSemesterIds = previousSemesters.Select(s => s.SemesterId).ToList();
+            var candidateTasks = new List<Task<IEnumerable<Thesis>>>();
+
+            if (referenceSemesterId > 0)
+            {
+                candidateTasks.Add(_thesisRepository.GetThesesBySemesterIdsAsync(
+                    new[] { referenceSemesterId },
+                    new[] { CampusConstants.ThesisStatus.Published, CampusConstants.ThesisStatus.Registered }));
+            }
+
+            if (previousSemesterIds.Count > 0)
+            {
+                candidateTasks.Add(_thesisRepository.GetThesesBySemesterIdsAsync(
+                    previousSemesterIds,
+                    new[] { CampusConstants.ThesisStatus.Registered }));
+            }
+
+            var candidateResults = await Task.WhenAll(candidateTasks);
+            var candidates = candidateResults
+                .SelectMany(r => r)
                 .Where(t => t.ThesisId != thesisId)
+                .GroupBy(t => t.ThesisId)
+                .Select(g => g.First())
                 .ToList();
 
             if (candidates.Count == 0)
