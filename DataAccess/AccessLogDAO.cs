@@ -34,6 +34,15 @@ namespace DataAccess
                 .Take(pageSize)
                 .ToListAsync();
 
+            // Ensure CreatedAt is treated as UTC for proper JSON serialization (adds 'Z' suffix)
+            foreach (var log in logs)
+            {
+                if (log.CreatedAt.Kind == DateTimeKind.Unspecified)
+                {
+                    log.CreatedAt = DateTime.SpecifyKind(log.CreatedAt, DateTimeKind.Utc);
+                }
+            }
+
             return (logs, totalCount);
         }
     }

@@ -444,7 +444,7 @@ namespace DataAccess
             //         with string concatenation that Pomelo/EF Core can't translate.
             var sixMonthsAgo = DateTime.UtcNow.AddMonths(-6);
             var rawLogins = await _context.AccessLogs.AsNoTracking()
-                .Where(a => a.Action == "Login" && a.IsSuccess && a.CreatedAt >= sixMonthsAgo)
+                .Where(a => a.Action.StartsWith("Login") && a.IsSuccess && a.CreatedAt >= sixMonthsAgo)
                 .GroupBy(a => new { a.CreatedAt.Year, a.CreatedAt.Month })
                 .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
                 .ToListAsync();

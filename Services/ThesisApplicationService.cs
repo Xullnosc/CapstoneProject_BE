@@ -60,9 +60,9 @@ namespace Services
 
             // 3.5. Validate: team must have exactly 5 members OR be a special team
             int memberCount = team.Teammembers?.Count ?? 0;
-            if (memberCount < 5 && !team.IsSpecial)
+            if (memberCount < 4 && !team.IsSpecial)
             {
-                throw new InvalidOperationException("Nhóm của bạn phải có đủ 5 thành viên hoặc là nhóm đặc biệt (Special Team) mới có thể đăng ký đề tài.");
+                throw new InvalidOperationException("Nhóm của bạn phải có đủ 4 thành viên hoặc là nhóm đặc biệt (Special Team) mới có thể đăng ký đề tài.");
             }
 
             // 4. Validate: thesis must be Published
