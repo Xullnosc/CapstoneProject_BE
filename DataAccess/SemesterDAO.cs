@@ -232,7 +232,8 @@ namespace DataAccess
             // Filter whitelist students who are NOT in the teamed set
             var query = _context.Whitelists
                 .Include(w => w.Role)
-                .Where(w => w.SemesterId == semesterId && w.RoleId == studentRoleId)
+                .Where(w => w.SemesterId == semesterId && w.RoleId == studentRoleId
+                    && w.Status == CampusConstants.WhitelistStatus.Qualified)
                 .AsNoTracking();
 
             // We need to filter in memory if we use the HashSet

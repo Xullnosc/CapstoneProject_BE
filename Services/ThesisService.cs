@@ -152,7 +152,7 @@ namespace Services
                     );
 
                 if (team.LeaderId != targetUser.UserId)
-                    throw new InvalidOperationException(
+                throw new InvalidOperationException(
                         "Only the team leader can propose a thesis."
                     );
 
