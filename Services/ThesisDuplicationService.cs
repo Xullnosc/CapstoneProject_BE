@@ -113,25 +113,25 @@ namespace Services
             //    Current semester: Published + Registered
             //    Previous semesters: Registered only
             var previousSemesterIds = previousSemesters.Select(s => s.SemesterId).ToList();
-            var candidateTasks = new List<Task<IEnumerable<Thesis>>>();
+            var candidateResults = new List<Thesis>();
 
             if (referenceSemesterId > 0)
             {
-                candidateTasks.Add(_thesisRepository.GetThesesBySemesterIdsAsync(
+                var current = await _thesisRepository.GetThesesBySemesterIdsAsync(
                     new[] { referenceSemesterId },
-                    new[] { CampusConstants.ThesisStatus.Published, CampusConstants.ThesisStatus.Registered }));
+                    new[] { CampusConstants.ThesisStatus.Published, CampusConstants.ThesisStatus.Registered });
+                candidateResults.AddRange(current);
             }
 
             if (previousSemesterIds.Count > 0)
             {
-                candidateTasks.Add(_thesisRepository.GetThesesBySemesterIdsAsync(
+                var previous = await _thesisRepository.GetThesesBySemesterIdsAsync(
                     previousSemesterIds,
-                    new[] { CampusConstants.ThesisStatus.Registered }));
+                    new[] { CampusConstants.ThesisStatus.Registered });
+                candidateResults.AddRange(previous);
             }
 
-            var candidateResults = await Task.WhenAll(candidateTasks);
             var candidates = candidateResults
-                .SelectMany(r => r)
                 .Where(t => t.ThesisId != thesisId)
                 .GroupBy(t => t.ThesisId)
                 .Select(g => g.First())
