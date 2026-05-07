@@ -111,36 +111,35 @@ public class AuthService : IAuthService
                 // 2. Check if user is in whitelist
                 var whitelistEntry = await _whitelistRepository.GetByEmailAsync(email);
 
-                bool isAuthorized = false;
                 if (whitelistEntry == null)
                 {
-                    isAuthorized = false;
+                    throw new UnauthorizedAccessException(await GetSupportContactMessageAsync("Tài khoản của bạn chưa được phân quyền vào hệ thống."));
                 }
-                else if (whitelistEntry.CampusId != targetCampusId.Value)
+                
+                if (whitelistEntry.CampusId != targetCampusId.Value)
                 {
                     var registeredCampusName = CampusConstants.MapIdToFullName(whitelistEntry.CampusId);
                     throw new UnauthorizedAccessException(
                         $"Tài khoản của bạn thuộc cơ sở {registeredCampusName}. Vui lòng chọn đúng cơ sở khi đăng nhập."
                     );
                 }
-                else
-                {
-                    // 2.1 [LIFECYCLE GUARD] Block student login khi kỳ học đã Đóng (Closed)
-                    // Cho phép đăng nhập ở cả Open và In Progress (review giữa kỳ)
-                    if (whitelistEntry.Role?.RoleName == CampusConstants.Roles.Student)
-                    {
-                        if (whitelistEntry.Status == CampusConstants.WhitelistStatus.Unqualified)
-                        {
-                            throw new UnauthorizedAccessException("Bạn không có trong danh sách được phép tham gia kỳ này hoặc trạng thái tài khoản không hợp lệ.");
-                        }
 
-                        if (whitelistEntry.Semester == null || CampusConstants.SemesterStatus.IsClosedStage(whitelistEntry.Semester.Status))
-                        {
-                            throw new UnauthorizedAccessException("Học kỳ bạn tham gia đã kết thúc. Bạn không thể đăng nhập vào hệ thống lúc này.");
-                        }
+                // 2.1 [LIFECYCLE GUARD] Block student login khi kỳ học đã Đóng (Closed)
+                if (whitelistEntry.Role?.RoleName == CampusConstants.Roles.Student)
+                {
+                    if (whitelistEntry.Status == CampusConstants.WhitelistStatus.Unqualified)
+                    {
+                        throw new UnauthorizedAccessException("Bạn không có trong danh sách được phép tham gia kỳ này hoặc trạng thái tài khoản không hợp lệ.");
                     }
-                    isAuthorized = true;
+
+                    if (whitelistEntry.Semester == null || CampusConstants.SemesterStatus.IsClosedStage(whitelistEntry.Semester.Status))
+                    {
+                        throw new UnauthorizedAccessException("Học kỳ bạn tham gia đã kết thúc. Bạn không thể đăng nhập vào hệ thống lúc này.");
+                    }
                 }
+
+                // If we reach here, they are authorized
+                bool isAuthorized = true;
 
                 int? roleId = whitelistEntry?.RoleId;
                 string? studentCode = whitelistEntry?.StudentCode;
