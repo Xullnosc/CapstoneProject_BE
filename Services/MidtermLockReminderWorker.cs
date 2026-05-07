@@ -1,5 +1,6 @@
 using BusinessObjects;
 using BusinessObjects.Models;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -73,6 +74,21 @@ namespace Services
                             string title = "Nhắc nhở: Thực hiện Lock Học Kỳ";
                             string message = $"Hôm nay là ngày được thông báo để lock học kỳ {semester.SemesterCode} cho việc Review Giữa Kỳ. Vui lòng truy cập hệ thống và thực hiện manual lock để chốt học kỳ.";
 
+                            var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+                            string frontendUrl = "http://localhost:5173";
+                            var allowedOrigins = configuration["AllowedOrigins"];
+                            if (!string.IsNullOrEmpty(allowedOrigins))
+                            {
+                                var origins = allowedOrigins.Split(',');
+                                if (origins.Length > 0 && !string.IsNullOrWhiteSpace(origins[0]))
+                                    frontendUrl = origins[0].Trim();
+                            }
+
+                            string emailBody = EmailTemplateConstants.MidtermLockReminderTemplate
+                                .Replace("{SemesterCode}", semester.SemesterCode)
+                                .Replace("{SystemLink}", frontendUrl)
+                                .Replace("{CurrentYear}", DateTime.UtcNow.Year.ToString());
+
                             await notificationService.CreateBulkNotificationsAsync(
                                 userIds,
                                 NotificationType.HODAction.ToString(),
@@ -80,7 +96,8 @@ namespace Services
                                 message,
                                 "Semester",
                                 semester.SemesterId,
-                                sendEmail: true
+                                sendEmail: true,
+                                emailBody: emailBody
                             );
 
                             _logger.LogInformation($"Sent Midterm Lock reminder to {campusHods.Count} HODs for Semester {semester.SemesterCode}.");
