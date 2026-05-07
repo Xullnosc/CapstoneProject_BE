@@ -30,5 +30,10 @@ namespace Services
         {
             return await _dashboardRepository.GetAdminDashboardStatsAsync();
         }
+
+        public async Task<HodDashboardStatsDTO> GetHodDashboardStatsAsync()
+        {
+            return await _dashboardRepository.GetHodDashboardStatsAsync();
+        }
     }
 }

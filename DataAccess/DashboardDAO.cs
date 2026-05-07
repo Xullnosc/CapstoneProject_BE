@@ -476,6 +476,45 @@ namespace DataAccess
             };
         }
 
+        public async Task<HodDashboardStatsDTO> GetHodDashboardStatsAsync()
+        {
+            var summary = await GetDashboardStatsAsync();
+            var semester = await ResolveCurrentSemesterAsync();
+
+            var thesesByStatus = await _context.Theses.AsNoTracking()
+                .GroupBy(t => t.Status ?? "Unknown")
+                .Select(g => new ThesisStatusCountDTO { Status = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ToListAsync();
+
+            var teamsBySemester = await (
+                from s in _context.Semesters.AsNoTracking()
+                orderby s.StartDate descending
+                select new SemesterTeamCountDTO
+                {
+                    SemesterCode = s.SemesterCode,
+                    TeamCount = _context.Teams.Count(t => t.SemesterId == s.SemesterId),
+                    ThesisCount = _context.Theses.Count(t => t.SemesterId == s.SemesterId)
+                }
+            ).Take(8).ToListAsync();
+            teamsBySemester.Reverse();
+
+            var teamsByStatus = await _context.Teams.AsNoTracking()
+                .GroupBy(t => t.Status ?? "Unknown")
+                .Select(g => new TeamStatusCountDTO { Status = g.Key, Count = g.Count() })
+                .OrderByDescending(x => x.Count)
+                .ToListAsync();
+
+            return new HodDashboardStatsDTO
+            {
+                Summary = summary,
+                CurrentSemesterCode = semester?.SemesterCode,
+                ThesesByStatus = thesesByStatus,
+                TeamsBySemester = teamsBySemester,
+                TeamsByStatus = teamsByStatus
+            };
+        }
+
         private async Task<Semester?> ResolveCurrentSemesterAsync()
         {
             var activeSemester = await _context

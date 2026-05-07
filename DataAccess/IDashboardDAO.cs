@@ -11,5 +11,8 @@ namespace DataAccess
 
         /// <summary>Aggregated cross-campus stats for the Admin dashboard (roles, statuses, trends).</summary>
         Task<AdminDashboardStatsDTO> GetAdminDashboardStatsAsync();
+
+        /// <summary>Campus-scoped stats for the HOD dashboard.</summary>
+        Task<HodDashboardStatsDTO> GetHodDashboardStatsAsync();
     }
 }

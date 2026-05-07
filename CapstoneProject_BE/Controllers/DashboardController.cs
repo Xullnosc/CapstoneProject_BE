@@ -54,6 +54,21 @@ namespace CapstoneProject_BE.Controllers
             }
         }
 
+        [HttpGet("hod-stats")]
+        [Authorize(Roles = "HOD,Head of Department")]
+        public async Task<ActionResult<HodDashboardStatsDTO>> GetHodDashboardStats()
+        {
+            try
+            {
+                var stats = await _dashboardService.GetHodDashboardStatsAsync();
+                return Ok(stats);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error retrieving HOD dashboard statistics.", details = ex.Message });
+            }
+        }
+
         [HttpGet("lecturer-stats")]
         [Authorize(Roles = "Lecturer,HOD")]
         public async Task<ActionResult<LecturerDashboardStatsDTO>> GetLecturerDashboardStats()

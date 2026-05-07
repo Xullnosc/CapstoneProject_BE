@@ -11,5 +11,7 @@ namespace Services
 
         /// <summary>Aggregated cross-campus stats for the Admin dashboard.</summary>
         Task<AdminDashboardStatsDTO> GetAdminDashboardStatsAsync();
+
+        Task<HodDashboardStatsDTO> GetHodDashboardStatsAsync();
     }
 }
